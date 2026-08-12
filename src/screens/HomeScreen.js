@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
 import { CoralButton, Field, Logo, OutlinePill, Sheet } from '../components/UI';
+import CodeBoxes from '../components/CodeBoxes';
 import { useStore } from '../store';
 
 const suggestions = [
-  { title: 'Votre album de vacances', sub: 'Partagez vos meilleurs moments de vacances', bg: '#F3E9C8' },
-  { title: 'Fête de famille', sub: 'Rassemblez les meilleurs souvenirs', bg: '#D9E4F5' },
-  { title: 'La 1ère année', sub: 'Immortalisez le premier rire', bg: '#D8EBD8' },
-  { title: 'Moments spéciaux', sub: 'Pour les moments spéciaux de la vie', bg: '#F8DDE4' },
+  { title: 'Votre album de vacances', sub: 'Partagez vos meilleurs moments de vacances', bg: '#D6F0F1' },
+  { title: 'Fête de famille', sub: 'Rassemblez les meilleurs souvenirs', bg: '#F8E3DE' },
+  { title: 'La 1ère année', sub: 'Immortalisez le premier rire', bg: '#E4F4F4' },
+  { title: 'Moments spéciaux', sub: 'Pour les moments spéciaux de la vie', bg: '#FDE8E4' },
 ];
 
 export default function HomeScreen() {
@@ -46,7 +47,7 @@ export default function HomeScreen() {
         {state.albums.map((a) => (
           <TouchableOpacity key={a.id} style={{ marginBottom: 18 }} onPress={() => nav.navigate('Album', { id: a.id })}>
             <View style={styles.cover}>
-              {a.photos[0] ? null : <Text style={styles.coverLogo}>celebrate</Text>}
+              {a.photos[0] ? null : <Logo size={56} />}
             </View>
             <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 8 }}>{a.name}</Text>
             <Text style={{ color: colors.muted }}>{a.photos.length} photo{a.photos.length > 1 ? 's' : ''}</Text>
@@ -70,7 +71,7 @@ export default function HomeScreen() {
       </Sheet>
       <Sheet visible={join} onClose={() => setJoin(false)} title="Rejoindre un album">
         <Text style={{ textAlign: 'center', marginBottom: 12 }}>Entrez le code à 8 chiffres pour rejoindre l'album.</Text>
-        <Field value={code} onChangeText={(t) => setCode(t.slice(0, 8).toUpperCase())} placeholder="Code" />
+          {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
         <CoralButton title="Continuer" disabled={code.length < 8} onPress={() => setJoin(false)} />
       </Sheet>
     </View>

@@ -13,47 +13,11 @@ import { colors } from '../theme';
 export function Logo({ size = 42, color = colors.ink }) {
   return (
     <Text style={{ fontSize: size, color, fontFamily: 'Georgia', fontStyle: 'italic', fontWeight: '500' }}>
-      celebrate
+      SharePix
     </Text>
   );
 }
 
-export function CameraMark({ color = '#fff', size = 72 }) {
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <View
-        style={{
-          width: size * 0.78,
-          height: size * 0.62,
-          borderRadius: size * 0.18,
-          borderWidth: 2.5,
-          borderColor: color,
-        }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          width: size * 0.28,
-          height: size * 0.28,
-          borderRadius: size,
-          borderWidth: 2.5,
-          borderColor: color,
-        }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          top: size * 0.12,
-          right: size * 0.18,
-          width: 6,
-          height: 6,
-          borderRadius: 6,
-          backgroundColor: color,
-        }}
-      />
-    </View>
-  );
-}
 
 export function CoralButton({ title, onPress, disabled, color = colors.coral, textColor = '#fff' }) {
   return (
