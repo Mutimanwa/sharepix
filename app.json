@@ -1,24 +1,25 @@
 {
   "expo": {
-    "name": "celebrate_app",
-    "slug": "celebrate_app",
+    "name": "Celebrate",
+    "slug": "celebrate-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF7A62"
     },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "app.celebrate.sharepix" },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+        "backgroundColor": "#FF7A62",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "package": "app.celebrate.sharepix"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "web": { "favicon": "./assets/favicon.png" },
+    "plugins": ["expo-image-picker"]
   }
 }
