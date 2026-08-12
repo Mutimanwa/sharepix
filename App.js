@@ -2,8 +2,10 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { Home01Icon , Notification03Icon , UserCircle02Icon} from '@hugeicons/core-free-icons'
 import { StatusBar } from 'expo-status-bar';
+import { TabHome, TabBell, TabUser } from './src/components/HomeArt';
 import { StoreProvider } from './src/store';
 import { colors } from './src/theme';
 import SplashScreen from './src/screens/SplashScreen';
@@ -21,7 +23,6 @@ import {
   PremiumScreen,
   PcUploadScreen,
 } from './src/screens/ExtraScreens';
-
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -33,22 +34,35 @@ function Tabs() {
         tabBarActiveTintColor: colors.teal,
         tabBarInactiveTintColor: '#9A9A9A',
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#E4EEEE', height: 62, paddingTop: 6 },
       }}
     >
       <Tab.Screen
         name="Accueil"
         component={HomeScreen}
-        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⌂</Text> }}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <HugeiconsIcon icon={Home01Icon} size={24} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Activités"
         component={ActivitiesScreen}
-        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>🔔</Text> }}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <HugeiconsIcon icon={Notification03Icon} size={24} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Profil"
         component={ProfileScreen}
-        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>☺</Text> }}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <HugeiconsIcon icon={UserCircle02Icon} size={24} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+          ),
+        }}
       />
     </Tab.Navigator>
   );

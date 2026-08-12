@@ -4,6 +4,8 @@
   "main": "index.js",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.9",
+    "@hugeicons/core-free-icons": "^4.2.3",
+    "@hugeicons/react-native": "^1.0.15",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.18.16",
     "@react-navigation/native": "^7.3.16",
