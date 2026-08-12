@@ -1,23 +1,25 @@
 export const colors = {
-  coral: '#FF7A62',
-  coralDark: '#F56B54',
-  orange: '#FFA33A',
-  cream: '#FBF3EB',
+  teal: '#2BA3A8',
+  tealDark: '#164E52',
+  tealDeep: '#0E3A3E',
+  coral: '#E07A6A',
+  coralDark: '#C96556',
+  orange: '#2BA3A8',
+  cream: '#F3F8F8',
   taupe: '#C4B8B0',
   taupeDark: '#A89B93',
   white: '#FFFFFF',
-  ink: '#1C1C1C',
-  muted: '#8C8C8C',
-  light: '#F4F4F5',
-  border: '#E8E8EA',
+  ink: '#164E52',
+  muted: '#6B7C7D',
+  light: '#EEF5F5',
+  border: '#D5E3E3',
   success: '#22C55E',
-  peach: '#FFF1E8',
+  peach: '#E8F6F6',
 };
 
 export const fonts = {
-  script: {
+  brand: {
     fontFamily: 'Georgia',
-    fontStyle: 'italic',
-    fontWeight: '500',
+    fontWeight: '700',
   },
 };

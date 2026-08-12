@@ -1,25 +1,25 @@
 {
   "expo": {
-    "name": "Celebrate",
-    "slug": "celebrate-app",
+    "name": "SharePix",
+    "slug": "sharepix",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/sharepix-logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/sharepix-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FF7A62"
+      "backgroundColor": "#0E3A3E"
     },
-    "ios": { "supportsTablet": true, "bundleIdentifier": "app.celebrate.sharepix" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "app.sharepix.mobile" },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FF7A62",
-        "foregroundImage": "./assets/android-icon-foreground.png"
+        "backgroundColor": "#0E3A3E",
+        "foregroundImage": "./assets/sharepix-logo.png"
       },
-      "package": "app.celebrate.sharepix"
+      "package": "app.sharepix.mobile"
     },
-    "web": { "favicon": "./assets/favicon.png" },
+    "web": { "favicon": "./assets/sharepix-logo.png" },
     "plugins": ["expo-image-picker"]
   }
 }

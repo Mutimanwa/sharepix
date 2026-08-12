@@ -30,7 +30,7 @@ function Tabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.coral,
+        tabBarActiveTintColor: colors.teal,
         tabBarInactiveTintColor: '#9A9A9A',
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       }}
