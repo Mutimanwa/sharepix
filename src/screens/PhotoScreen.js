@@ -9,8 +9,10 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 import { CoralButton } from '../components/UI';
+import BackButton from '../components/BackButton';
 import { useStore } from '../store';
 
 export default function PhotoScreen({ route, navigation }) {
@@ -31,11 +33,9 @@ export default function PhotoScreen({ route, navigation }) {
   }
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root} edges={['top']}>
       <View style={styles.top}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={{ fontSize: 22 }}>‹</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => navigation.goBack()} />
         <View style={{ flex: 1, marginLeft: 8 }}>
           <Text style={{ fontWeight: '700' }}>{state.profile.firstName || 'Vous'}</Text>
           <Text style={{ color: colors.muted, fontSize: 12 }}>il y a quelques secondes</Text>
@@ -111,7 +111,7 @@ export default function PhotoScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -4,22 +4,38 @@
     "slug": "sharepix",
     "version": "1.0.0",
     "orientation": "portrait",
+
     "icon": "./assets/sharepix-logo.png",
+
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/sharepix-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0E3A3E"
+
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.sharepix.mobile"
     },
-    "ios": { "supportsTablet": true, "bundleIdentifier": "app.sharepix.mobile" },
+
     "android": {
+      "package": "app.sharepix.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#0E3A3E",
         "foregroundImage": "./assets/sharepix-logo.png"
-      },
-      "package": "app.sharepix.mobile"
+      }
     },
-    "web": { "favicon": "./assets/sharepix-logo.png" },
-    "plugins": ["expo-image-picker"]
+
+    "web": {
+      "favicon": "./assets/sharepix-logo.png"
+    },
+
+    "plugins": [
+      "expo-image-picker",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E3A3E",
+          "image": "./assets/splash-icon1.png",
+          "imageWidth": 200
+        }
+      ]
+    ]
   }
 }

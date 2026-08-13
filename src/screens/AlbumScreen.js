@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-  ArrowLeft01Icon,
   PreferenceHorizontalIcon,
   Notification03Icon,
   Menu01Icon,
@@ -24,6 +23,7 @@ import {
 import { colors } from '../theme';
 import { CoralButton } from '../components/UI';
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
+import BackButton from '../components/BackButton';
 import { useStore } from '../store';
 
 const TABS = [
@@ -43,9 +43,7 @@ export default function AlbumScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.root}>
         <View style={styles.top}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={10}>
-            
-              <HugeiconsIcon icon={ArrowLeft01Icon} size={24} color={colors.tealDark} /></TouchableOpacity>
+          <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Album</Text>
         </View>
         <View style={styles.center}>
@@ -74,12 +72,7 @@ export default function AlbumScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <View style={styles.top}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12}>
-        <View style={styles.iconBtnContainer} >
-           <HugeiconsIcon icon={ArrowLeft01Icon} size={24} color={colors.tealDark} />
-        </View>
-        </TouchableOpacity>
-
+        <BackButton onPress={() => navigation.goBack()} />
         <View style={styles.headText}>
           <Text style={styles.title} numberOfLines={1}>{album.name}</Text>
           <Text style={styles.meta}>
@@ -182,9 +175,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
-  iconBtn: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
-  iconBtnContainer : {backgroundColor: '#8d8c8c61' ,padding: 10, borderRadius: 50 ,alignItems: 'center', justifyContent: 'center' } ,
-  headText: { flex: 1, marginLeft: 10 },
+  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headText: { flex: 1, marginLeft: 2 },
   title: { fontWeight: '800', fontSize: 18, color: colors.tealDark },
   meta: { color: colors.muted, marginTop: 1 },
   tabs: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#E4EEEE' },
