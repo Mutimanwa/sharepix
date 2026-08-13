@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Rect, Path, Ellipse } from 'react-native-svg';
 
-export function IconVacances({ size = 52 }) {
+export function IconVacances({ size = 80 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Ellipse cx="32" cy="46" rx="20" ry="8" fill="#2BA3A8" />
@@ -12,7 +12,7 @@ export function IconVacances({ size = 52 }) {
   );
 }
 
-export function IconFamille({ size = 52 }) {
+export function IconFamille({ size = 80 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Circle cx="24" cy="22" r="8" fill="#E07A6A" />
@@ -23,7 +23,7 @@ export function IconFamille({ size = 52 }) {
   );
 }
 
-export function IconBebe({ size = 52 }) {
+export function IconBebe({ size = 80 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Circle cx="32" cy="28" r="14" fill="#F4C7BE" />
@@ -35,7 +35,7 @@ export function IconBebe({ size = 52 }) {
   );
 }
 
-export function IconSpecial({ size = 52 }) {
+export function IconSpecial({ size = 80 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Path d="M32 10 L36 24 H51 L39 33 L44 48 L32 39 L20 48 L25 33 L13 24 H28 Z" fill="#E07A6A" />

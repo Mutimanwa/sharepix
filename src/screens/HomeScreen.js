@@ -41,6 +41,7 @@ export default function HomeScreen() {
            <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
         </View>
 
+        {/* Actions Buttons */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actCoral} onPress={() => setCreate(true)} activeOpacity={0.88}>
             <HugeiconsIcon icon={Add01Icon} size={22} color="#fff" strokeWidth={2} />
@@ -59,6 +60,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Idee d'albums */}
         <Text style={styles.h}>Idées d’albums</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
           {suggestions.map((s) => {
@@ -70,11 +72,13 @@ export default function HomeScreen() {
                 onPress={() => {
                   setName(s.title);
                   setCreate(true);
-                }}
-              >
+                }}>
                 <Ico />
-                <Text style={styles.ideaT}>{s.title}</Text>
-                <Text style={styles.ideaS}>{s.sub}</Text>
+                <View style={{ flex: 1 , justifyContent: 'center'}}>
+                   <Text style={styles.ideaT}>{s.title}</Text>
+                  <Text style={styles.ideaS}>{s.sub}</Text>
+                </View>
+               
               </TouchableOpacity>
             );
           })}
@@ -145,7 +149,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.cream },
   header: {
     flexDirection: 'flex',
-    justifyContent: 'space-center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 18,
     paddingTop: 14,
@@ -158,27 +162,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.coral,
     borderRadius: 20,
     padding: 16,
-    minHeight: 112,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   actTeal: {
     flex: 1,
     backgroundColor: colors.tealDark,
     borderRadius: 20,
     padding: 16,
-    minHeight: 112,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   actPlus: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  actTitle: { color: '#fff', fontSize: 17, fontWeight: '800', marginTop: 10 },
+  actTitle: { color: '#fff', fontSize: 17, fontWeight: '800' , marginLeft: 8},
   actHint: { color: 'rgba(255,255,255,0.8)', marginTop: 4, fontSize: 13 },
   h: { fontSize: 18, fontWeight: '800', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
   idea: {
-    width: 148,
+    width: 350,
     borderRadius: 20,
     padding: 14,
     marginLeft: 18,
+    flexDirection: 'row',
+    gap: 15,
   },
-  ideaT: { fontWeight: '800', marginTop: 8, color: colors.tealDark, fontSize: 16 },
-  ideaS: { color: '#5A6E6F', marginTop: 4, fontSize: 12 },
+  ideaT: { fontWeight: '800', color: colors.tealDark, fontSize: 17 },
+  ideaS: { color: '#434848', marginTop: 4, fontSize: 19 },
   rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18 },
   count: {
     marginTop: 10,
