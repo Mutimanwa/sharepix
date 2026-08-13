@@ -18,6 +18,12 @@ export function Logo({ size = 42, color = colors.ink }) {
   );
 }
 
+export function LogoImage({ size = 42 }) {
+  return (
+    <Image source={require('../../assets/sharepix-logo.png')} style={{ width: size, height: size }} />
+  );
+}
+
 
 export function CoralButton({ title, onPress, disabled, color = colors.coral, textColor = '#fff' }) {
   return (

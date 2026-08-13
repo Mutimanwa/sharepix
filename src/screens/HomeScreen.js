@@ -84,6 +84,7 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
+        {/* Albums */}
         <View style={styles.rowHead}>
           <Text style={styles.h}>Mes albums</Text>
           <Text style={styles.count}>{state.albums.length}</Text>
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 },
   album: { width: '50%', padding: 6 },
   cover: {
-    height: 140,
+    height: 210,
     borderRadius: 18,
     backgroundColor: colors.tealDeep,
     alignItems: 'center',
@@ -218,6 +219,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   coverImg: { width: '100%', height: '100%' },
-  albumName: { fontSize: 16, fontWeight: '700', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
+  albumName: { fontSize: 19, fontWeight: '700', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
   albumMeta: { color: colors.muted, paddingHorizontal: 4, marginTop: 2 },
 });

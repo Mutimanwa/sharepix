@@ -33,8 +33,8 @@ function Tabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.teal,
         tabBarInactiveTintColor: '#9A9A9A',
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#E4EEEE', height: 62, paddingTop: 6 },
+        tabBarLabelStyle: { fontSize: 17, fontWeight: '600' },
+        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#E4EEEE', height: 72, paddingTop: 6 },
       }}
     >
       <Tab.Screen
@@ -42,7 +42,7 @@ function Tabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <HugeiconsIcon icon={Home01Icon} size={24} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+            <HugeiconsIcon icon={Home01Icon} size={30} color={color} strokeWidth={focused ? 2.2 : 1.6} />
           ),
         }}
       />
@@ -51,7 +51,7 @@ function Tabs() {
         component={ActivitiesScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <HugeiconsIcon icon={Notification03Icon} size={24} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+            <HugeiconsIcon icon={Notification03Icon} size={30} color={color} strokeWidth={focused ? 2.2 : 1.6} />
           ),
         }}
       />
@@ -60,7 +60,7 @@ function Tabs() {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <HugeiconsIcon icon={UserCircle02Icon} size={24} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+            <HugeiconsIcon icon={UserCircle02Icon} size={30} color={color} strokeWidth={focused ? 2.2 : 1.6} />
           ),
         }}
       />
