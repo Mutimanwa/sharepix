@@ -4,28 +4,25 @@
     "slug": "sharepix",
     "version": "1.0.0",
     "orientation": "portrait",
-
     "icon": "./assets/sharepix-logo.png",
-
     "userInterfaceStyle": "light",
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.sharepix.mobile"
     },
-
     "android": {
       "package": "app.sharepix.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#0E3A3E",
         "foregroundImage": "./assets/sharepix-logo.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
-
     "web": {
       "favicon": "./assets/sharepix-logo.png"
     },
-
     "plugins": [
       "expo-image-picker",
       [
@@ -36,6 +33,11 @@
           "imageWidth": 200
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "dfb1170a-ddf5-446e-bc7a-1f62c0efec71"
+      }
+    }
   }
 }

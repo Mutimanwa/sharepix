@@ -31,13 +31,12 @@ export default function HomeScreen() {
   const [name, setName] = useState('');
   const [first, setFirst] = useState(state.profile.firstName);
   const [code, setCode] = useState('');
-  const hello = state.profile.firstName ? `Bonjour, ${state.profile.firstName}` : 'Bonjour';
 
   return (
     <View style={styles.root}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
         <View style={styles.header}>
-          <Logo size={46} />
+          <Logo size={36} />
            <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
         </View>
 
@@ -47,6 +46,7 @@ export default function HomeScreen() {
             <HugeiconsIcon icon={Add01Icon} size={22} color="#fff" strokeWidth={2} />
             <Text style={styles.actTitle}>Ajouter</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.actTeal}
             onPress={() => {
@@ -103,7 +103,7 @@ export default function HomeScreen() {
                   {a.photos[0] ? (
                     <Image source={{ uri: a.photos[0].uri }} style={styles.coverImg} />
                   ) : (
-                    <Logo size={48} />
+                    <Logo size={30} />
                   )}
                 </View>
                 <Text style={styles.albumName} numberOfLines={1}>{a.name}</Text>
@@ -130,6 +130,7 @@ export default function HomeScreen() {
           }}
         />
       </Sheet>
+
       <Sheet
         visible={join}
         onClose={() => {
@@ -155,9 +156,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 14,
   },
-  hello: { fontSize: 24, fontWeight: '800', color: colors.tealDark },
   sub: { color: colors.muted, marginTop: 4, fontSize: 14 },
-  actions: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, marginTop: 18 },
+  actions: { flexDirection: 'row', gap: 10, paddingHorizontal: 18, marginTop: 18 },
   actCoral: {
     flex: 1,
     backgroundColor: colors.coral,
@@ -174,20 +174,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  actPlus: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  actTitle: { color: '#fff', fontSize: 17, fontWeight: '800' , marginLeft: 8},
+  actPlus: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  actTitle: { color: '#fff', fontSize: 14, fontWeight: '600' , marginLeft: 8},
   actHint: { color: 'rgba(255,255,255,0.8)', marginTop: 4, fontSize: 13 },
-  h: { fontSize: 18, fontWeight: '800', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
+  h: { fontSize: 18, fontWeight: '700', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
   idea: {
-    width: 350,
+    width: 300,
     borderRadius: 20,
     padding: 14,
     marginLeft: 18,
     flexDirection: 'row',
     gap: 15,
   },
-  ideaT: { fontWeight: '800', color: colors.tealDark, fontSize: 17 },
-  ideaS: { color: '#434848', marginTop: 4, fontSize: 19 },
+  ideaT: { fontWeight: '800', color: colors.tealDark, fontSize: 15 },
+  ideaS: { color: '#434848', marginTop: 4, fontSize: 15 },
   rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18 },
   count: {
     marginTop: 10,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 },
   album: { width: '50%', padding: 6 },
   cover: {
-    height: 210,
+    height: 150,
     borderRadius: 18,
     backgroundColor: colors.tealDeep,
     alignItems: 'center',
