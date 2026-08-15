@@ -9,14 +9,9 @@ import {
   UserCircle02Icon,
 } from '@hugeicons/core-free-icons';
 import { StatusBar } from 'expo-status-bar';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoreProvider } from './src/store';
 import { colors } from './src/theme';
-
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -25,7 +20,6 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import AlbumScreen from './src/screens/AlbumScreen';
 import PhotoScreen from './src/screens/PhotoScreen';
 import MenuScreen from './src/screens/MenuScreen';
-
 import {
   FiltersScreen,
   QRScreen,
@@ -37,36 +31,21 @@ import {
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-/**
- * Navigation principale avec gestion de la Safe Area.
- */
 function Tabs() {
   const insets = useSafeAreaInsets();
-
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-
         tabBarActiveTintColor: colors.teal,
         tabBarInactiveTintColor: '#9A9A9A',
-
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-        },
-
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopColor: '#E4EEEE',
-
-          // Hauteur de la barre + espace réservé
-          height: 50 + insets.bottom,
-
-          // paddingTop: 1,
-
-          // Espace pour la navigation Android
-          paddingBottom: insets.bottom,
+          height: 52 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 6,
         },
       }}
     >
@@ -75,42 +54,25 @@ function Tabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <HugeiconsIcon
-              icon={Home01Icon}
-              size={18}
-              color={color}
-              strokeWidth={focused ? 2.2 : 1.6}
-            />
+            <HugeiconsIcon icon={Home01Icon} size={22} color={color} strokeWidth={focused ? 2.2 : 1.6} />
           ),
         }}
       />
-
       <Tab.Screen
         name="Activités"
         component={ActivitiesScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <HugeiconsIcon
-              icon={Notification03Icon}
-              size={18}
-              color={color}
-              strokeWidth={focused ? 2.2 : 1.6}
-            />
+            <HugeiconsIcon icon={Notification03Icon} size={22} color={color} strokeWidth={focused ? 2.2 : 1.6} />
           ),
         }}
       />
-
       <Tab.Screen
         name="Profil"
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <HugeiconsIcon
-              icon={UserCircle02Icon}
-              size={18}
-              color={color}
-              strokeWidth={focused ? 2.2 : 1.6}
-            />
+            <HugeiconsIcon icon={UserCircle02Icon} size={22} color={color} strokeWidth={focused ? 2.2 : 1.6} />
           ),
         }}
       />
@@ -123,70 +85,19 @@ export default function App() {
     <SafeAreaProvider>
       <StoreProvider>
         <NavigationContainer>
-          <StatusBar style="dark" />
-
-          <Stack.Navigator
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen
-              name="Splash"
-              component={SplashScreen}
-            />
-
-            <Stack.Screen
-              name="Onboarding"
-              component={OnboardingScreen}
-            />
-
-            <Stack.Screen
-              name="Main"
-              component={Tabs}
-            />
-
-            <Stack.Screen
-              name="Album"
-              component={AlbumScreen}
-            />
-
-            <Stack.Screen
-              name="Photo"
-              component={PhotoScreen}
-            />
-
-            <Stack.Screen
-              name="Menu"
-              component={MenuScreen}
-            />
-
-            <Stack.Screen
-              name="Filters"
-              component={FiltersScreen}
-              options={{
-                presentation: 'modal',
-              }}
-            />
-
-            <Stack.Screen
-              name="QR"
-              component={QRScreen}
-            />
-
-            <Stack.Screen
-              name="Members"
-              component={MembersScreen}
-            />
-
-            <Stack.Screen
-              name="Premium"
-              component={PremiumScreen}
-            />
-
-            <Stack.Screen
-              name="PcUpload"
-              component={PcUploadScreen}
-            />
+          <StatusBar style="light" />
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Main" component={Tabs} />
+            <Stack.Screen name="Album" component={AlbumScreen} />
+            <Stack.Screen name="Photo" component={PhotoScreen} />
+            <Stack.Screen name="Menu" component={MenuScreen} />
+            <Stack.Screen name="Filters" component={FiltersScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="QR" component={QRScreen} />
+            <Stack.Screen name="Members" component={MembersScreen} />
+            <Stack.Screen name="Premium" component={PremiumScreen} />
+            <Stack.Screen name="PcUpload" component={PcUploadScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </StoreProvider>

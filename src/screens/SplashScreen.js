@@ -1,10 +1,17 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 
 const LOGO = require('../../assets/sharepix-logo.png');
 
 export default function SplashScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const logoSize = Math.min(176, Math.round(width * 0.42));
+  const stage = Math.round(logoSize * 1.55);
+
   const pop = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
@@ -16,33 +23,14 @@ export default function SplashScreen({ navigation }) {
 
   useEffect(() => {
     Animated.sequence([
-      Animated.spring(pop, {
-        toValue: 1,
-        friction: 5,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeIn, {
-        toValue: 1,
-        duration: 420,
-        useNativeDriver: true,
-      }),
+      Animated.spring(pop, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+      Animated.timing(fadeIn, { toValue: 1, duration: 420, useNativeDriver: true }),
     ]).start();
 
     const loopPulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
     loopPulse.start();
@@ -51,12 +39,7 @@ export default function SplashScreen({ navigation }) {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(val, {
-            toValue: 1,
-            duration: 1600,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
+          Animated.timing(val, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
           Animated.timing(val, { toValue: 0, duration: 0, useNativeDriver: true }),
         ])
       );
@@ -69,18 +52,8 @@ export default function SplashScreen({ navigation }) {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(val, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(val, {
-            toValue: 0,
-            duration: 280,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
+          Animated.timing(val, { toValue: 1, duration: 280, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: 280, easing: Easing.in(Easing.quad), useNativeDriver: true }),
         ])
       );
     const b1 = bounce(d1, 0);
@@ -118,14 +91,28 @@ export default function SplashScreen({ navigation }) {
   });
 
   return (
-    <View style={styles.root}>
-      <View style={styles.center}>
-        <View style={styles.stage}>
-          <Animated.View style={[styles.ring, makeRingStyle(ring)]} />
-          <Animated.View style={[styles.ring, styles.ringAlt, makeRingStyle(ring2)]} />
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <StatusBar style="light" />
+      <View style={[styles.center, { minHeight: height * 0.55 }]}>
+        <View style={{ width: stage, height: stage, alignItems: 'center', justifyContent: 'center' }}>
+          <Animated.View
+            style={[
+              styles.ring,
+              { width: logoSize * 0.95, height: logoSize * 0.95, borderRadius: logoSize },
+              makeRingStyle(ring),
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.ring,
+              styles.ringAlt,
+              { width: logoSize * 0.95, height: logoSize * 0.95, borderRadius: logoSize },
+              makeRingStyle(ring2),
+            ]}
+          />
           <Animated.Image
             source={LOGO}
-            style={[styles.logo, { transform: [{ scale: logoScale }] }]}
+            style={{ width: logoSize, height: logoSize, transform: [{ scale: logoScale }] }}
             resizeMode="contain"
           />
         </View>
@@ -137,7 +124,7 @@ export default function SplashScreen({ navigation }) {
         </Animated.View>
       </View>
 
-      <Animated.View style={[styles.footer, { opacity: fadeIn }]}>
+      <Animated.View style={[styles.footer, { opacity: fadeIn, paddingBottom: Math.max(insets.bottom, 12) }]}>
         <Text style={styles.by}>Created by</Text>
         <Text style={styles.restart}>RESTART</Text>
       </Animated.View>
@@ -152,28 +139,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  stage: {
-    width: 260,
-    height: 260,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  center: { alignItems: 'center', justifyContent: 'center', flex: 1 },
   ring: {
     position: 'absolute',
-    width: 168,
-    height: 168,
-    borderRadius: 168,
     borderWidth: 2,
     borderColor: colors.teal,
   },
   ringAlt: { borderColor: colors.coral },
-  logo: { width: 176, height: 176 },
   loader: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 8,
-    height: 20,
+    marginTop: 16,
+    height: 22,
     alignItems: 'flex-end',
   },
   dot: {
@@ -183,16 +160,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.teal,
   },
   dotCoral: { backgroundColor: colors.coral },
-  footer: { position: 'absolute', bottom: 52, alignItems: 'center' },
+  footer: { alignItems: 'center', paddingBottom: 8 },
   by: {
     color: 'rgba(255,255,255,0.55)',
-    fontSize: 12,
-    letterSpacing: 1.6,
+    fontSize: 11,
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
   restart: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     letterSpacing: 4,
     marginTop: 4,
