@@ -29,10 +29,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#0E3A3E",
-          "image": "./assets/sharepix-icon.png",
+          "image": "./assets/sharepix-logo.png",
           "imageWidth": 200
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

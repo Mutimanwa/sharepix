@@ -9,8 +9,9 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -23,7 +24,7 @@ import {
   Camera01Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import { CoralButton, BackButton, Page } from '../components/UI';
+import { CoralButton, BackButton } from '../components/UI';
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
 import { useStore } from '../store';
 
@@ -39,10 +40,11 @@ export default function AlbumScreen({ route, navigation }) {
   const album = state.albums.find((a) => a.id === id);
   const [tab, setTab] = useState('all');
   const [uploading, setUploading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   if (!album) {
     return (
-      <Page style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.top}>
           <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Album</Text>
@@ -50,7 +52,7 @@ export default function AlbumScreen({ route, navigation }) {
         <View style={styles.center}>
           <Text>Album introuvable</Text>
         </View>
-      </Page>
+      </SafeAreaView>
     );
   }
 
@@ -71,7 +73,8 @@ export default function AlbumScreen({ route, navigation }) {
   };
 
   return (
-    <Page style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Header */}
       <View style={styles.top}>
         <BackButton onPress={() => navigation.goBack()} />
         <View style={styles.headText}>
@@ -91,6 +94,7 @@ export default function AlbumScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
+      {/* Tabs */}
       <View style={styles.tabs}>
         {TABS.map((t) => {
           const on = tab === t.key;
@@ -111,44 +115,51 @@ export default function AlbumScreen({ route, navigation }) {
         })}
       </View>
 
-      {tab === 'vid' ? (
-        <View style={styles.center}>
-          <EmptyVideos />
-          <Text style={styles.emptyH}>Passez à l'Album Premium pour ajouter des vidéos</Text>
-          <Text style={styles.emptyP}>Dans un Album Premium, chaque membre peut télécharger des vidéos.</Text>
-          <View style={{ width: '84%', marginTop: 22 }}>
-            <CoralButton title="En savoir plus" onPress={() => navigation.navigate('Premium')} />
+      {/* Content */}
+      <View style={styles.contentContainer}>
+        {tab === 'vid' ? (
+          <View style={styles.center}>
+            <EmptyVideos />
+            <Text style={styles.emptyH}>Passez à l'Album Premium pour ajouter des vidéos</Text>
+            <Text style={styles.emptyP}>Dans un Album Premium, chaque membre peut télécharger des vidéos.</Text>
+            <View style={{ width: '84%', marginTop: 22 }}>
+              <CoralButton title="En savoir plus" onPress={() => navigation.navigate('Premium')} />
+            </View>
           </View>
-        </View>
-      ) : photos.length === 0 ? (
-        <View style={styles.center}>
-          {tab === 'fav' ? <EmptyFavs /> : <EmptyPhotos />}
-          <Text style={styles.emptyH}>
-            {tab === 'fav'
-              ? "Vous n'avez pas encore enregistré de favoris"
-              : "Personne n'a encore téléchargé de photos"}
-          </Text>
-          {tab !== 'fav' && <Text style={styles.emptyP}>Téléchargez votre première photo.</Text>}
-        </View>
-      ) : (
-        <FlatList
-          data={photos}
-          numColumns={3}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.cell}
-              onPress={() => navigation.navigate('Photo', { albumId: id, photoId: item.id })}
-            >
-              <Image source={{ uri: item.uri }} style={styles.thumb} />
-            </TouchableOpacity>
-          )}
-        />
-      )}
+        ) : photos.length === 0 ? (
+          <View style={styles.center}>
+            {tab === 'fav' ? <EmptyFavs /> : <EmptyPhotos />}
+            <Text style={styles.emptyH}>
+              {tab === 'fav'
+                ? "Vous n'avez pas encore enregistré de favoris"
+                : "Personne n'a encore téléchargé de photos"}
+            </Text>
+            {tab !== 'fav' && <Text style={styles.emptyP}>Téléchargez votre première photo.</Text>}
+          </View>
+        ) : (
+          <FlatList
+            data={photos}
+            numColumns={3}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ 
+              paddingBottom: 100 + insets.bottom,
+              paddingTop: 4,
+            }}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.cell}
+                onPress={() => navigation.navigate('Photo', { albumId: id, photoId: item.id })}
+              >
+                <Image source={{ uri: item.uri }} style={styles.thumb} />
+              </TouchableOpacity>
+            )}
+          />
+        )}
+      </View>
 
+      {/* FAB Button - avec padding bottom pour éviter la tab bar */}
       {tab !== 'vid' && (
-        <View style={styles.fabWrap}>
+        <View style={[styles.fabWrap, { bottom: Math.max(insets.bottom, 28) }]}>
           <TouchableOpacity style={styles.fab} onPress={pick} activeOpacity={0.88}>
             <HugeiconsIcon icon={Camera01Icon} size={22} color="#fff" />
             <Text style={styles.fabTxt}>Ajouter</Text>
@@ -156,43 +167,126 @@ export default function AlbumScreen({ route, navigation }) {
         </View>
       )}
 
+      {/* Upload Banner */}
       <Modal visible={uploading} transparent animationType="fade">
-        <View style={styles.banner}>
-          <Text style={{ color: '#fff', fontWeight: '600' }}>
-            Téléchargement en cours. Ne fermez pas l'appli.
-          </Text>
-        </View>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={[styles.banner, { marginTop: insets.top + 10 }]}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>
+              Téléchargement en cours. Ne fermez pas l'appli.
+            </Text>
+          </View>
+        </SafeAreaView>
       </Modal>
-    </Page>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.cream },
+  root: { 
+    flex: 1, 
+    backgroundColor: colors.cream,
+  },
   top: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 8,
     paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headText: { flex: 1, marginLeft: 2 },
-  title: { fontWeight: '800', fontSize: 18, color: colors.tealDark },
-  meta: { color: colors.muted, marginTop: 1 },
-  tabs: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#E4EEEE' },
-  tab: { flex: 1, alignItems: 'center', paddingTop: 12 },
-  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tabT: { color: colors.muted, fontWeight: '600' },
-  tabOn: { color: colors.teal },
-  line: { height: 2.5, backgroundColor: colors.teal, width: '56%', marginTop: 10, borderRadius: 2 },
-  lineOff: { height: 2.5, marginTop: 10 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  emptyH: { fontSize: 20, fontWeight: '800', textAlign: 'center', color: colors.tealDark, marginTop: 16 },
-  emptyP: { marginTop: 8, color: colors.muted, textAlign: 'center', fontSize: 15 },
-  cell: { width: '33.33%', aspectRatio: 1, padding: 1.5 },
-  thumb: { flex: 1, backgroundColor: '#DDECEC', borderRadius: 4 },
-  fabWrap: { position: 'absolute', left: 48, right: 48, bottom: 28 },
+  iconBtn: { 
+    width: 40, 
+    height: 40, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  headText: { 
+    flex: 1, 
+    marginLeft: 2 
+  },
+  title: { 
+    fontWeight: '800', 
+    fontSize: 18, 
+    color: colors.tealDark 
+  },
+  meta: { 
+    color: colors.muted, 
+    marginTop: 1,
+    fontSize: 12,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  tabs: { 
+    flexDirection: 'row', 
+    backgroundColor: '#fff', 
+    borderBottomWidth: 1, 
+    borderColor: '#E4EEEE' 
+  },
+  tab: { 
+    flex: 1, 
+    alignItems: 'center', 
+    paddingTop: 12 
+  },
+  tabInner: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6 
+  },
+  tabT: { 
+    color: colors.muted, 
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  tabOn: { 
+    color: colors.teal 
+  },
+  line: { 
+    height: 2.5, 
+    backgroundColor: colors.teal, 
+    width: '56%', 
+    marginTop: 10, 
+    borderRadius: 2 
+  },
+  lineOff: { 
+    height: 2.5, 
+    marginTop: 10 
+  },
+  center: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    padding: 28 
+  },
+  emptyH: { 
+    fontSize: 20, 
+    fontWeight: '800', 
+    textAlign: 'center', 
+    color: colors.tealDark, 
+    marginTop: 16 
+  },
+  emptyP: { 
+    marginTop: 8, 
+    color: colors.muted, 
+    textAlign: 'center', 
+    fontSize: 15 
+  },
+  cell: { 
+    width: '33.33%', 
+    aspectRatio: 1, 
+    padding: 1.5 
+  },
+  thumb: { 
+    flex: 1, 
+    backgroundColor: '#DDECEC', 
+    borderRadius: 4 
+  },
+  fabWrap: { 
+    position: 'absolute', 
+    left: 48, 
+    right: 48,
+  },
   fab: {
     height: 54,
     borderRadius: 28,
@@ -201,10 +295,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    shadowColor: colors.tealDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  fabTxt: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  fabTxt: { 
+    color: '#fff', 
+    fontSize: 17, 
+    fontWeight: '700' 
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   banner: {
-    marginTop: 88,
     backgroundColor: colors.tealDark,
     padding: 14,
     marginHorizontal: 16,

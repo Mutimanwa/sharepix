@@ -6,12 +6,15 @@ import {
   Dimensions,
   FlatList,
   TouchableOpacity,
+  SafeAreaView,
 } from 'react-native';
 import { colors } from '../theme';
-import { CoralButton, Logo, Sheet, Field } from '../components/UI';
+import { CoralButton, Logo, Sheet, Field, FullPage } from '../components/UI';
 import { ArtShare, ArtPrivate, ArtQuality } from '../components/OnboardingArt';
 import CodeBoxes from '../components/CodeBoxes';
 import { useStore } from '../store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 const { width } = Dimensions.get('window');
 
@@ -42,6 +45,7 @@ export default function OnboardingScreen({ navigation }) {
   const [name, setName] = useState('');
   const [first, setFirst] = useState('');
   const { createAlbum, setOnboarded } = useStore();
+  const insets = useSafeAreaInsets();
 
   const goHome = () => {
     setOnboarded();
@@ -54,7 +58,8 @@ export default function OnboardingScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <StatusBar style='dark' />
       <View style={styles.brand}>
         <Logo size={64} />
       </View>
@@ -95,7 +100,7 @@ export default function OnboardingScreen({ navigation }) {
         ))}
       </View>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 28) }]}>
         <CoralButton title="Créez un nouvel album" onPress={() => setCreate(true)} />
         <CoralButton
           title="Utilisez le code d'accès"
@@ -104,6 +109,7 @@ export default function OnboardingScreen({ navigation }) {
         />
       </View>
 
+      {/* Sheets avec SafeArea intégré */}
       <Sheet
         visible={join}
         onClose={() => {
@@ -111,6 +117,7 @@ export default function OnboardingScreen({ navigation }) {
           setCode('');
         }}
         title="Rejoindre un album"
+        useSafeArea={true}
       >
         <Text style={styles.center}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
         {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
@@ -125,9 +132,23 @@ export default function OnboardingScreen({ navigation }) {
         />
       </Sheet>
 
-      <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album">
-        <Field label="Nom de l'album" value={name} onChangeText={setName} />
-        <Field label="Votre prénom" value={first} onChangeText={setFirst} />
+      <Sheet
+        visible={create}
+        onClose={() => setCreate(false)}
+        title="Personnalisez votre album"
+        useSafeArea={true}
+      >
+        <Field 
+          label="Nom de l'album" 
+          value={name} 
+          onChangeText={setName}
+          autoFocus
+        />
+        <Field 
+          label="Votre prénom" 
+          value={first} 
+          onChangeText={setFirst}
+        />
         <Text style={styles.center}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton
           title="Créer un album"
@@ -144,20 +165,59 @@ export default function OnboardingScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.cream },
-  brand: { alignItems: 'center', paddingTop: 20 },
-  page: { width, alignItems: 'center', paddingHorizontal: 28 },
-  artWrap: { marginTop: 8, marginBottom: 8 },
+  root: {
+    flex: 1,
+    backgroundColor: colors.cream,
+  },
+  brand: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  page: {
+    width,
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 8,
+  },
+  artWrap: {
+    marginTop: 4,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     textAlign: 'center',
     fontSize: 22,
     fontWeight: '700',
     lineHeight: 30,
     color: colors.tealDark,
+    paddingHorizontal: 8,
   },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 10 },
-  dot: { width: 8, height: 8, borderRadius: 8, backgroundColor: '#C5D8D8' },
-  dotOn: { backgroundColor: colors.teal, width: 22 },
-  actions: { paddingHorizontal: 22, paddingBottom: 28 },
-  center: { textAlign: 'center', color: '#333', marginVertical: 10, fontSize: 16 },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 8,
+    backgroundColor: '#C5D8D8',
+  },
+  dotOn: {
+    backgroundColor: colors.teal,
+    width: 22,
+  },
+  actions: {
+    paddingHorizontal: 22,
+    paddingTop: 4,
+  },
+  center: {
+    textAlign: 'center',
+    color: '#333',
+    marginVertical: 10,
+    fontSize: 16,
+  },
 });
