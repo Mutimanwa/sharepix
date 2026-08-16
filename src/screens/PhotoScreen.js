@@ -88,7 +88,7 @@ export default function PhotoScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { paddingTop: insets.top ,paddingBottom: 100 + insets.bottom}]} edges={['top']}>
       <StatusBar style="dark" />
       
       <KeyboardAvoidingView 
