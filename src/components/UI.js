@@ -16,6 +16,7 @@ import {
 import { colors } from '../theme';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -125,6 +126,7 @@ export function Sheet({
   keyboardVerticalOffset = Platform.OS === 'ios' ? 0 : 0,
 }) {
   const scrollRef = useRef(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
@@ -136,7 +138,7 @@ export function Sheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} style={[{paddingBottom: 40}]} animationType="slide" transparent>
+    <Modal visible={visible} style={[insets.bottom]} animationType="slide" transparent>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}

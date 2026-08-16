@@ -44,8 +44,8 @@ function Tabs() {
           backgroundColor: '#FFFFFF',
           borderTopColor: '#E4EEEE',
           height: 52 + insets.bottom,
-          paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 6,
+          paddingBottom: Math.max(insets.bottom, 1),
+          paddingTop: 1,
         },
       }}
     >

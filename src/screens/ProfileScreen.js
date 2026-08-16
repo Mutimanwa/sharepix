@@ -40,7 +40,7 @@ export default function ProfileScreen() {
       <Row title="Commentaires" sub="Quand quelqu'un a commenté une photo ou répondu à votre commentaire" value={p.comments} onValueChange={(comments) => updateProfile({ comments })} />
 
       <View style={styles.help}>
-        <Text style={{ fontWeight: '800', fontSize: 16 }}>Avez-vous des questions?</Text>
+        <Text style={{ fontWeight: '700', fontSize: 16 }}>Avez-vous des questions?</Text>
         <Text style={{ marginTop: 6, color: '#333' }}>Envoyez-nous un e-mail à l'adresse suivante : hello@celebrate.app</Text>
         <TouchableOpacity style={styles.mail} onPress={() => Linking.openURL('mailto:hello@celebrate.app')}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>Ecrire un e-mail</Text>
@@ -50,18 +50,18 @@ export default function ProfileScreen() {
       {['FAQ - Questions Fréquentes', 'Restaurer les achats', 'CGV', 'Sécurité des données', 'Licences', 'Impression', 'Supprimer mon compte'].map((t) => (
         <Text key={t} style={styles.link}>{t}</Text>
       ))}
-      <Text style={{ color: colors.muted, marginTop: 16 }}>Version 23.0.0 (100095)</Text>
+      <Text style={{ color: colors.muted, marginTop: 16 ,textAlign: 'center'}}>Version 1.0.0 </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 18, paddingTop: 14 },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: '800' },
+  root: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 18},
+  head: { flexDirection: 'row', paddingVertical: 8 , justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 20, fontWeight: '600' },
   avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#F6C7B0', alignSelf: 'center', marginVertical: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
-  rt: { fontSize: 17, fontWeight: '700' },
+  rt: { fontSize: 17, fontWeight: '600' },
   rs: { color: colors.muted, marginTop: 4 },
   help: { backgroundColor: colors.peach, borderRadius: 16, padding: 16, marginVertical: 16 },
   mail: { marginTop: 12, backgroundColor: colors.coral, alignSelf: 'flex-start', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22 },

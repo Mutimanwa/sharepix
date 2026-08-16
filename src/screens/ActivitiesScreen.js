@@ -92,8 +92,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '600',
     color: colors.tealDark,
   },
   content: {
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   h: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 16,
     color: colors.tealDark,
