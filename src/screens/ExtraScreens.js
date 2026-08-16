@@ -14,7 +14,7 @@ import {
   Tick02Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import BackButton from '../components/BackButton';
+import { BackButton, CoralButton, SmallButton, Page } from '../components/UI';
 import { useStore } from '../store';
 
 const ORDERS = [
@@ -35,7 +35,7 @@ function ScreenHead({ title, onBack, right }) {
     <View style={styles.head}>
       <BackButton onPress={onBack} />
       <Text style={styles.headTitle}>{title}</Text>
-      {right || <View style={{ width: 50 }} />}
+      {right || <View style={{ width: 44 }} />}
     </View>
   );
 }
@@ -85,7 +85,7 @@ export function FiltersScreen({ navigation }) {
   const dirty = order !== 'recent' || group !== 'all';
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <View style={styles.head}>
         <BackButton variant="close" onPress={() => navigation.goBack()} />
         <Text style={styles.headTitle}>Filtre</Text>
@@ -101,7 +101,11 @@ export function FiltersScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 20 }} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.section}>Ordre</Text>
         <Text style={styles.hint}>Toutes les photos et vidéos sont automatiquement triées par heure de capture.</Text>
         <View style={styles.card}>
@@ -133,45 +137,45 @@ export function FiltersScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-        <TouchableOpacity
-          style={[styles.cta, !dirty && styles.ctaOff]}
-          disabled={!dirty}
+      <View style={styles.footerBtn}>
+        <CoralButton
+          title="Appliquer"
           onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.ctaTxt}>Appliquer</Text>
-        </TouchableOpacity>
+          disabled={!dirty}
+          color={dirty ? colors.coral : '#D5D8D8'}
+        />
       </View>
-    </SafeAreaView>
+    </Page>
   );
 }
 
 export function QRScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
-      <View style={{ alignItems: 'center', paddingHorizontal: 24, marginTop: 12 }}>
+      <View style={styles.qrContainer}>
         <View style={styles.qrCard}>
           <QrMark />
         </View>
         <Text style={styles.albumName}>{album?.name}</Text>
         <Text style={styles.hintCenter}>Ce code QR mène directement à l'album SharePix</Text>
-        <TouchableOpacity style={[styles.cta, { marginTop: 22, width: '100%' }]}>
-          <HugeiconsIcon icon={Download01Icon} size={20} color="#fff" />
-          <Text style={styles.ctaTxt}>Enregistrer comme image</Text>
-        </TouchableOpacity>
+        <CoralButton
+          title="Enregistrer comme image"
+          onPress={() => {}}
+          style={{ marginTop: 22 }}
+        />
       </View>
-    </SafeAreaView>
+    </Page>
   );
 }
 
 export function MembersScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
-      <View style={{ flex: 1, paddingHorizontal: 20, justifyContent: 'center' }}>
+      <View style={styles.membersContainer}>
         <View style={styles.emptyCard}>
           <View style={styles.iconBubble}>
             <HugeiconsIcon icon={UserMultipleIcon} size={32} color={colors.teal} />
@@ -183,19 +187,18 @@ export function MembersScreen({ route, navigation }) {
           <View style={styles.codeBox}>
             <Text style={styles.code}>{album?.code}</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.cta, { width: '100%', marginTop: 16 }]}
+          <CoralButton
+            title="Inviter"
             onPress={() =>
               Share.share({
                 message: `Rejoins mon album « ${album?.name} » sur SharePix. Code : ${album?.code}`,
               })
             }
-          >
-            <Text style={styles.ctaTxt}>Invitez</Text>
-          </TouchableOpacity>
+            style={{ marginTop: 16 }}
+          />
         </View>
       </View>
-    </SafeAreaView>
+    </Page>
   );
 }
 
@@ -206,7 +209,7 @@ export function PremiumScreen({ navigation }) {
     { icon: Diamond01Icon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
   ];
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Album Premium" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
         <View style={styles.hero}>
@@ -214,7 +217,7 @@ export function PremiumScreen({ navigation }) {
             <HugeiconsIcon icon={Diamond01Icon} size={36} color="#fff" />
           </View>
           <Text style={styles.albumName}>Passez à Premium</Text>
-          <Text style={styles.hintCenter}>Vidéos, qualité originale et plus d’espace pour vos événements.</Text>
+          <Text style={styles.hintCenter}>Vidéos, qualité originale et plus d'espace pour vos événements.</Text>
         </View>
         <View style={styles.card}>
           {perks.map((p, i) => (
@@ -231,39 +234,39 @@ export function PremiumScreen({ navigation }) {
           ))}
         </View>
         <View style={styles.warn}>
-          <Text style={styles.warnT}>Le Play Store n’est pas disponible pour le moment. Réessayez plus tard.</Text>
+          <Text style={styles.warnT}>Le Play Store n'est pas disponible pour le moment. Réessayez plus tard.</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Page>
   );
 }
 
 export function PcUploadScreen({ navigation }) {
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Téléchargement PC" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
         <Text style={styles.lead}>
-          Ajoutez photos et vidéos à l’album depuis le navigateur de votre ordinateur.
+          Ajoutez photos et vidéos à l'album depuis le navigateur de votre ordinateur.
         </Text>
         <View style={styles.stepCard}>
           <View style={styles.n}><Text style={styles.nTxt}>1</Text></View>
           <HugeiconsIcon icon={ComputerIcon} size={28} color={colors.teal} />
           <Text style={styles.stepT}>Ouvrez web.sharepix.app</Text>
-          <Text style={styles.rowH}>Sur l’ordinateur, dans votre navigateur.</Text>
+          <Text style={styles.rowH}>Sur l'ordinateur, dans votre navigateur.</Text>
         </View>
         <View style={styles.stepCard}>
           <View style={styles.n}><Text style={styles.nTxt}>2</Text></View>
           <HugeiconsIcon icon={QrCodeIcon} size={28} color={colors.coral} />
           <Text style={styles.stepT}>Scannez le QR affiché</Text>
-          <Text style={styles.rowH}>Tenez le téléphone devant l’écran pour lier l’album.</Text>
+          <Text style={styles.rowH}>Tenez le téléphone devant l'écran pour lier l'album.</Text>
         </View>
-        <TouchableOpacity style={styles.cta}>
-          <HugeiconsIcon icon={QrCodeIcon} size={20} color="#fff" />
-          <Text style={styles.ctaTxt}>Scanner le QR code</Text>
-        </TouchableOpacity>
+        <CoralButton
+          title="Scanner le QR code"
+          onPress={() => {}}
+        />
       </ScrollView>
-    </SafeAreaView>
+    </Page>
   );
 }
 
@@ -274,6 +277,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   headTitle: { fontWeight: '800', fontSize: 18, color: colors.tealDark },
   reset: { color: colors.coral, fontWeight: '700' },
@@ -309,17 +316,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   chipOn: { backgroundColor: colors.tealDark, borderColor: colors.tealDark },
-  cta: {
-    height: 54,
-    borderRadius: 28,
-    backgroundColor: colors.coral,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  footerBtn: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
-  ctaOff: { backgroundColor: '#D5D8D8' },
-  ctaTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  qrContainer: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginTop: 12,
+  },
   qrCard: {
     backgroundColor: '#fff',
     padding: 18,
@@ -330,6 +339,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   albumName: { fontSize: 22, fontWeight: '800', marginTop: 18, color: colors.tealDark, textAlign: 'center' },
+  membersContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+  },
   emptyCard: {
     backgroundColor: '#fff',
     borderRadius: 22,

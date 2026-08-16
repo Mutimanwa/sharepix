@@ -86,14 +86,23 @@ export default function App() {
       <StoreProvider>
         <NavigationContainer>
           <StatusBar style="light" />
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Navigator 
+            screenOptions={{ 
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.cream },
+            }}
+          >
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Main" component={Tabs} />
             <Stack.Screen name="Album" component={AlbumScreen} />
             <Stack.Screen name="Photo" component={PhotoScreen} />
             <Stack.Screen name="Menu" component={MenuScreen} />
-            <Stack.Screen name="Filters" component={FiltersScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen 
+              name="Filters" 
+              component={FiltersScreen} 
+              options={{ presentation: 'modal' }} 
+            />
             <Stack.Screen name="QR" component={QRScreen} />
             <Stack.Screen name="Members" component={MembersScreen} />
             <Stack.Screen name="Premium" component={PremiumScreen} />

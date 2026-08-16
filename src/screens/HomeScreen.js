@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
-import { CoralButton, Field, Logo, Sheet } from '../components/UI';
+import { CoralButton, Field, Logo, Sheet, Page, SmallButton } from '../components/UI';
 import CodeBoxes from '../components/CodeBoxes';
 import { IconVacances, IconFamille, IconBebe, IconSpecial } from '../components/HomeArt';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -33,16 +35,20 @@ export default function HomeScreen() {
   const [code, setCode] = useState('');
 
   return (
-    <View style={styles.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
+    <Page style={styles.root} edges={['top', 'left', 'right']}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 28 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <Logo size={36} />
-           <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
+          <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
         </View>
 
         {/* Actions Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actCoral} onPress={() => setCreate(true)} activeOpacity={0.88}>
+          <TouchableOpacity style={[styles.actCoral]} onPress={() => setCreate(true)} activeOpacity={0.88}>
             <HugeiconsIcon icon={Add01Icon} size={22} color="#fff" strokeWidth={2} />
             <Text style={styles.actTitle}>Ajouter</Text>
           </TouchableOpacity>
@@ -61,7 +67,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Idee d'albums */}
-        <Text style={styles.h}>Idées d’albums</Text>
+        <Text style={styles.h}>Idées d'albums</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
           {suggestions.map((s) => {
             const Ico = s.Icon;
@@ -72,13 +78,13 @@ export default function HomeScreen() {
                 onPress={() => {
                   setName(s.title);
                   setCreate(true);
-                }}>
+                }}
+              >
                 <Ico />
-                <View style={{ flex: 1 , justifyContent: 'center'}}>
-                   <Text style={styles.ideaT}>{s.title}</Text>
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <Text style={styles.ideaT}>{s.title}</Text>
                   <Text style={styles.ideaS}>{s.sub}</Text>
                 </View>
-               
               </TouchableOpacity>
             );
           })}
@@ -116,10 +122,20 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
+      {/* Sheets avec gestion du clavier */}
       <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album">
-        <Field label="Nom de l'album" value={name} onChangeText={setName} />
-        <Field label="Votre prénom" value={first} onChangeText={setFirst} />
-        <Text style={{ textAlign: 'center', marginBottom: 10 }}>Vous pouvez à nouveau changer les deux.</Text>
+        <Field 
+          label="Nom de l'album" 
+          value={name} 
+          onChangeText={setName} 
+          autoFocus
+        />
+        <Field 
+          label="Votre prénom" 
+          value={first} 
+          onChangeText={setFirst} 
+        />
+        <Text style={styles.sheetHint}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton
           title="Créer un album"
           disabled={!name.trim()}
@@ -139,20 +155,31 @@ export default function HomeScreen() {
         }}
         title="Rejoindre un album"
       >
-        <Text style={{ textAlign: 'center' }}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
+        <Text style={styles.sheetHint}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
         {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
-        <CoralButton title="Continuer" disabled={code.length < 8} onPress={() => setJoin(false)} />
+        <CoralButton 
+          title="Continuer" 
+          disabled={code.length < 8} 
+          onPress={() => {
+            const album = state.albums.find(a => a.code === code);
+            if (album) {
+              setJoin(false);
+              setCode('');
+              nav.navigate('Album', { id: album.id });
+            } else {
+              alert('Code invalide');
+            }
+          }}
+        />
       </Sheet>
-    </View>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.cream },
   header: {
-    flexDirection: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     paddingHorizontal: 18,
     paddingTop: 14,
   },
@@ -165,6 +192,7 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   actTeal: {
     flex: 1,
@@ -173,10 +201,9 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  actPlus: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  actTitle: { color: '#fff', fontSize: 14, fontWeight: '600' , marginLeft: 8},
-  actHint: { color: 'rgba(255,255,255,0.8)', marginTop: 4, fontSize: 13 },
+  actTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginLeft: 8 },
   h: { fontSize: 18, fontWeight: '700', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
   idea: {
     width: 300,
@@ -185,6 +212,7 @@ const styles = StyleSheet.create({
     marginLeft: 18,
     flexDirection: 'row',
     gap: 15,
+    alignItems: 'center',
   },
   ideaT: { fontWeight: '800', color: colors.tealDark, fontSize: 15 },
   ideaS: { color: '#434848', marginTop: 4, fontSize: 15 },
@@ -221,4 +249,10 @@ const styles = StyleSheet.create({
   coverImg: { width: '100%', height: '100%' },
   albumName: { fontSize: 19, fontWeight: '700', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
   albumMeta: { color: colors.muted, paddingHorizontal: 4, marginTop: 2 },
+  sheetHint: { 
+    textAlign: 'center', 
+    marginVertical: 10, 
+    fontSize: 14, 
+    color: colors.muted,
+  },
 });

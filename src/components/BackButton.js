@@ -1,30 +1,30 @@
 import React from 'react';
-import { TouchableOpacity, View, StyleSheet } from 'react-native';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { colors } from '../theme';
 
-export default function BackButton({ onPress, variant = 'back' }) {
+export default function BackButton({ onPress, variant = 'back', style = {} }) {
   return (
-    <TouchableOpacity onPress={onPress} style={styles.hit} hitSlop={12} activeOpacity={0.75}>
-      <View style={styles.circle}>
-        <HugeiconsIcon
-          icon={variant === 'close' ? Cancel01Icon : ArrowLeft01Icon}
-          size={22}
-          color={colors.tealDark}
-        />
-      </View>
+    <TouchableOpacity 
+      onPress={onPress} 
+      style={[styles.hit, style]} 
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      activeOpacity={0.75}
+    >
+      <Text style={styles.icon}>{variant === 'close' ? '✕' : '←'}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  hit: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
-  circle: {
-    backgroundColor: '#8d8c8c61',
-    padding: 10,
-    borderRadius: 50,
+  hit: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  icon: {
+    fontSize: 24,
+    color: colors.tealDark,
+    fontWeight: '400',
   },
 });

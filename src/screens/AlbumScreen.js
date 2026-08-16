@@ -7,6 +7,8 @@ import {
   Image,
   FlatList,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,9 +23,8 @@ import {
   Camera01Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import { CoralButton } from '../components/UI';
+import { CoralButton, BackButton, Page } from '../components/UI';
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
-import BackButton from '../components/BackButton';
 import { useStore } from '../store';
 
 const TABS = [
@@ -41,7 +42,7 @@ export default function AlbumScreen({ route, navigation }) {
 
   if (!album) {
     return (
-      <SafeAreaView style={styles.root}>
+      <Page style={styles.root}>
         <View style={styles.top}>
           <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Album</Text>
@@ -49,7 +50,7 @@ export default function AlbumScreen({ route, navigation }) {
         <View style={styles.center}>
           <Text>Album introuvable</Text>
         </View>
-      </SafeAreaView>
+      </Page>
     );
   }
 
@@ -70,7 +71,7 @@ export default function AlbumScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <View style={styles.top}>
         <BackButton onPress={() => navigation.goBack()} />
         <View style={styles.headText}>
@@ -162,7 +163,7 @@ export default function AlbumScreen({ route, navigation }) {
           </Text>
         </View>
       </Modal>
-    </SafeAreaView>
+    </Page>
   );
 }
 

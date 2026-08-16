@@ -12,8 +12,7 @@ import {
   Copy01Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import { Logo } from '../components/UI';
-import BackButton from '../components/BackButton';
+import { Logo, BackButton, Page } from '../components/UI';
 import { useStore } from '../store';
 
 export default function MenuScreen({ route, navigation }) {
@@ -26,7 +25,7 @@ export default function MenuScreen({ route, navigation }) {
     });
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <View style={styles.top}>
         <BackButton onPress={() => navigation.goBack()} />
         <BackButton variant="close" onPress={() => navigation.goBack()} />
@@ -90,7 +89,7 @@ export default function MenuScreen({ route, navigation }) {
           <Text style={styles.qrTxt}>Voir le code QR</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </Page>
   );
 }
 
@@ -115,8 +114,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  hero: { alignItems: 'center', paddingHorizontal: 18, paddingBottom: 8 },
+  hero: { alignItems: 'center', paddingHorizontal: 18, paddingBottom: 8, paddingTop: 16 },
   cover: {
     width: 88,
     height: 88,
