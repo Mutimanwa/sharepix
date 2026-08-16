@@ -29,9 +29,7 @@ export function Logo({ size = 42, color = colors.ink }) {
 }
 
 export function LogoImage({ size = 42 }) {
-  // Si vous avez une image, décommentez
-  // return <Image source={require('../../assets/sharepix-logo.png')} style={{ width: size, height: size }} />;
-  return <Logo size={size} />;
+  return <Image source={require('../../assets/sharepix-logo.png')} style={{ width: size, height: size }} />;
 }
 
 // Bouton uniforme avec taille fixe

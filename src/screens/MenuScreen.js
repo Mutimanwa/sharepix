@@ -34,7 +34,7 @@ export default function MenuScreen({ route, navigation }) {
         <BackButton variant="close" onPress={() => navigation.goBack()} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.hero}>
           <View style={styles.cover}>
             <Logo size={12} color='#fff' />
@@ -119,8 +119,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   hero: { alignItems: 'center', paddingHorizontal: 18, paddingBottom: 8, paddingTop: 16 },
   cover: {

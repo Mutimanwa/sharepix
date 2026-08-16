@@ -155,7 +155,7 @@ export function FiltersScreen({ navigation }) {
 export function QRScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , {paddingTop: insets.top  , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
       <View style={styles.qrContainer}>
         <View style={styles.qrCard}>
@@ -176,7 +176,7 @@ export function QRScreen({ route, navigation }) {
 export function MembersScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
       <View style={styles.membersContainer}>
         <View style={styles.emptyCard}>
@@ -212,7 +212,7 @@ export function PremiumScreen({ navigation }) {
     { icon: Diamond01Icon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
   ];
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Album Premium" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
         <View style={styles.hero}>
@@ -245,45 +245,47 @@ export function PremiumScreen({ navigation }) {
 }
 
 export function PcUploadScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Téléchargement PC" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <Text style={styles.lead}>
           Ajoutez photos et vidéos à l'album depuis le navigateur de votre ordinateur.
         </Text>
         <View style={styles.stepCard}>
           <View style={styles.n}><Text style={styles.nTxt}>1</Text></View>
-          <HugeiconsIcon icon={ComputerIcon} size={28} color={colors.teal} />
+          <HugeiconsIcon icon={ComputerIcon} size={200} color={colors.teal} />
           <Text style={styles.stepT}>Ouvrez web.sharepix.app</Text>
           <Text style={styles.rowH}>Sur l'ordinateur, dans votre navigateur.</Text>
         </View>
         <View style={styles.stepCard}>
           <View style={styles.n}><Text style={styles.nTxt}>2</Text></View>
-          <HugeiconsIcon icon={QrCodeIcon} size={28} color={colors.coral} />
+          <HugeiconsIcon icon={QrCodeIcon} size={200} color={colors.coral} />
           <Text style={styles.stepT}>Scannez le QR affiché</Text>
           <Text style={styles.rowH}>Tenez le téléphone devant l'écran pour lier l'album.</Text>
         </View>
-        <CoralButton
+        
+      </ScrollView>
+
+      <View style={styles.footerBtn} >
+          <CoralButton
           title="Scanner le QR code"
           onPress={() => {}}
         />
-      </ScrollView>
+      </View>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.cream },
+  root: { flex: 1,},
   head: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   headTitle: { fontWeight: '600', fontSize: 18, color: colors.tealDark },
   reset: { color: colors.coral, fontWeight: '700' },
@@ -330,18 +332,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginTop: 12,
+    marginTop:100,
   },
   qrCard: {
-    backgroundColor: '#fff',
     padding: 18,
-    borderRadius: 24,
+    borderRadius: 5,
     shadowColor: '#164E52',
     shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowRadius: 5,
     elevation: 3,
   },
-  albumName: { fontSize: 22, fontWeight: '700', marginTop: 18, color: colors.tealDark, textAlign: 'center' },
+  albumName: { fontSize: 22, fontWeight: '600', marginTop: 18, color: colors.tealDark, textAlign: 'center' },
   membersContainer: {
     flex: 1,
     paddingHorizontal: 20,
@@ -362,7 +363,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  emptyH: { fontSize: 22, fontWeight: '800', textAlign: 'center', color: colors.tealDark },
+  emptyH: { fontSize: 22, fontWeight: '600', textAlign: 'center', color: colors.tealDark },
   codeBox: {
     marginTop: 16,
     backgroundColor: colors.light,
@@ -372,7 +373,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  code: { fontWeight: '800', letterSpacing: 1.4, color: colors.tealDark, fontSize: 16 },
+  code: { fontWeight: '700', letterSpacing: 2, color: colors.tealDark, fontSize: 16 },
   hero: { alignItems: 'center', marginBottom: 18 },
   cover: {
     width: 84,

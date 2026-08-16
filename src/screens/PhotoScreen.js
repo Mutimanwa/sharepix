@@ -6,12 +6,13 @@ import {
   Image,
   TextInput,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   Modal,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -27,37 +28,38 @@ import { useStore } from '../store';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../components/UI';
 
+// Récupération des dimensions de l'écran pour l'image
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.45; // L'image prend 45% de l'écran
+
 export default function PhotoScreen({ route, navigation }) {
   const { albumId, photoId } = route.params;
   const { state, toggleLike, toggleFavorite, addComment, deletePhoto } = useStore();
+  const insets = useSafeAreaInsets();
+  const inputRef = useRef(null);
+  const scrollViewRef = useRef(null);
+
+  // 1. Gestion du carousel (Swipe)
   const album = state.albums.find((a) => a.id === albumId);
-  const photo = album?.photos.find((p) => p.id === photoId);
+  const photos = album?.photos || [];
+  const initialIndex = photos.findIndex((p) => p.id === photoId);
+  
+  const [currentIndex, setCurrentIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [text, setText] = useState('');
   const [del, setDel] = useState(false);
   const [tip, setTip] = useState(true);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const insets = useSafeAreaInsets();
-  const scrollViewRef = useRef(null);
-  const inputRef = useRef(null);
 
-  // Gérer l'ouverture/fermeture du clavier
+  // La photo actuellement affichée
+  const currentPhoto = photos[currentIndex];
+
+  // Scroll automatique vers le bas quand un nouveau commentaire est ajouté
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true)
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false)
-    );
+    if (scrollViewRef.current && currentPhoto?.comments?.length > 0) {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [currentPhoto?.comments?.length]);
 
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
-  if (!photo) {
+  if (!album || photos.length === 0 || initialIndex === -1) {
     return (
       <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
         <StatusBar style="dark" />
@@ -66,82 +68,115 @@ export default function PhotoScreen({ route, navigation }) {
           <Text style={styles.author}>Photo</Text>
         </View>
         <View style={styles.center}>
-          <Text style={{ color: colors.muted }}>Photo introuvable</Text>
+          <Text style={{ color: colors.muted }}>Photo ou album introuvable</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   const send = () => {
-    if (!text.trim()) return;
-    addComment(albumId, photoId, text.trim());
+    if (!text.trim() || !currentPhoto) return;
+    addComment(albumId, currentPhoto.id, text.trim());
     setText('');
-    // Fermer le clavier après l'envoi
     Keyboard.dismiss();
   };
 
-  const handleFocus = () => {
-    // Scroll vers le bas quand l'input est focus
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 300);
-  };
+  // Configuration pour que le FlatList horizontal démarre sur la bonne photo
+  const getItemLayout = (_, index) => ({
+    length: SCREEN_WIDTH,
+    offset: SCREEN_WIDTH * index,
+    index,
+  });
+
+  const renderImageItem = ({ item }) => (
+    <View style={styles.imageContainer}>
+      <Image source={{ uri: item.uri }} style={styles.img} resizeMode="contain" />
+    </View>
+  );
 
   return (
-    <SafeAreaView style={[styles.root, { paddingTop: insets.top ,paddingBottom: 100 + insets.bottom}]} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top']}>
       <StatusBar style="dark" />
       
+      {/* Header Fixe */}
+      <View style={styles.top}>
+        <BackButton onPress={() => navigation.goBack()} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.author}>{state.profile.firstName || 'Vous'}</Text>
+          <Text style={styles.when}>à l'instant</Text>
+        </View>
+        <TouchableOpacity style={styles.iconHit} onPress={() => setDel(true)} hitSlop={8}>
+          <HugeiconsIcon icon={Delete02Icon} size={22} color={colors.coral} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Le KeyboardAvoidingView englobe tout le contenu variable */}
       <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
+        style={styles.mainContent} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1 }}>
-            {/* Header */}
-            <View style={styles.top}>
-              <BackButton onPress={() => navigation.goBack()} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.author}>{state.profile.firstName || 'Vous'}</Text>
-                <Text style={styles.when}>à l'instant</Text>
+            
+            {/* 2. Carousel d'images (Swipe Horizontal) */}
+            <FlatList
+              data={photos}
+              renderItem={renderImageItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={initialIndex}
+              getItemLayout={getItemLayout}
+              onMomentumScrollEnd={(event) => {
+                const newIndex = Math.round(
+                  event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+                );
+                if (newIndex !== currentIndex && newIndex >= 0 && newIndex < photos.length) {
+                  setCurrentIndex(newIndex);
+                  setTip(false); // Cache le tip quand on swipe
+                }
+              }}
+            />
+
+            {/* Indicateur de position (ex: 1 / 5) */}
+            <View style={styles.pagination}>
+              <Text style={styles.paginationText}>
+                {currentIndex + 1} / {photos.length}
+              </Text>
+            </View>
+
+            {/* Actions Fixes */}
+            {currentPhoto && (
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.act} onPress={() => toggleLike(albumId, currentPhoto.id)}>
+                  <HugeiconsIcon
+                    icon={FavouriteIcon}
+                    size={24}
+                    color={currentPhoto.liked ? colors.coral : colors.tealDark}
+                    strokeWidth={currentPhoto.liked ? 2.4 : 1.6}
+                  />
+                  <Text style={[styles.actLbl, currentPhoto.liked && { color: colors.coral }]}>J'aime</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.act}>
+                  <HugeiconsIcon icon={Download01Icon} size={22} color={colors.tealDark} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.act}
+                  onPress={() => {
+                    toggleFavorite(albumId, currentPhoto.id);
+                    setTip(false);
+                  }}
+                >
+                  <HugeiconsIcon
+                    icon={StarIcon}
+                    size={24}
+                    color={currentPhoto.favorite ? colors.coral : colors.tealDark}
+                    strokeWidth={currentPhoto.favorite ? 2.4 : 1.6}
+                  />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.iconHit} onPress={() => setDel(true)} hitSlop={8}>
-                <HugeiconsIcon icon={Delete02Icon} size={22} color={colors.coral} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Image */}
-            <Image source={{ uri: photo.uri }} style={styles.img} resizeMode="contain" />
-
-            {/* Actions */}
-            <View style={styles.actions}>
-              <TouchableOpacity style={styles.act} onPress={() => toggleLike(albumId, photoId)}>
-                <HugeiconsIcon
-                  icon={FavouriteIcon}
-                  size={24}
-                  color={photo.liked ? colors.coral : colors.tealDark}
-                  strokeWidth={photo.liked ? 2.4 : 1.6}
-                />
-                <Text style={[styles.actLbl, photo.liked && { color: colors.coral }]}>J'aime</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.act}>
-                <HugeiconsIcon icon={Download01Icon} size={22} color={colors.tealDark} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.act}
-                onPress={() => {
-                  toggleFavorite(albumId, photoId);
-                  setTip(false);
-                }}
-              >
-                <HugeiconsIcon
-                  icon={StarIcon}
-                  size={24}
-                  color={photo.favorite ? colors.coral : colors.tealDark}
-                  strokeWidth={photo.favorite ? 2.4 : 1.6}
-                />
-              </TouchableOpacity>
-            </View>
+            )}
 
             {/* Tip */}
             {tip && (
@@ -153,23 +188,22 @@ export default function PhotoScreen({ route, navigation }) {
               </View>
             )}
 
-            {/* Comments Section - avec ScrollView pour les commentaires */}
-            <ScrollView
-              ref={scrollViewRef}
-              style={styles.commentsContainer}
-              contentContainerStyle={[
-                styles.commentsContent,
-                { paddingBottom: keyboardVisible ? 120 : 80 }
-              ]}
-              showsVerticalScrollIndicator={true}
-              keyboardShouldPersistTaps="handled"
-            >
-              {photo.comments.length === 0 ? (
-                <View style={styles.emptyComments}>
-                  <Text style={styles.emptyC}>Soyez le premier à commenter.</Text>
-                </View>
-              ) : (
-                photo.comments.map((c) => (
+            {/* Zone de commentaires (Scrollable verticalement) */}
+            {currentPhoto && (
+              <FlatList
+                ref={scrollViewRef}
+                data={currentPhoto.comments}
+                keyExtractor={(c) => c.id}
+                style={styles.commentsContainer}
+                contentContainerStyle={styles.commentsContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <View style={styles.emptyComments}>
+                    <Text style={styles.emptyC}>Soyez le premier à commenter.</Text>
+                  </View>
+                }
+                renderItem={({ item: c }) => (
                   <View key={c.id} style={styles.cmt}>
                     <View style={styles.av}>
                       <Text style={styles.avT}>{(c.author || 'V')[0]}</Text>
@@ -186,19 +220,12 @@ export default function PhotoScreen({ route, navigation }) {
                       </View>
                     </View>
                   </View>
-                ))
-              )}
-            </ScrollView>
+                )}
+              />
+            )}
 
-            {/* Input Bar - avec padding dynamique pour le clavier */}
-            <View style={[
-              styles.bar,
-              { 
-                paddingBottom: keyboardVisible 
-                  ? Math.max(insets.bottom + 10, 10) 
-                  : Math.max(insets.bottom, 10)
-              }
-            ]}>
+            {/* Barre de saisie fixe en bas */}
+            <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
               <TextInput
                 ref={inputRef}
                 style={styles.inp}
@@ -208,7 +235,6 @@ export default function PhotoScreen({ route, navigation }) {
                 onChangeText={setText}
                 onSubmitEditing={send}
                 returnKeyType="send"
-                onFocus={handleFocus}
                 multiline={false}
               />
               <TouchableOpacity 
@@ -220,6 +246,7 @@ export default function PhotoScreen({ route, navigation }) {
                 <HugeiconsIcon icon={SentIcon} size={20} color="#fff" />
               </TouchableOpacity>
             </View>
+
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -241,7 +268,7 @@ export default function PhotoScreen({ route, navigation }) {
             <TouchableOpacity
               style={styles.cta}
               onPress={() => {
-                deletePhoto(albumId, photoId);
+                if (currentPhoto) deletePhoto(albumId, currentPhoto.id);
                 setDel(false);
                 navigation.goBack();
               }}
@@ -260,6 +287,10 @@ export default function PhotoScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1,
+    backgroundColor: colors.cream,
+  },
+  mainContent: {
     flex: 1,
     backgroundColor: colors.cream,
   },
@@ -288,10 +319,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Styles pour le Carousel d'images
+  imageContainer: {
+    width: SCREEN_WIDTH,
+    height: IMAGE_HEIGHT,
+    backgroundColor: colors.tealDeep, // Fond sombre pour faire ressortir l'image
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   img: {
     width: '100%',
-    height: 320,
+    height: '100%',
+  },
+  pagination: {
+    alignItems: 'center',
+    paddingVertical: 6,
     backgroundColor: colors.tealDeep,
+  },
+  paginationText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
@@ -332,7 +380,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   commentsContainer: {
-    flex: 1,
+    flex: 1, // Prend tout l'espace restant au-dessus du clavier
   },
   commentsContent: {
     paddingHorizontal: 14,
