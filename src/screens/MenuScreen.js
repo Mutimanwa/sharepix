@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   PencilEdit02Icon,
@@ -14,6 +14,7 @@ import {
 import { colors } from '../theme';
 import { Logo, BackButton, Page } from '../components/UI';
 import { useStore } from '../store';
+import { StatusBar } from 'expo-status-bar';
 
 export default function MenuScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
@@ -23,9 +24,11 @@ export default function MenuScreen({ route, navigation }) {
     Share.share({
       message: `Rejoins mon album « ${album.name} » sur SharePix. Code : ${album.code}`,
     });
+  const insets = useSafeAreaInsets();
 
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root ,{paddingTop: insets.top} ]} edges={['top']}>
+      <StatusBar style='dark' />
       <View style={styles.top}>
         <BackButton onPress={() => navigation.goBack()} />
         <BackButton variant="close" onPress={() => navigation.goBack()} />

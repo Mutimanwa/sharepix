@@ -27,6 +27,7 @@ import { colors } from '../theme';
 import { CoralButton, BackButton } from '../components/UI';
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
 import { useStore } from '../store';
+import { StatusBar } from 'expo-status-bar';
 
 const TABS = [
   { key: 'all', label: 'Tous', icon: GridViewIcon },
@@ -44,7 +45,7 @@ export default function AlbumScreen({ route, navigation }) {
 
   if (!album) {
     return (
-      <SafeAreaView style={styles.root} edges={['top']}>
+      <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
         <View style={styles.top}>
           <BackButton onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Album</Text>
@@ -73,7 +74,8 @@ export default function AlbumScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
+      <StatusBar style='dark' />
       {/* Header */}
       <View style={styles.top}>
         <BackButton onPress={() => navigation.goBack()} />
@@ -159,7 +161,7 @@ export default function AlbumScreen({ route, navigation }) {
 
       {/* FAB Button - avec padding bottom pour éviter la tab bar */}
       {tab !== 'vid' && (
-        <View style={[styles.fabWrap, { bottom: Math.max(insets.bottom, 28) }]}>
+        <View style={[styles.fabWrap, { bottom: Math.max(insets.bottom, 38) }]}>
           <TouchableOpacity style={styles.fab} onPress={pick} activeOpacity={0.88}>
             <HugeiconsIcon icon={Camera01Icon} size={22} color="#fff" />
             <Text style={styles.fabTxt}>Ajouter</Text>

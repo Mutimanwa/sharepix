@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Linking }
 import { Field } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 function Row({ title, sub, value, onValueChange }) {
   return (
@@ -11,7 +13,7 @@ function Row({ title, sub, value, onValueChange }) {
         <Text style={styles.rt}>{title}</Text>
         {sub ? <Text style={styles.rs}>{sub}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onValueChange} trackColor={{ true: colors.coral }} />
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ true: colors.coral , false: colors.muted}} />
     </View>
   );
 }
@@ -19,9 +21,11 @@ function Row({ title, sub, value, onValueChange }) {
 export default function ProfileScreen() {
   const { state, updateProfile } = useStore();
   const p = state.profile;
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView style={[styles.root , {paddingTop: insets.top}]} contentContainerStyle={{ paddingBottom: 40 }}>
+      <StatusBar style='dark' />
       <View style={styles.head}>
         <Text style={styles.title}>Mon profil</Text>
         <Text style={{ color: colors.coral, fontWeight: '700' }}>Sauvegarder</Text>
@@ -52,7 +56,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 18, paddingTop: 12 },
+  root: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 18, paddingTop: 14 },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '800' },
   avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#F6C7B0', alignSelf: 'center', marginVertical: 16 },

@@ -10,6 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CoralButton } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
+import { StatusBar } from 'expo-status-bar';
+
 
 export default function ActivitiesScreen() {
   const { state, updateProfile } = useStore();
@@ -54,6 +56,7 @@ export default function ActivitiesScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
+      <StatusBar style='dark' />
       <View style={styles.header}>
         <Text style={styles.title}>Activités</Text>
       </View>

@@ -17,6 +17,8 @@ import { IconVacances, IconFamille, IconBebe, IconSpecial } from '../components/
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Add01Icon, UserAdd01Icon } from '@hugeicons/core-free-icons';
 import { useStore } from '../store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 const suggestions = [
   { title: 'Vacances', sub: 'Vos plus beaux voyages', bg: '#D6F0F1', Icon: IconVacances },
@@ -33,9 +35,11 @@ export default function HomeScreen() {
   const [name, setName] = useState('');
   const [first, setFirst] = useState(state.profile.firstName);
   const [code, setCode] = useState('');
+   const insets = useSafeAreaInsets();
 
   return (
-    <Page style={styles.root} edges={['top', 'left', 'right']}>
+    <Page style={[styles.root ,{ paddingTop: insets.top }]} edges={['top', 'left', 'right']}>
+      <StatusBar style='dark' />
       <ScrollView 
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={{ paddingBottom: 28 }}

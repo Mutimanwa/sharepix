@@ -16,6 +16,8 @@ import {
 import { colors } from '../theme';
 import { BackButton, CoralButton, SmallButton, Page } from '../components/UI';
 import { useStore } from '../store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 const ORDERS = [
   { key: 'recent', label: 'Le plus récent en premier' },
@@ -83,9 +85,10 @@ export function FiltersScreen({ navigation }) {
   const [order, setOrder] = useState('recent');
   const [group, setGroup] = useState('all');
   const dirty = order !== 'recent' || group !== 'all';
+  const insets = useSafeAreaInsets();
 
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
       <View style={styles.head}>
         <BackButton variant="close" onPress={() => navigation.goBack()} />
         <Text style={styles.headTitle}>Filtre</Text>
