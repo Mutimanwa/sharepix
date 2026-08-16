@@ -40,21 +40,19 @@ export default function HomeScreen() {
   return (
     <Page style={[styles.root ,{ paddingTop: insets.top }]} edges={['top', 'left', 'right']}>
       <StatusBar style='dark' />
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={{ paddingBottom: 28 }}
-        keyboardShouldPersistTaps="handled"
-      >
+
         <View style={styles.header}>
           <Logo size={36} />
           <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
-        </View>
+        </View> 
+
+
 
         {/* Actions Buttons */}
-        <View style={styles.actions}>
+        <View style={[styles.actions,{paddingBottom: 10}]}>
           <TouchableOpacity style={[styles.actCoral]} onPress={() => setCreate(true)} activeOpacity={0.88}>
-            <HugeiconsIcon icon={Add01Icon} size={22} color="#fff" strokeWidth={2} />
-            <Text style={styles.actTitle}>Ajouter</Text>
+            <HugeiconsIcon icon={Add01Icon} size={22} color={colors.coral} strokeWidth={2} />
+            <Text style={[styles.actTitle , {color: colors.coral}]}>Nouvel album</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -65,10 +63,16 @@ export default function HomeScreen() {
             }}
             activeOpacity={0.88}
           >
-            <HugeiconsIcon icon={UserAdd01Icon} size={22} color="#fff" strokeWidth={2} />
-            <Text style={styles.actTitle}>Rejoindre</Text>
+            <HugeiconsIcon icon={UserAdd01Icon} size={22} color={colors.tealDark} strokeWidth={2} />
+            <Text style={[styles.actTitle , {color: colors.tealDark}]}>Rejoindre</Text>
           </TouchableOpacity>
         </View>
+
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 28 }}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* Idee d'albums */}
         <Text style={styles.h}>Idées d'albums</Text>
@@ -183,42 +187,50 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.cream },
   header: {
-    flexDirection: 'column',
+    display: 'flex',
+    flexDirection: 'column' ,
     paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingTop: 3,
+    alignItems: 'center'
   },
   sub: { color: colors.muted, marginTop: 4, fontSize: 14 },
   actions: { flexDirection: 'row', gap: 10, paddingHorizontal: 18, marginTop: 18 },
   actCoral: {
     flex: 1,
-    backgroundColor: colors.coral,
-    borderRadius: 20,
-    padding: 16,
+    height: 40,
+    color: colors.coral,
+    borderColor: colors.coral,
+    borderWidth: 1,
+    borderRadius: 30,
+    padding: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actTeal: {
     flex: 1,
-    backgroundColor: colors.tealDark,
-    borderRadius: 20,
+    height: 40,
+    color: colors.tealDark,
+    borderColor: colors.tealDark,
+    borderWidth: 1,
+    borderRadius: 30,
     padding: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginLeft: 8 },
-  h: { fontSize: 18, fontWeight: '700', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
+  h: { fontSize: 17, fontWeight: '600', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
   idea: {
     width: 300,
-    borderRadius: 20,
+    borderRadius: 5,
     padding: 14,
     marginLeft: 18,
     flexDirection: 'row',
     gap: 15,
     alignItems: 'center',
   },
-  ideaT: { fontWeight: '800', color: colors.tealDark, fontSize: 15 },
+  ideaT: { fontWeight: '700', color: colors.tealDark, fontSize: 15 },
   ideaS: { color: '#434848', marginTop: 4, fontSize: 15 },
   rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18 },
   count: {
@@ -229,7 +241,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   empty: {
     marginHorizontal: 18,
@@ -244,14 +256,14 @@ const styles = StyleSheet.create({
   album: { width: '50%', padding: 6 },
   cover: {
     height: 150,
-    borderRadius: 18,
+    borderRadius: 5,
     backgroundColor: colors.tealDeep,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   coverImg: { width: '100%', height: '100%' },
-  albumName: { fontSize: 19, fontWeight: '700', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
+  albumName: { fontSize: 19, fontWeight: '600', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
   albumMeta: { color: colors.muted, paddingHorizontal: 4, marginTop: 2 },
   sheetHint: { 
     textAlign: 'center', 

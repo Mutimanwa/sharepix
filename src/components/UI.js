@@ -14,6 +14,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { colors } from '../theme';
+import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -39,7 +41,7 @@ export function CoralButton({
   color = colors.coral, 
   textColor = '#fff',
   style = {},
-  height = 54,
+  height = 45,
 }) {
   return (
     <TouchableOpacity
@@ -134,7 +136,7 @@ export function Sheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} style={[{paddingBottom: 40}]} animationType="slide" transparent>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}
@@ -208,7 +210,12 @@ export function BackButton({ onPress, variant = 'back', style = {} }) {
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       activeOpacity={0.75}
     >
-      <Text style={styles.backButtonText}>{variant === 'close' ? '✕' : '←'}</Text>
+      {
+        variant === 'close' ? (
+           <HugeiconsIcon size={24} color={colors.tealDark} variant="stroke" icon={Cancel01Icon} />
+        ) : (
+          <HugeiconsIcon size={24} color={colors.tealDark} variant="stroke" icon={ArrowLeft01Icon} />
+        )}
     </TouchableOpacity>
   );
 }
@@ -269,12 +276,12 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5,
     borderColor: '#E0E0E0',
-    borderRadius: 12,
+    borderRadius: 5,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 10,
     fontSize: 17,
     backgroundColor: '#fff',
-    minHeight: 50,
+    maxHeight: 45,
   },
   
   // Sheet
@@ -358,14 +365,12 @@ const styles = StyleSheet.create({
   
   // BackButton
   backButton: {
+    // backgroundColor: colors.light,
+    borderRadius: 50,
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: colors.tealDark,
-    fontWeight: '400',
-  },
+    marginEnd: 10
+  }
 });

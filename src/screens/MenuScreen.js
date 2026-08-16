@@ -37,7 +37,7 @@ export default function MenuScreen({ route, navigation }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
         <View style={styles.hero}>
           <View style={styles.cover}>
-            <Logo size={52} />
+            <Logo size={12} color='#fff' />
           </View>
           <Text style={styles.name}>{album.name}</Text>
           <Text style={styles.meta}>
@@ -112,7 +112,7 @@ function Row({ icon, title, hint, onPress, last }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.cream },
+  root: { flex: 1,  },
   top: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  name: { fontSize: 26, fontWeight: '800', color: colors.tealDark, marginTop: 12 },
+  name: { fontSize: 26, fontWeight: '600', color: colors.tealDark, marginTop: 12 },
   meta: { color: colors.muted, marginTop: 4 },
   edit: {
     flexDirection: 'row',
@@ -147,7 +147,6 @@ const styles = StyleSheet.create({
   },
   editTxt: { fontWeight: '600', color: colors.tealDark },
   card: {
-    backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 18,
     borderRadius: 18,
@@ -170,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowT: { fontSize: 16, fontWeight: '700', color: colors.tealDark },
+  rowT: { fontSize: 16, fontWeight: '600', color: colors.tealDark },
   rowH: { color: colors.muted, fontSize: 12, marginTop: 2 },
   invite: {
     backgroundColor: '#fff',

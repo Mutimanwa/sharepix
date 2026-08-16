@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     marginLeft: 2 
   },
   title: { 
-    fontWeight: '800', 
+    fontWeight: '600', 
     fontSize: 18, 
     color: colors.tealDark 
   },
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   },
   emptyH: { 
     fontSize: 20, 
-    fontWeight: '800', 
+    fontWeight: '600', 
     textAlign: 'center', 
     color: colors.tealDark, 
     marginTop: 16 
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     right: 48,
   },
   fab: {
-    height: 54,
+    height: 45,
     borderRadius: 28,
     backgroundColor: colors.coral,
     flexDirection: 'row',
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   fabTxt: { 
     color: '#fff', 
     fontSize: 17, 
-    fontWeight: '700' 
+    fontWeight: '600' 
   },
   modalContainer: {
     flex: 1,
