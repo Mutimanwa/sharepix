@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -182,8 +182,8 @@ export function MembersScreen({ route, navigation }) {
       <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
       <View style={styles.membersContainer}>
         <View style={styles.emptyCard}>
-          <View style={styles.iconBubble}>
-            <HugeiconsIcon icon={UserMultipleIcon} size={32} color={colors.teal} />
+          <View >
+           <Image source={require('../../assets/empty/members.png')} style={{ width: 250, height: 250 }} />
           </View>
           <Text style={styles.emptyH}>Pas encore de membres</Text>
           <Text style={styles.hintCenter}>
@@ -258,13 +258,13 @@ export function PcUploadScreen({ navigation }) {
         </Text>
         <View style={styles.stepCard}>
           <View style={styles.n}><Text style={styles.nTxt}>1</Text></View>
-          <HugeiconsIcon icon={ComputerIcon} size={200} color={colors.teal} />
+          <Image source={require('../../assets/ilustration/webdevise.png')} style={{ width: 200, height: 200 }} />
           <Text style={styles.stepT}>Ouvrez web.sharepix.app</Text>
           <Text style={styles.rowH}>Sur l'ordinateur, dans votre navigateur.</Text>
         </View>
         <View style={styles.stepCard}>
           <View style={styles.n}><Text style={styles.nTxt}>2</Text></View>
-          <HugeiconsIcon icon={QrCodeIcon} size={200} color={colors.coral} />
+          <Image source={require('../../assets/ilustration/qrcode.png')} style={{ width: 200, height: 200 }} />
           <Text style={styles.stepT}>Scannez le QR affiché</Text>
           <Text style={styles.rowH}>Tenez le téléphone devant l'écran pour lier l'album.</Text>
         </View>
@@ -423,5 +423,5 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   nTxt: { fontWeight: '800', color: colors.tealDark },
-  stepT: { fontWeight: '800', fontSize: 16, color: colors.tealDark, marginTop: 8 },
+  stepT: { fontWeight: '700', fontSize: 16, color: colors.tealDark, marginTop: 8 },
 });

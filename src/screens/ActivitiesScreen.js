@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CoralButton } from '../components/UI';
@@ -33,7 +34,9 @@ export default function ActivitiesScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.centerContent}>
-            <Text style={styles.emoji}>💬⭐</Text>
+            <View>
+               <Image source={require('../../assets/empty/activity.png')} style={{ width: 120, height: 120 }} />
+            </View>
             <Text style={styles.h}>Activer les notifications</Text>
             <Text style={styles.p}>
               Ne manquez pas le moment où quelqu'un vous mentionne dans les commentaires, 
@@ -69,7 +72,9 @@ export default function ActivitiesScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.centerContent}>
-          <Text style={styles.emoji}>💬⭐</Text>
+            <View>
+               <Image source={require('../../assets/empty/activity.png')} style={{ width: 120, height: 120 }} />
+            </View>
           <Text style={styles.h}>Il n'y a pas encore d'activités</Text>
           <Text style={styles.p}>
             Commencez par mentionner quelqu'un avec @nom dans un commentaire !

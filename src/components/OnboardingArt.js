@@ -1,5 +1,4 @@
 import React from 'react';
-import Svg, { Circle, Rect, Path, G, Ellipse } from 'react-native-svg';
 import { colors } from '../theme';
 import { Image } from 'react-native';
 const image1 = require('../../assets/ilustration/01.png');

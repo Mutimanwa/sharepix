@@ -106,6 +106,9 @@ export default function HomeScreen() {
 
         {state.albums.length === 0 ? (
           <View style={styles.empty}>
+            <View >
+               <Image source={require('../../assets/empty/album.png')} style={{ width: 120, height: 120 }} />
+            </View>
             <Text style={styles.emptyT}>Aucun album pour le moment</Text>
             <Text style={styles.emptyS}>Créez le premier ou rejoignez un proche.</Text>
           </View>
@@ -117,7 +120,7 @@ export default function HomeScreen() {
                   {a.photos[0] ? (
                     <Image source={{ uri: a.photos[0].uri }} style={styles.coverImg} />
                   ) : (
-                    <Logo size={30} />
+                    <Image source={require('../../assets/empty/photo.png')} style={{ width: 150, height: 150 }} />
                   )}
                 </View>
                 <Text style={styles.albumName} numberOfLines={1}>{a.name}</Text>
@@ -257,7 +260,7 @@ const styles = StyleSheet.create({
   cover: {
     height: 150,
     borderRadius: 5,
-    backgroundColor: colors.tealDeep,
+    backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
