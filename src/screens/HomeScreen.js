@@ -185,7 +185,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.cream },
+  root: { flex: 1, },
   header: {
     display: 'flex',
     flexDirection: 'column' ,

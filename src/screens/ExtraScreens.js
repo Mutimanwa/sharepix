@@ -154,6 +154,7 @@ export function FiltersScreen({ navigation }) {
 
 export function QRScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
+  const insets = useSafeAreaInsets();
   return (
     <Page style={[styles.root , {paddingTop: insets.top  , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
@@ -175,6 +176,7 @@ export function QRScreen({ route, navigation }) {
 
 export function MembersScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
+   const insets = useSafeAreaInsets();
   return (
     <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
@@ -211,6 +213,7 @@ export function PremiumScreen({ navigation }) {
     { icon: Image01Icon, title: 'Qualité originale', hint: 'Aucun recadrage, aucun tassement' },
     { icon: Diamond01Icon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
   ];
+  const insets = useSafeAreaInsets();
   return (
     <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
       <ScreenHead title="Album Premium" onBack={() => navigation.goBack()} />

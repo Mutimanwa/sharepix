@@ -61,7 +61,7 @@ export default function OnboardingScreen({ navigation }) {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar style='dark' />
       <View style={styles.brand}>
-        <Logo size={64} />
+        <Logo size={44} />
       </View>
 
       <FlatList
@@ -78,7 +78,7 @@ export default function OnboardingScreen({ navigation }) {
           return (
             <View style={styles.page}>
               <View style={styles.artWrap}>
-                <Art size={Math.min(280, width - 64)} />
+                <Art size={Math.min(300, width - 64)} />
               </View>
               <Text style={styles.title}>{item.title}</Text>
             </View>
@@ -167,7 +167,7 @@ export default function OnboardingScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.cream,
+
   },
   brand: {
     alignItems: 'center',
@@ -181,15 +181,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   artWrap: {
-    marginTop: 4,
+    marginTop: 100,
     marginBottom: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     lineHeight: 30,
     color: colors.tealDark,
     paddingHorizontal: 8,
