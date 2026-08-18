@@ -13,6 +13,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -32,6 +33,9 @@ import { BackButton } from '../components/UI';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.70; // L'image prend 70% de l'écran
 
+// Variable globale pour suivre si le tip a déjà été affiché durant la session
+let globalHasSeenTip = false;
+
 export default function PhotoScreen({ route, navigation }) {
   const { albumId, photoId } = route.params;
   const { state, toggleLike, toggleFavorite, addComment, deletePhoto } = useStore();
@@ -47,7 +51,7 @@ export default function PhotoScreen({ route, navigation }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [text, setText] = useState('');
   const [del, setDel] = useState(false);
-  const [tip, setTip] = useState(true);
+  const [tip, setTip] = useState(!globalHasSeenTip);
 
   // La photo actuellement affichée
   const currentPhoto = photos[currentIndex];
@@ -82,6 +86,11 @@ export default function PhotoScreen({ route, navigation }) {
     Keyboard.dismiss();
   };
 
+  const dismissTip = () => {
+    setTip(false);
+    globalHasSeenTip = true;
+  };
+
   // Configuration pour que le FlatList horizontal démarre sur la bonne photo
   const getItemLayout = (_, index) => ({
     length: SCREEN_WIDTH,
@@ -96,7 +105,7 @@ export default function PhotoScreen({ route, navigation }) {
   );
 
   return (
-    <SafeAreaView style={styles.root} edges={['top' , 'bottom']}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       
       {/* Header Fixe */}
@@ -111,121 +120,126 @@ export default function PhotoScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Le KeyboardAvoidingView englobe tout le contenu variable */}
-      <KeyboardAvoidingView style={styles.mainContent} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* Le KeyboardAvoidingView englobe le contenu scrollable et la barre de saisie */}
+      <KeyboardAvoidingView 
+        style={styles.mainContent} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1 }}>
             
-            {/* 2. Carousel d'images (Swipe Horizontal) */}
-            <FlatList
-              data={photos}
-              renderItem={renderImageItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              initialScrollIndex={initialIndex}
-              getItemLayout={getItemLayout}
-              onMomentumScrollEnd={(event) => {
-                const newIndex = Math.round(
-                  event.nativeEvent.contentOffset.x / SCREEN_WIDTH
-                );
-                if (newIndex !== currentIndex && newIndex >= 0 && newIndex < photos.length) {
-                  setCurrentIndex(newIndex);
-                  setTip(false); // Cache le tip quand on swipe
-                }
-              }}
-            />
-
-            {/* Indicateur de position (ex: 1 / 5) */}
-            <View style={styles.pagination}>
-              <Text style={styles.paginationText}>
-                {currentIndex + 1} / {photos.length}
-              </Text>
-            </View>
-
-            {/* Actions Fixes */}
-            {currentPhoto && (
-              <View style={styles.actions}>
-                <TouchableOpacity style={styles.act} onPress={() => toggleLike(albumId, currentPhoto.id)}>
-                  <HugeiconsIcon
-                    icon={FavouriteIcon}
-                    size={24}
-                    color={currentPhoto.liked ? colors.coral : colors.tealDark}
-                    strokeWidth={currentPhoto.liked ? 2.4 : 1.6}
-                  />
-                  <Text style={[styles.actLbl, currentPhoto.liked && { color: colors.coral }]}>J'aime</Text>
-                </TouchableOpacity>
-                <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <TouchableOpacity style={styles.act}>
-                  <HugeiconsIcon icon={Download01Icon} size={22} color={colors.tealDark} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.act}
-                  onPress={() => {
-                    toggleFavorite(albumId, currentPhoto.id);
-                    setTip(false);
-                  }}
-                >
-                  <HugeiconsIcon
-                    icon={StarIcon}
-                    size={24}
-                    color={currentPhoto.favorite ? colors.coral : colors.tealDark}
-                    strokeWidth={currentPhoto.favorite ? 2.4 : 1.6}
-                  />
-                </TouchableOpacity>
-                </View>
-              
-              </View>
-            )}
-
-            {/* Tip */}
-            {tip && (
-              <View style={styles.tip}>
-                <Text style={styles.tipTxt}>Touchez l'étoile pour ajouter la photo à vos favoris.</Text>
-                <TouchableOpacity onPress={() => setTip(false)}>
-                  <Text style={styles.tipOk}>OK</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Zone de commentaires (Scrollable verticalement) */}
-            {currentPhoto && (
+            {/* ScrollView principal unifié pour tout le contenu central */}
+            <ScrollView
+              ref={scrollViewRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* 2. Carousel d'images (Swipe Horizontal) */}
               <FlatList
-                ref={scrollViewRef}
-                data={currentPhoto.comments}
-                keyExtractor={(c) => c.id}
-                style={styles.commentsContainer}
-                contentContainerStyle={styles.commentsContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                ListEmptyComponent={
-                  <View style={styles.emptyComments}>
-                    <Image source={require('../../assets/empty/comment.png')} style={{ width: 100, height: 100, marginBottom: 12 }} />
-                    <Text style={styles.emptyH}>Aucun commentaire pour le moment</Text>
-                    <Text style={styles.emptyC}>Soyez le premier à commenter.</Text>
-                  </View>
-                }
-                renderItem={({ item: c }) => (
-                  <View key={c.id} style={styles.cmt}>
-                    <View style={styles.av}>
-                      <Text style={styles.avT}>{(c.author || 'V')[0]}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.cmtHeader}>
-                        <Text style={styles.cmtA}>{c.author}</Text>
-                        <Text style={styles.when}>à l'instant</Text>
-                      </View>
-                      <Text style={styles.cmtB}>{c.text}</Text>
-                      <View style={styles.cmtActions}>
-                        <Text style={styles.cmtAct}>J'aime</Text>
-                        <Text style={styles.cmtAct}>Répondre</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
+                data={photos}
+                renderItem={renderImageItem}
+                keyExtractor={(item) => item.id}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                initialScrollIndex={initialIndex}
+                getItemLayout={getItemLayout}
+                onMomentumScrollEnd={(event) => {
+                  const newIndex = Math.round(
+                    event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+                  );
+                  if (newIndex !== currentIndex && newIndex >= 0 && newIndex < photos.length) {
+                    setCurrentIndex(newIndex);
+                    dismissTip(); // Cache le tip dès qu'on swipe
+                  }
+                }}
               />
-            )}
+
+              {/* Indicateur de position (ex: 1 / 5) */}
+              <View style={styles.pagination}>
+                <Text style={styles.paginationText}>
+                  {currentIndex + 1} / {photos.length}
+                </Text>
+              </View>
+
+              {/* Actions Fixes */}
+              {currentPhoto && (
+                <View style={styles.actions}>
+                  <TouchableOpacity style={styles.act} onPress={() => toggleLike(albumId, currentPhoto.id)}>
+                    <HugeiconsIcon
+                      icon={FavouriteIcon}
+                      size={24}
+                      color={currentPhoto.liked ? colors.coral : colors.tealDark}
+                      strokeWidth={currentPhoto.liked ? 2.4 : 1.6}
+                    />
+                    <Text style={[styles.actLbl, currentPhoto.liked && { color: colors.coral }]}>J'aime</Text>
+                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 16 }}>
+                    <TouchableOpacity style={styles.act}>
+                      <HugeiconsIcon icon={Download01Icon} size={22} color={colors.tealDark} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.act}
+                      onPress={() => {
+                        toggleFavorite(albumId, currentPhoto.id);
+                        dismissTip();
+                      }}
+                    >
+                      <HugeiconsIcon
+                        icon={StarIcon}
+                        size={24}
+                        color={currentPhoto.favorite ? colors.coral : colors.tealDark}
+                        strokeWidth={currentPhoto.favorite ? 2.4 : 1.6}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Tip (Apparaît une seule fois) */}
+              {tip && (
+                <View style={styles.tip}>
+                  <Text style={styles.tipTxt}>Touchez l'étoile pour ajouter la photo à vos favoris.</Text>
+                  <TouchableOpacity onPress={dismissTip}>
+                    <Text style={styles.tipOk}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Zone de commentaires intégrée au défilement principal */}
+              {currentPhoto && (
+                <View style={styles.commentsContent}>
+                  {currentPhoto.comments && currentPhoto.comments.length > 0 ? (
+                    currentPhoto.comments.map((c) => (
+                      <View key={c.id} style={styles.cmt}>
+                        <View style={styles.av}>
+                          <Text style={styles.avT}>{(c.author || 'V')[0]}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.cmtHeader}>
+                            <Text style={styles.cmtA}>{c.author}</Text>
+                            <Text style={styles.when}>à l'instant</Text>
+                          </View>
+                          <Text style={styles.cmtB}>{c.text}</Text>
+                          <View style={styles.cmtActions}>
+                            <Text style={styles.cmtAct}>J'aime</Text>
+                            <Text style={styles.cmtAct}>Répondre</Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.emptyComments}>
+                      <Image source={require('../../assets/empty/comment.png')} style={{ width: 100, height: 100, marginBottom: 12 }} />
+                      <Text style={styles.emptyH}>Aucun commentaire pour le moment</Text>
+                      <Text style={styles.emptyC}>Soyez le premier à commenter.</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </ScrollView>
 
             {/* Barre de saisie fixe en bas */}
             <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -256,7 +270,7 @@ export default function PhotoScreen({ route, navigation }) {
 
       {/* Modal de suppression */}
       <Modal visible={del} transparent animationType="slide">
-        <View style={[styles.modal]} >
+        <View style={styles.modal}>
           <View style={styles.sheet}>
             <View style={styles.sheetTop}>
               <View style={{ width: 50 }} />
@@ -322,7 +336,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Styles pour le Carousel d'images
   imageContainer: {
     width: SCREEN_WIDTH,
     height: IMAGE_HEIGHT,
@@ -380,20 +393,22 @@ const styles = StyleSheet.create({
   },
   tipOk: {
     color: colors.tealDark,
-    fontWeight: '800',
-  },
-  commentsContainer: {
-    flex: 1, // Prend tout l'espace restant au-dessus du clavier
+    fontWeight: '600',
   },
   commentsContent: {
     paddingHorizontal: 14,
     paddingTop: 8,
   },
   emptyComments: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 30,
+  },
+  emptyH: {
+    fontWeight: '600',
+    color: colors.tealDark,
+    fontSize: 16,
+    marginBottom: 4,
   },
   emptyC: {
     textAlign: 'center',
@@ -483,7 +498,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Modal Styles
   modal: {
     flex: 1,
     backgroundColor: 'rgba(14,58,62,0.45)',
@@ -504,7 +518,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   sheetH: {
-    fontWeight: '800',
+    fontWeight: '600',
     color: colors.tealDark,
     fontSize: 16,
   },
@@ -520,7 +534,7 @@ const styles = StyleSheet.create({
   },
   delT: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'center',
     color: colors.tealDark,
   },
@@ -540,7 +554,7 @@ const styles = StyleSheet.create({
   },
   ctaTxt: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 16,
   },
   cancel: {
