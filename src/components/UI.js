@@ -136,14 +136,14 @@ export function Sheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} style={[ Math.max(insets.bottom, 28) ]} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}
         keyboardVerticalOffset={keyboardVerticalOffset}
       >
         <Pressable style={styles.sheetOverlay} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet , { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.sheetHead}>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
               <Text style={{ fontSize: 22 }}>✕</Text>
