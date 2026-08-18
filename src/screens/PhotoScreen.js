@@ -30,7 +30,7 @@ import { BackButton } from '../components/UI';
 
 // Récupération des dimensions de l'écran pour l'image
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.45; // L'image prend 45% de l'écran
+const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.70; // L'image prend 70% de l'écran
 
 export default function PhotoScreen({ route, navigation }) {
   const { albumId, photoId } = route.params;
@@ -68,6 +68,7 @@ export default function PhotoScreen({ route, navigation }) {
           <Text style={styles.author}>Photo</Text>
         </View>
         <View style={styles.center}>
+          <Image source={require('../../assets/empty/photo.png')} style={{ width: 120, height: 120, marginBottom: 12 }} />
           <Text style={{ color: colors.muted }}>Photo ou album introuvable</Text>
         </View>
       </SafeAreaView>
@@ -95,7 +96,7 @@ export default function PhotoScreen({ route, navigation }) {
   );
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top' , 'bottom']}>
       <StatusBar style="dark" />
       
       {/* Header Fixe */}
@@ -111,10 +112,7 @@ export default function PhotoScreen({ route, navigation }) {
       </View>
 
       {/* Le KeyboardAvoidingView englobe tout le contenu variable */}
-      <KeyboardAvoidingView 
-        style={styles.mainContent} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={styles.mainContent} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1 }}>
             
@@ -158,7 +156,8 @@ export default function PhotoScreen({ route, navigation }) {
                   />
                   <Text style={[styles.actLbl, currentPhoto.liked && { color: colors.coral }]}>J'aime</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.act}>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <TouchableOpacity style={styles.act}>
                   <HugeiconsIcon icon={Download01Icon} size={22} color={colors.tealDark} />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -175,6 +174,8 @@ export default function PhotoScreen({ route, navigation }) {
                     strokeWidth={currentPhoto.favorite ? 2.4 : 1.6}
                   />
                 </TouchableOpacity>
+                </View>
+              
               </View>
             )}
 
@@ -200,6 +201,8 @@ export default function PhotoScreen({ route, navigation }) {
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={
                   <View style={styles.emptyComments}>
+                    <Image source={require('../../assets/empty/comment.png')} style={{ width: 100, height: 100, marginBottom: 12 }} />
+                    <Text style={styles.emptyH}>Aucun commentaire pour le moment</Text>
                     <Text style={styles.emptyC}>Soyez le premier à commenter.</Text>
                   </View>
                 }
@@ -253,7 +256,7 @@ export default function PhotoScreen({ route, navigation }) {
 
       {/* Modal de suppression */}
       <Modal visible={del} transparent animationType="slide">
-        <View style={styles.modal}>
+        <View style={[styles.modal]} >
           <View style={styles.sheet}>
             <View style={styles.sheetTop}>
               <View style={{ width: 50 }} />
@@ -323,7 +326,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: SCREEN_WIDTH,
     height: IMAGE_HEIGHT,
-    backgroundColor: colors.tealDeep, // Fond sombre pour faire ressortir l'image
+    backgroundColor: colors.cream, 
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -334,10 +337,10 @@ const styles = StyleSheet.create({
   pagination: {
     alignItems: 'center',
     paddingVertical: 6,
-    backgroundColor: colors.tealDeep,
+    backgroundColor: colors.cream,
   },
   paginationText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.tealDark,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
     color: colors.tealDark,
   },
   tip: {
-    backgroundColor: colors.tealDark,
+    backgroundColor: colors.border,
     marginHorizontal: 14,
     marginTop: 10,
     padding: 12,
@@ -371,12 +374,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tipTxt: {
-    color: '#fff',
+    color: colors.tealDark,
     flex: 1,
     lineHeight: 20,
   },
   tipOk: {
-    color: colors.coral,
+    color: colors.tealDark,
     fontWeight: '800',
   },
   commentsContainer: {
@@ -451,7 +454,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingVertical: 15,
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#fff',
@@ -485,6 +488,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(14,58,62,0.45)',
     justifyContent: 'flex-end',
+    paddingBottom: Platform.OS === 'ios' ? 0 : 20,
   },
   sheet: {
     backgroundColor: '#fff',

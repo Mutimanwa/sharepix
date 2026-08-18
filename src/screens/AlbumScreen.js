@@ -161,7 +161,7 @@ export default function AlbumScreen({ route, navigation }) {
 
       {/* FAB Button - avec padding bottom pour éviter la tab bar */}
       {tab !== 'vid' && (
-        <View style={[styles.fabWrap, { bottom: Math.max(insets.bottom, 38) }]}>
+        <View style={[styles.fabWrap, { paddingBottom: Math.max(insets.bottom, 38) }]}>
           <TouchableOpacity style={styles.fab} onPress={pick} activeOpacity={0.88}>
             <HugeiconsIcon icon={Camera01Icon} size={22} color="#fff" />
             <Text style={styles.fabTxt}>Ajouter</Text>
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     position: 'absolute', 
     left: 48, 
     right: 48,
-    bottom: 10
+    bottom: 30
   },
   fab: {
     height: 45,

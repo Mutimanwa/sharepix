@@ -13,7 +13,7 @@
     "android": {
       "package": "app.sharepix.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#0E3A3E",
+        "backgroundColor": "#F3F8F8",
         "foregroundImage": "./assets/sharepix-icon.png"
       },
       "permissions": [

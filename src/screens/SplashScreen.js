@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   restart: {
-    color: '#fff',
+    color: colors.tealDark,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 4,

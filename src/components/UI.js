@@ -136,7 +136,7 @@ export function Sheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} style={[insets.bottom]} animationType="slide" transparent>
+    <Modal visible={visible} style={[ Math.max(insets.bottom, 28) ]} animationType="slide" transparent>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}
@@ -154,7 +154,7 @@ export function Sheet({
           <ScrollView 
             ref={scrollRef}
             style={styles.sheetContent}
-            contentContainerStyle={styles.sheetContentContainer}
+            contentContainerStyle={[styles.sheetContentContainer , { paddingBottom: Math.max(insets.bottom, 20) }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             scrollEnabled={true}
