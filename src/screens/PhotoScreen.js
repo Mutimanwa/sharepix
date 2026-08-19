@@ -57,11 +57,11 @@ export default function PhotoScreen({ route, navigation }) {
   const currentPhoto = photos[currentIndex];
 
   // Scroll automatique vers le bas quand un nouveau commentaire est ajouté
-  useEffect(() => {
-    if (scrollViewRef.current && currentPhoto?.comments?.length > 0) {
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [currentPhoto?.comments?.length]);
+  // useEffect(() => {
+  //   if (scrollViewRef.current && currentPhoto?.comments?.length > 0) {
+  //     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+  //   }
+  // }, [currentPhoto?.comments?.length]);
 
   if (!album || photos.length === 0 || initialIndex === -1) {
     return (

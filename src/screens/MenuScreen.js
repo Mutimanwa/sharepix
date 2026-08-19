@@ -15,7 +15,7 @@ import { colors } from '../theme';
 import { Logo, BackButton, Page } from '../components/UI';
 import { useStore } from '../store';
 import { StatusBar } from 'expo-status-bar';
-import * as Clipboard from 'expo-clipboard'; // Import de l'utilitaire de copie Expo
+import * as Clipboard from 'expo-clipboard'; 
 
 export default function MenuScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
