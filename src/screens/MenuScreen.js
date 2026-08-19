@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   PencilEdit02Icon,
@@ -15,29 +15,40 @@ import { colors } from '../theme';
 import { Logo, BackButton, Page } from '../components/UI';
 import { useStore } from '../store';
 import { StatusBar } from 'expo-status-bar';
+import * as Clipboard from 'expo-clipboard'; // Import de l'utilitaire de copie Expo
 
 export default function MenuScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
+  const insets = useSafeAreaInsets();
+
   if (!album) return null;
 
   const invite = () =>
     Share.share({
       message: `Rejoins mon album « ${album.name} » sur SharePix. Code : ${album.code}`,
     });
-  const insets = useSafeAreaInsets();
+
+  // Fonction pour copier le code dans le presse-papiers
+  const copyToClipboard = async () => {
+    await Clipboard.setStringAsync(album.code);
+    Alert.instance ? Alert.alert("Copié", "Code d'invitation copié !") : alert("Code d'invitation copié !");
+  };
 
   return (
-    <Page style={[styles.root ,{paddingTop: insets.top} ]} edges={['top']}>
-      <StatusBar style='dark' />
+    <Page style={styles.root} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
+      
+      {/* Header corrigé : Un seul bouton de fermeture/retour et un titre propre */}
       <View style={styles.top}>
         <BackButton onPress={() => navigation.goBack()} />
+        <Text style={styles.headerTitle}>Options de l'album</Text>
         <BackButton variant="close" onPress={() => navigation.goBack()} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.hero}>
           <View style={styles.cover}>
-            <Logo size={12} color='#fff' />
+            <Logo size={12} color="#fff" />
           </View>
           <Text style={styles.name}>{album.name}</Text>
           <Text style={styles.meta}>
@@ -77,10 +88,11 @@ export default function MenuScreen({ route, navigation }) {
             Partagez le code d'invitation pour ajouter des membres à cet album.
           </Text>
           <View style={styles.codeRow}>
-            <View style={styles.codeBox}>
+            {/* Rendre le codeBox cliquable pour copier directement */}
+            <TouchableOpacity style={styles.codeBox} onPress={copyToClipboard} activeOpacity={0.7}>
               <Text style={styles.code}>{album.code}</Text>
               <HugeiconsIcon icon={Copy01Icon} size={16} color={colors.teal} />
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.inviteBtn} onPress={invite} activeOpacity={0.88}>
               <Text style={styles.inviteBtnTxt}>Invitez</Text>
             </TouchableOpacity>
@@ -112,13 +124,21 @@ function Row({ icon, title, hint, onPress, last }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1,  },
+  root: { flex: 1 },
   top: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
     paddingVertical: 8,
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.tealDark,
   },
   hero: { alignItems: 'center', paddingHorizontal: 18, paddingBottom: 8, paddingTop: 16 },
   cover: {
@@ -149,6 +169,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
     borderRadius: 18,
     paddingHorizontal: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E8EEEE',
   },
   row: {
     flexDirection: 'row',

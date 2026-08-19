@@ -173,7 +173,7 @@ export default function AlbumScreen({ route, navigation }) {
       <Modal visible={uploading} transparent animationType="fade">
         <SafeAreaView style={styles.modalContainer}>
           <View style={[styles.banner, { marginTop: insets.top + 10 }]}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>
+            <Text style={{ color: colors.tealDark, fontWeight: '600' }}>
               Téléchargement en cours. Ne fermez pas l'appli.
             </Text>
           </View>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   banner: {
-    backgroundColor: colors.tealDark,
+    backgroundColor: colors.cream,
     padding: 14,
     marginHorizontal: 16,
     borderRadius: 12,

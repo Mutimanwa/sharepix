@@ -242,7 +242,7 @@ export default function PhotoScreen({ route, navigation }) {
             </ScrollView>
 
             {/* Barre de saisie fixe en bas */}
-            <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom) }]}>
               <TextInput
                 ref={inputRef}
                 style={styles.inp}
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(14,58,62,0.45)',
     justifyContent: 'flex-end',
-    paddingBottom: Platform.OS === 'ios' ? 0 : 20,
+    paddingBottom: Platform.OS === 'ios' ? 0 : 40,
   },
   sheet: {
     backgroundColor: '#fff',

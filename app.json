@@ -28,7 +28,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0E3A3E",
+          "backgroundColor": "#F3F8F8",
           "image": "./assets/sharepix-logo.png",
           "imageWidth": 200
         }
