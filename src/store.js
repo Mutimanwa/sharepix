@@ -1,10 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isSupabaseConfigured } from './config';
+import { restoreSession, syncProfile } from './services/auth';
 
 const KEY = 'sharepix.v1';
 
 const defaultState = {
   onboarded: false,
+  favTipSeen: false,
+  authChecked: false, // true quand on sait si une session Supabase existe
+  user: null,         // utilisateur Supabase connecté ({id, email, firstName, lastName})
   profile: {
     firstName: '',
     lastName: '',
@@ -33,14 +38,47 @@ export function StoreProvider({ children }) {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(KEY);
-        if (raw) setState({ ...defaultState, ...JSON.parse(raw) });
+        if (raw) setState({ ...defaultState, ...JSON.parse(raw), user: null, authChecked: false });
       } catch {}
       setReady(true);
     })();
   }, []);
 
+  // Restaure la session Supabase au démarrage (offline-first : si Supabase
+  // n'est pas configuré ou pas de session, on continue en local)
   useEffect(() => {
-    if (ready) AsyncStorage.setItem(KEY, JSON.stringify(state)).catch(() => {});
+    let cancelled = false;
+    (async () => {
+      try {
+        if (isSupabaseConfigured) {
+          const user = await restoreSession();
+          if (!cancelled && user) {
+            setState((s) => ({
+              ...s,
+              user,
+              profile: {
+                ...s.profile,
+                firstName: s.profile.firstName || user.firstName,
+                lastName: s.profile.lastName || user.lastName,
+              },
+            }));
+          }
+        }
+      } catch {}
+      if (!cancelled) setState((s) => ({ ...s, authChecked: true }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persistance locale : on EXCLUT les champs runtime (user, authChecked) —
+  // la session Supabase est persistée par Supabase lui-même.
+  useEffect(() => {
+    if (ready) {
+      const { user, authChecked, ...toPersist } = state;
+      AsyncStorage.setItem(KEY, JSON.stringify(toPersist)).catch(() => {});
+    }
   }, [state, ready]);
 
   const api = useMemo(
@@ -48,7 +86,30 @@ export function StoreProvider({ children }) {
       ready,
       state,
       setOnboarded: () => setState((s) => ({ ...s, onboarded: true })),
-      updateProfile: (p) => setState((s) => ({ ...s, profile: { ...s.profile, ...p } })),
+      dismissFavTip: () => setState((s) => ({ ...s, favTipSeen: true })),
+      // Connecte l'utilisateur Supabase et recopie son prénom/nom dans le profil local
+      setAuthUser: (user) =>
+        setState((s) => ({
+          ...s,
+          user,
+          profile: {
+            ...s.profile,
+            firstName: user?.firstName || s.profile.firstName,
+            lastName: user?.lastName || s.profile.lastName,
+          },
+        })),
+      clearAuthUser: () => setState((s) => ({ ...s, user: null })),
+      updateProfile: (p) => {
+        setState((s) => ({ ...s, profile: { ...s.profile, ...p } }));
+        // Synchro douce vers la table `profiles` si connecté
+        if (state.user?.id) {
+          const merged = { ...state.profile, ...p };
+          syncProfile(state.user.id, {
+            firstName: merged.firstName,
+            lastName: merged.lastName,
+          });
+        }
+      },
       createAlbum: ({ name, firstName }) => {
         const album = {
           id: Date.now().toString(),

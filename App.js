@@ -14,6 +14,9 @@ import { StoreProvider } from './src/store';
 import { colors } from './src/theme';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+// ── SUPABASE AUTH : intégration ──
+import AuthScreen from './src/screens/AuthScreen';
+// ── SUPABASE AUTH : fin ──
 import HomeScreen from './src/screens/HomeScreen';
 import ActivitiesScreen from './src/screens/ActivitiesScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -94,6 +97,9 @@ export default function App() {
           >
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            {/* ── SUPABASE AUTH : intégration ── */}
+            <Stack.Screen name="Auth" component={AuthScreen} />
+            {/* ── SUPABASE AUTH : fin ── */}
             <Stack.Screen name="Main" component={Tabs} />
             <Stack.Screen name="Album" component={AlbumScreen} />
             <Stack.Screen name="Photo" component={PhotoScreen} />
