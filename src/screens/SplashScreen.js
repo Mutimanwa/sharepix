@@ -94,7 +94,13 @@ export default function SplashScreen({ navigation }) {
   //   - sinon                            -> Main
   useEffect(() => {
     if (!ready) return; // attend le store local (rapide, AsyncStorage)
-
+      console.log('SPLASH STATE:', {
+    ready,
+    authChecked,
+    onboarded: state.onboarded,
+    user: state.user,
+    supabase: isSupabaseConfigured,
+  });
     const decide = (checkAuth) => {
       if (navigated.current) return;
       navigated.current = true;

@@ -8,6 +8,7 @@ const KEY = 'sharepix.v1';
 const defaultState = {
   onboarded: false,
   favTipSeen: false,
+  // — Runtime auth (jamais persisté dans AsyncStorage) —
   authChecked: false, // true quand on sait si une session Supabase existe
   user: null,         // utilisateur Supabase connecté ({id, email, firstName, lastName})
   profile: {
