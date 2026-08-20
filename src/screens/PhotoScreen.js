@@ -13,6 +13,7 @@ import {
   Platform,
   Keyboard,
   Dimensions,
+  ScrollView, // <-- AJOUT DE SCROLLVIEW
 } from 'react-native';
 
 import {
@@ -74,7 +75,7 @@ export default function PhotoScreen({ route, navigation }) {
   // REFS
   // -------------------------------------------------------
 
-  const photoListRef = useRef(null);
+  const horizontalScrollRef = useRef(null); // <-- RENOMMÉ POUR LA SCROLLVIEW
   const commentInputRef = useRef(null);
 
 
@@ -193,10 +194,6 @@ export default function PhotoScreen({ route, navigation }) {
       return;
     }
 
-    // -----------------------------------------------------
-    // RESPONSE
-    // -----------------------------------------------------
-
     if (replyTo) {
       const reply = {
         id: `reply-${Date.now()}`,
@@ -222,11 +219,6 @@ export default function PhotoScreen({ route, navigation }) {
 
       return;
     }
-
-
-    // -----------------------------------------------------
-    // NORMAL COMMENT
-    // -----------------------------------------------------
 
     addComment(
       albumId,
@@ -288,36 +280,6 @@ export default function PhotoScreen({ route, navigation }) {
 
 
   // -------------------------------------------------------
-  // PHOTO LAYOUT
-  // -------------------------------------------------------
-
-  const getItemLayout = (_, index) => ({
-    length: SCREEN_WIDTH,
-    offset: SCREEN_WIDTH * index,
-    index,
-  });
-
-
-  // -------------------------------------------------------
-  // PHOTO ITEM
-  // -------------------------------------------------------
-
-  const renderImageItem = ({
-    item,
-  }) => {
-    return (
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: item.uri }}
-          style={styles.img}
-          resizeMode="contain"
-        />
-      </View>
-    );
-  };
-
-
-  // -------------------------------------------------------
   // COMMENT DATA
   // -------------------------------------------------------
 
@@ -340,51 +302,28 @@ export default function PhotoScreen({ route, navigation }) {
     return (
       <View style={styles.commentBlock}>
 
-        {/* COMMENTAIRE PRINCIPAL */}
-
         <View style={styles.cmt}>
-
-          {/* AVATAR */}
-
           <View style={styles.av}>
             <Text style={styles.avT}>
               {(comment.author || 'V')[0].toUpperCase()}
             </Text>
           </View>
 
-
-          {/* CONTENT */}
-
           <View style={styles.commentBody}>
-
-            {/* HEADER */}
-
             <View style={styles.cmtHeader}>
-
               <Text style={styles.cmtA}>
                 {comment.author || 'Vous'}
               </Text>
-
               <Text style={styles.when}>
                 à l'instant
               </Text>
-
             </View>
-
-
-            {/* TEXT */}
 
             <Text style={styles.cmtB}>
               {comment.text}
             </Text>
 
-
-            {/* ACTIONS */}
-
             <View style={styles.cmtActions}>
-
-              {/* LIKE */}
-
               <TouchableOpacity
                 onPress={() =>
                   toggleCommentLike(comment.id)
@@ -405,9 +344,6 @@ export default function PhotoScreen({ route, navigation }) {
                 </Text>
               </TouchableOpacity>
 
-
-              {/* REPLY */}
-
               <TouchableOpacity
                 onPress={() =>
                   handleReply(comment)
@@ -419,29 +355,18 @@ export default function PhotoScreen({ route, navigation }) {
                   Répondre
                 </Text>
               </TouchableOpacity>
-
             </View>
-
           </View>
-
         </View>
-
-
-        {/* -------------------------------------------------
-            REPLIES
-        ------------------------------------------------- */}
 
         {replies.length > 0 && (
           <View style={styles.replies}>
-
             {replies.map((reply) => (
               <View
                 key={reply.id}
                 style={styles.reply}
               >
-
                 <View style={styles.replyLine} />
-
                 <View style={styles.replyAvatar}>
                   <Text
                     style={styles.replyAvatarText}
@@ -449,22 +374,16 @@ export default function PhotoScreen({ route, navigation }) {
                     {(reply.author || 'V')[0].toUpperCase()}
                   </Text>
                 </View>
-
                 <View style={styles.replyBody}>
-
                   <Text style={styles.replyAuthor}>
                     {reply.author}
                   </Text>
-
                   <Text style={styles.replyText}>
                     {reply.text}
                   </Text>
-
                 </View>
-
               </View>
             ))}
-
           </View>
         )}
 
@@ -482,24 +401,22 @@ export default function PhotoScreen({ route, navigation }) {
       <>
 
         {/* -----------------------------------------------
-            PHOTO CAROUSEL
+            PHOTO CAROUSEL (CORRIGÉ : ScrollView au lieu de FlatList)
         ------------------------------------------------ */}
-
-        <FlatList
-          ref={photoListRef}
-          data={photos}
-          renderItem={renderImageItem}
-          keyExtractor={(item) => item.id}
+        <ScrollView
+          ref={horizontalScrollRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex}
-          getItemLayout={getItemLayout}
-          nestedScrollEnabled
-          decelerationRate="fast"
-
+          directionalLockEnabled={true} // <-- MAGIQUE : Empêche le conflit de scroll
+          onLayout={() => {
+            // Permet de démarrer sur la bonne image sans bug visuel
+            horizontalScrollRef.current?.scrollTo({
+              x: SCREEN_WIDTH * initialIndex,
+              animated: false,
+            });
+          }}
           onMomentumScrollEnd={(event) => {
-
             const newIndex = Math.round(
               event.nativeEvent.contentOffset.x /
                 SCREEN_WIDTH
@@ -511,11 +428,20 @@ export default function PhotoScreen({ route, navigation }) {
               newIndex < photos.length
             ) {
               setCurrentIndex(newIndex);
-
               dismissTip();
             }
           }}
-        />
+        >
+          {photos.map((photo) => (
+            <View key={photo.id} style={styles.imageContainer}>
+              <Image
+                source={{ uri: photo.uri }}
+                style={styles.img}
+                resizeMode="contain"
+              />
+            </View>
+          ))}
+        </ScrollView>
 
 
         {/* -----------------------------------------------
@@ -523,11 +449,9 @@ export default function PhotoScreen({ route, navigation }) {
         ------------------------------------------------ */}
 
         <View style={styles.pagination}>
-
           <Text style={styles.paginationText}>
             {currentIndex + 1} / {photos.length}
           </Text>
-
         </View>
 
 
@@ -537,9 +461,6 @@ export default function PhotoScreen({ route, navigation }) {
 
         {currentPhoto && (
           <View style={styles.actions}>
-
-            {/* LIKE PHOTO */}
-
             <TouchableOpacity
               style={styles.act}
               onPress={() =>
@@ -550,7 +471,6 @@ export default function PhotoScreen({ route, navigation }) {
               }
               activeOpacity={0.7}
             >
-
               <HugeiconsIcon
                 icon={FavouriteIcon}
                 size={24}
@@ -565,7 +485,6 @@ export default function PhotoScreen({ route, navigation }) {
                     : 1.6
                 }
               />
-
               <Text
                 style={[
                   styles.actLbl,
@@ -576,11 +495,7 @@ export default function PhotoScreen({ route, navigation }) {
               >
                 J'aime
               </Text>
-
             </TouchableOpacity>
-
-
-            {/* RIGHT ACTIONS */}
 
             <View
               style={{
@@ -588,40 +503,28 @@ export default function PhotoScreen({ route, navigation }) {
                 gap: 16,
               }}
             >
-
-              {/* DOWNLOAD */}
-
               <TouchableOpacity
                 style={styles.actIcon}
                 activeOpacity={0.7}
               >
-
                 <HugeiconsIcon
                   icon={Download01Icon}
                   size={22}
                   color={colors.tealDark}
                 />
-
               </TouchableOpacity>
-
-
-              {/* FAVORITE */}
 
               <TouchableOpacity
                 style={styles.actIcon}
                 onPress={() => {
-
                   toggleFavorite(
                     albumId,
                     currentPhoto.id
                   );
-
                   dismissTip();
-
                 }}
                 activeOpacity={0.7}
               >
-
                 <HugeiconsIcon
                   icon={StarIcon}
                   size={24}
@@ -636,11 +539,8 @@ export default function PhotoScreen({ route, navigation }) {
                       : 1.6
                   }
                 />
-
               </TouchableOpacity>
-
             </View>
-
           </View>
         )}
 
@@ -651,12 +551,10 @@ export default function PhotoScreen({ route, navigation }) {
 
         {tip && (
           <View style={styles.tip}>
-
             <Text style={styles.tipTxt}>
               Touchez l'étoile pour ajouter
               la photo à vos favoris.
             </Text>
-
             <TouchableOpacity
               onPress={dismissTip}
               hitSlop={8}
@@ -665,7 +563,6 @@ export default function PhotoScreen({ route, navigation }) {
                 OK
               </Text>
             </TouchableOpacity>
-
           </View>
         )}
 
@@ -675,17 +572,14 @@ export default function PhotoScreen({ route, navigation }) {
         ------------------------------------------------ */}
 
         <View style={styles.commentsTitleRow}>
-
           <Text style={styles.commentsTitle}>
             Commentaires
           </Text>
-
           <View style={styles.commentsCount}>
             <Text style={styles.commentsCountText}>
               {comments.length}
             </Text>
           </View>
-
         </View>
 
       </>
@@ -698,14 +592,12 @@ export default function PhotoScreen({ route, navigation }) {
   // -------------------------------------------------------
 
   const renderEmptyComments = () => {
-
     if (comments.length > 0) {
       return null;
     }
 
     return (
       <View style={styles.emptyComments}>
-
         <Image
           source={require('../../assets/empty/comment.png')}
           style={{
@@ -714,15 +606,12 @@ export default function PhotoScreen({ route, navigation }) {
             marginBottom: 12,
           }}
         />
-
         <Text style={styles.emptyH}>
           Aucun commentaire pour le moment
         </Text>
-
         <Text style={styles.emptyC}>
           Soyez le premier à commenter.
         </Text>
-
       </View>
     );
   };
@@ -733,40 +622,30 @@ export default function PhotoScreen({ route, navigation }) {
   // -------------------------------------------------------
 
   const renderCommentInput = () => {
-
     return (
       <View
         style={[
           styles.bar,
           {
-            paddingBottom:
-              Math.max(insets.bottom),
+            paddingBottom: Math.max(insets.bottom, 10),
           },
         ]}
       >
-
-        {/* REPLY INDICATOR */}
-
         {replyTo && (
           <View style={styles.replyIndicator}>
-
             <View style={{ flex: 1 }}>
-
               <Text
                 style={styles.replyIndicatorLabel}
               >
                 Réponse à
               </Text>
-
               <Text
                 style={styles.replyIndicatorName}
                 numberOfLines={1}
               >
                 {replyTo.author}
               </Text>
-
             </View>
-
             <TouchableOpacity
               onPress={cancelReply}
               hitSlop={10}
@@ -775,15 +654,10 @@ export default function PhotoScreen({ route, navigation }) {
                 ✕
               </Text>
             </TouchableOpacity>
-
           </View>
         )}
 
-
-        {/* INPUT ROW */}
-
         <View style={styles.inputRow}>
-
           <TextInput
             ref={commentInputRef}
             style={styles.inp}
@@ -812,17 +686,13 @@ export default function PhotoScreen({ route, navigation }) {
             disabled={!text.trim()}
             activeOpacity={0.7}
           >
-
             <HugeiconsIcon
               icon={SentIcon}
               size={20}
               color="#fff"
             />
-
           </TouchableOpacity>
-
         </View>
-
       </View>
     );
   };
@@ -833,60 +703,46 @@ export default function PhotoScreen({ route, navigation }) {
   // -------------------------------------------------------
 
   return (
+    // RETIRÉ edges={['bottom']} pour ne pas bloquer le clavier
     <SafeAreaView
       style={styles.root}
-      edges={['top', 'bottom']}
+      edges={['top']}
     >
-
       <StatusBar style="dark" />
-
 
       {/* -----------------------------------------------
           HEADER
       ------------------------------------------------ */}
-
       <View style={styles.top}>
-
         <BackButton
           onPress={() => navigation.goBack()}
         />
 
         <View style={{ flex: 1 }}>
-
           <Text style={styles.author}>
             {state.profile.firstName || 'Vous'}
           </Text>
-
           <Text style={styles.when}>
             à l'instant
           </Text>
-
         </View>
-
-
-        {/* DELETE */}
 
         <TouchableOpacity
           style={styles.iconHit}
           onPress={() => setDel(true)}
           hitSlop={8}
         >
-
           <HugeiconsIcon
             icon={Delete02Icon}
             size={22}
             color={colors.coral}
           />
-
         </TouchableOpacity>
-
       </View>
-
 
       {/* -----------------------------------------------
           CONTENT
       ------------------------------------------------ */}
-
       <KeyboardAvoidingView
         style={styles.mainContent}
         behavior={
@@ -895,126 +751,83 @@ export default function PhotoScreen({ route, navigation }) {
             : 'height'
         }
       >
-
+        {/* LISTE DES COMMENTAIRES */}
         <FlatList
           data={comments}
           keyExtractor={(item) => item.id}
           renderItem={renderComment}
-
           ListHeaderComponent={renderHeader}
-
-          ListEmptyComponent={
-            renderEmptyComments
-          }
-
+          ListEmptyComponent={renderEmptyComments}
           showsVerticalScrollIndicator={false}
-
           keyboardShouldPersistTaps="handled"
-
           keyboardDismissMode={
             Platform.OS === 'ios'
               ? 'interactive'
               : 'on-drag'
           }
-
-          nestedScrollEnabled
-
-          contentContainerStyle={{
-            paddingBottom: 100,
-          }}
-
+          style={{ flex: 1 }}
+          // RETIRÉ contentContainerStyle={{ paddingBottom: 100 }}
           extraData={{
             likedComments,
             localReplies,
           }}
         />
 
+        {/* DÉPLACÉ ICI : La barre de saisie est MAINTENANT à l'intérieur du KAV */}
+        {renderCommentInput()}
+
       </KeyboardAvoidingView>
-
-
-      {/* -----------------------------------------------
-          COMMENT INPUT
-      ------------------------------------------------ */}
-
-      {renderCommentInput()}
-
 
       {/* -----------------------------------------------
           DELETE MODAL
       ------------------------------------------------ */}
+      <Sheet visible={del} onClose={() => setDel(false)} title="Supprimer" >
+        <View style={styles.delIco}>
+          <HugeiconsIcon
+            icon={Delete02Icon}
+            size={28}
+            color={colors.coral}
+          />
+        </View>
 
-     <Sheet visible={del} onClose={() => setDel(false)} title="Supprimer" >
-          
-            {/* ICON */}
+        <Text style={styles.delT}>
+          Supprimer définitivement ?
+        </Text>
 
-            <View style={styles.delIco}>
+        <Text style={styles.delP}>
+          Cette photo sera retirée pour
+          tous les invités de l'album.
+        </Text>
 
-              <HugeiconsIcon
-                icon={Delete02Icon}
-                size={28}
-                color={colors.coral}
-              />
+        <TouchableOpacity
+          style={styles.cta}
+          onPress={() => {
+            if (currentPhoto) {
+              deletePhoto(
+                albumId,
+                currentPhoto.id
+              );
+            }
+            setDel(false);
+            navigation.goBack();
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.ctaTxt}>
+            Supprimer
+          </Text>
+        </TouchableOpacity>
 
-            </View>
-
-
-            {/* TITLE */}
-
-            <Text style={styles.delT}>
-              Supprimer définitivement ?
-            </Text>
-
-
-            {/* DESCRIPTION */}
-
-            <Text style={styles.delP}>
-              Cette photo sera retirée pour
-              tous les invités de l'album.
-            </Text>
-
-
-            {/* DELETE */}
-
-            <TouchableOpacity
-              style={styles.cta}
-              onPress={() => {
-
-                if (currentPhoto) {
-                  deletePhoto(
-                    albumId,
-                    currentPhoto.id
-                  );
-                }
-
-                setDel(false);
-
-                navigation.goBack();
-
-              }}
-              activeOpacity={0.8}
-            >
-
-              <Text style={styles.ctaTxt}>
-                Supprimer
-              </Text>
-
-            </TouchableOpacity>
-
-
-            {/* CANCEL */}
-
-            <TouchableOpacity
-              style={styles.cancel}
-              onPress={() => setDel(false)}
-              activeOpacity={0.8}
-            >
-
-              <Text style={styles.cancelTxt}>
-                Annuler
-              </Text>
-
-            </TouchableOpacity>
-     </Sheet>
+        <TouchableOpacity
+          style={styles.cancel}
+          onPress={() => setDel(false)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.cancelTxt}>
+            Annuler
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
 
     </SafeAreaView>
   );
@@ -1022,7 +835,7 @@ export default function PhotoScreen({ route, navigation }) {
 
 
 // =========================================================
-// STYLES
+// STYLES (Aucune modification requise ici)
 // =========================================================
 
 const styles = StyleSheet.create({
@@ -1101,7 +914,6 @@ const styles = StyleSheet.create({
   pagination: {
     alignItems: 'center',
     paddingVertical: 2,
-    // backgroundColor: colors.cream,
   },
 
 

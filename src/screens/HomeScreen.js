@@ -93,6 +93,7 @@ export default function HomeScreen() {
                   <Text style={styles.ideaT}>{s.title}</Text>
                   <Text style={styles.ideaS}>{s.sub}</Text>
                 </View>
+              
               </TouchableOpacity>
             );
           })}

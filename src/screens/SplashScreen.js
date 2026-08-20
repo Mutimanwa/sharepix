@@ -124,7 +124,7 @@ export default function SplashScreen({ navigation }) {
         </Animated.View>
       </View>
 
-      <Animated.View style={[styles.footer, { opacity: fadeIn, paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <Animated.View style={[styles.footer, { opacity: fadeIn, paddingBottom: Math.max(insets.bottom) }]}>
         <Text style={styles.by}>Created by</Text>
         <Text style={styles.restart}>RESTART</Text>
       </Animated.View>
