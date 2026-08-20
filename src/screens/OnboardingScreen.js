@@ -13,9 +13,7 @@ import { CoralButton, Logo, Sheet, Field } from '../components/UI';
 import { ArtShare, ArtPrivate, ArtQuality } from '../components/OnboardingArt';
 import CodeBoxes from '../components/CodeBoxes';
 import { useStore } from '../store';
-// ── SUPABASE AUTH : intégration ──
 import { isSupabaseConfigured } from '../config';
-// ── SUPABASE AUTH : fin ──
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -47,18 +45,19 @@ export default function OnboardingScreen({ navigation }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [first, setFirst] = useState('');
-  // ── SUPABASE AUTH : on lit aussi `state` pour savoir si connecté ──
   const { createAlbum, setOnboarded, state } = useStore();
-  // ── SUPABASE AUTH : fin ──
   const insets = useSafeAreaInsets();
 
   const goHome = () => {
     setOnboarded();
-    // ── SUPABASE AUTH : intégration ──────────────────────────────────────
     // Backend configuré mais pas de session -> on passe par l'auth d'abord
-    if (isSupabaseConfigured && !state.user) navigation.replace('Auth');
-    else navigation.replace('Main');
-    // ── SUPABASE AUTH : fin ──
+    if (isSupabaseConfigured && !state.user) {
+      console.log('➡️ Onboarding -> Auth (Supabase configured, no user)');
+      navigation.replace('Auth');
+    } else {
+      console.log('➡️ Onboarding -> Main');
+      navigation.replace('Main');
+    }
   };
 
   const onScroll = (e) => {
@@ -176,7 +175,7 @@ export default function OnboardingScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-
+    backgroundColor: colors.cream,
   },
   brand: {
     alignItems: 'center',

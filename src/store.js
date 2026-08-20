@@ -35,46 +35,66 @@ export function StoreProvider({ children }) {
   const [state, setState] = useState(defaultState);
   const [ready, setReady] = useState(false);
 
+  // 1. Chargement du store local
   useEffect(() => {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(KEY);
-        if (raw) setState({ ...defaultState, ...JSON.parse(raw), user: null, authChecked: false });
-      } catch {}
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setState({ 
+            ...defaultState, 
+            ...parsed, 
+            user: null, 
+            authChecked: false 
+          });
+        }
+      } catch (error) {
+        console.log('Store load error:', error);
+      }
       setReady(true);
     })();
   }, []);
 
-  // Restaure la session Supabase au démarrage (offline-first : si Supabase
-  // n'est pas configuré ou pas de session, on continue en local)
+  // 2. Restauration de la session Supabase
   useEffect(() => {
     let cancelled = false;
+    
     (async () => {
       try {
         if (isSupabaseConfigured) {
+          console.log('🔄 Restoring Supabase session...');
           const user = await restoreSession();
           if (!cancelled && user) {
+            console.log('✅ Session restored:', user.email);
             setState((s) => ({
               ...s,
               user,
               profile: {
                 ...s.profile,
-                firstName: s.profile.firstName || user.firstName,
-                lastName: s.profile.lastName || user.lastName,
+                firstName: user.firstName || s.profile.firstName,
+                lastName: user.lastName || s.profile.lastName,
               },
             }));
+          } else if (!cancelled) {
+            console.log('ℹ️ No session found');
           }
         }
-      } catch {}
-      if (!cancelled) setState((s) => ({ ...s, authChecked: true }));
+      } catch (error) {
+        console.log('❌ Session restore error:', error);
+      }
+      if (!cancelled) {
+        setState((s) => ({ ...s, authChecked: true }));
+        console.log('🔐 Auth checked:', state.user ? 'connected' : 'not connected');
+      }
     })();
+
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Persistance locale : on EXCLUT les champs runtime (user, authChecked) —
-  // la session Supabase est persistée par Supabase lui-même.
+  // 3. Persistance locale (exclut les champs runtime)
   useEffect(() => {
     if (ready) {
       const { user, authChecked, ...toPersist } = state;
@@ -86,10 +106,14 @@ export function StoreProvider({ children }) {
     () => ({
       ready,
       state,
+      
       setOnboarded: () => setState((s) => ({ ...s, onboarded: true })),
+      
       dismissFavTip: () => setState((s) => ({ ...s, favTipSeen: true })),
+      
       // Connecte l'utilisateur Supabase et recopie son prénom/nom dans le profil local
-      setAuthUser: (user) =>
+      setAuthUser: (user) => {
+        console.log('👤 Setting auth user:', user?.email);
         setState((s) => ({
           ...s,
           user,
@@ -98,8 +122,14 @@ export function StoreProvider({ children }) {
             firstName: user?.firstName || s.profile.firstName,
             lastName: user?.lastName || s.profile.lastName,
           },
-        })),
-      clearAuthUser: () => setState((s) => ({ ...s, user: null })),
+        }));
+      },
+      
+      clearAuthUser: () => {
+        console.log('👋 Clearing auth user');
+        setState((s) => ({ ...s, user: null }));
+      },
+      
       updateProfile: (p) => {
         setState((s) => ({ ...s, profile: { ...s.profile, ...p } }));
         // Synchro douce vers la table `profiles` si connecté
@@ -108,9 +138,10 @@ export function StoreProvider({ children }) {
           syncProfile(state.user.id, {
             firstName: merged.firstName,
             lastName: merged.lastName,
-          });
+          }).catch(() => {});
         }
       },
+      
       createAlbum: ({ name, firstName }) => {
         const album = {
           id: Date.now().toString(),
@@ -127,10 +158,12 @@ export function StoreProvider({ children }) {
         }));
         return album;
       },
+      
       joinAlbum: (code) => {
         const found = state.albums.find((a) => a.code.toUpperCase() === code.toUpperCase());
         return found || null;
       },
+      
       addPhoto: (albumId, uri) => {
         setState((s) => ({
           ...s,
@@ -154,6 +187,7 @@ export function StoreProvider({ children }) {
           ),
         }));
       },
+      
       toggleLike: (albumId, photoId) => {
         setState((s) => ({
           ...s,
@@ -169,6 +203,7 @@ export function StoreProvider({ children }) {
           ),
         }));
       },
+      
       toggleFavorite: (albumId, photoId) => {
         setState((s) => ({
           ...s,
@@ -184,6 +219,7 @@ export function StoreProvider({ children }) {
           ),
         }));
       },
+      
       addComment: (albumId, photoId, text) => {
         setState((s) => ({
           ...s,
@@ -212,6 +248,7 @@ export function StoreProvider({ children }) {
           ),
         }));
       },
+      
       deletePhoto: (albumId, photoId) => {
         setState((s) => ({
           ...s,

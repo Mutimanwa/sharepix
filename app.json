@@ -2,13 +2,21 @@
   "expo": {
     "name": "SharePix",
     "slug": "sharepix",
+    "scheme": "sharepix",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/sharepix-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.sharepix.mobile"
+      "bundleIdentifier": "app.sharepix.mobile",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["sharepix"]
+          }
+        ]
+      }
     },
     "android": {
       "package": "app.sharepix.mobile",
@@ -18,6 +26,20 @@
       },
       "permissions": [
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "sharepix"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -33,7 +55,8 @@
           "imageWidth": 200
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {
