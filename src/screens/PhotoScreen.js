@@ -33,7 +33,7 @@ import {
 import { colors } from '../theme';
 import { useStore } from '../store';
 import { StatusBar } from 'expo-status-bar';
-import { BackButton } from '../components/UI';
+import { BackButton , Sheet } from '../components/UI';
 
 
 // ---------------------------------------------------------
@@ -943,41 +943,8 @@ export default function PhotoScreen({ route, navigation }) {
           DELETE MODAL
       ------------------------------------------------ */}
 
-      <Modal
-        visible={del}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDel(false)}
-      >
-
-        <View style={[styles.modal ,{paddingBottom: insets.bottom}]}>
-
-          <View style={styles.sheet}>
-
-            {/* HEADER */}
-
-            <View style={styles.sheetTop}>
-
-              <View
-                style={{
-                  width: 50,
-                }}
-              />
-
-              <Text style={styles.sheetH}>
-                Supprimer
-              </Text>
-
-              <BackButton
-                variant="close"
-                onPress={() =>
-                  setDel(false)
-                }
-              />
-
-            </View>
-
-
+     <Sheet visible={del} onClose={() => setDel(false)} title="Supprimer" >
+          
             {/* ICON */}
 
             <View style={styles.delIco}>
@@ -1047,12 +1014,7 @@ export default function PhotoScreen({ route, navigation }) {
               </Text>
 
             </TouchableOpacity>
-
-          </View>
-
-        </View>
-
-      </Modal>
+     </Sheet>
 
     </SafeAreaView>
   );
@@ -1067,6 +1029,7 @@ const styles = StyleSheet.create({
 
   root: {
     flex: 1,
+    backgroundColor: colors.white,
   },
 
 
@@ -1137,8 +1100,8 @@ const styles = StyleSheet.create({
 
   pagination: {
     alignItems: 'center',
-    paddingVertical: 6,
-    backgroundColor: colors.cream,
+    paddingVertical: 2,
+    // backgroundColor: colors.cream,
   },
 
 
@@ -1157,8 +1120,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
@@ -1191,7 +1154,7 @@ const styles = StyleSheet.create({
   // -------------------------------------------------------
 
   tip: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.cream,
     marginHorizontal: 14,
     marginTop: 10,
     padding: 12,
@@ -1231,16 +1194,15 @@ const styles = StyleSheet.create({
 
   commentsTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     color: colors.tealDark,
   },
 
 
   commentsCount: {
-    minWidth: 24,
-    height: 24,
+    minWidth: 15,
+    height: 15,
     borderRadius: 12,
-    paddingHorizontal: 7,
     backgroundColor: colors.teal,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1250,7 +1212,7 @@ const styles = StyleSheet.create({
   commentsCountText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
 
@@ -1294,19 +1256,12 @@ const styles = StyleSheet.create({
   cmt: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.light,
+    borderRadius: 5,
     padding: 12,
     marginBottom: 8,
-
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-
     elevation: 1,
   },
 
@@ -1315,7 +1270,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.light,
+    borderColor: colors.teal,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1343,7 +1299,7 @@ const styles = StyleSheet.create({
 
   cmtA: {
     flex: 1,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.tealDark,
     fontSize: 14,
   },
@@ -1422,8 +1378,8 @@ const styles = StyleSheet.create({
 
   replyBody: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.light,
+    borderRadius: 5,
     padding: 9,
   },
 
@@ -1534,36 +1490,6 @@ const styles = StyleSheet.create({
   // -------------------------------------------------------
   // DELETE MODAL
   // -------------------------------------------------------
-
-  modal: {
-    flex: 1,
-    backgroundColor: 'rgba(14,58,62,0.45)',
-    justifyContent: 'flex-end',
-  },
-
-
-  sheet: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-
-
-  sheetTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-
-
-  sheetH: {
-    fontWeight: '600',
-    color: colors.tealDark,
-    fontSize: 16,
-  },
 
 
   delIco: {
