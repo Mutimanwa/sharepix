@@ -11,6 +11,8 @@ export const APP_SCHEME = 'sharepix';
 // Format: [scheme]://[path]
 export const REDIRECT_URI = `${APP_SCHEME}://auth/callback`;
 
+export const REDIRECT_URI_WEB = 'http://localhost:8081/auth/callback';
+
 // Tant que ces clés sont vides, l'app fonctionne en mode 100% local
 // (offline-first) : l'écran d'auth est ignoré et tout reste sur l'appareil.
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);

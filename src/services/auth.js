@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { APP_SCHEME, REDIRECT_URI } from '../config';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -88,7 +89,45 @@ export async function signInWithEmail(email, password) {
 
 // ── Google OAuth ────────────────────────────────────────────────────────
 
-export async function signInWithGoogle() {
+/**
+ * Version Web - Redirige la page entière (standard pour le Web)
+ */
+export async function signInWithGoogleWeb() {
+  if (!supabase) throw new Error('Supabase non configuré');
+
+  try {
+    // SUR LE WEB : On doit absolument utiliser une URL http/https valide.
+    // On prend l'URL actuelle du navigateur (ex: http://localhost:8081)
+    const webRedirectUrl = `${window.location.origin}/auth/callback`;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: webRedirectUrl,
+      },
+    });
+
+    if (error) throw error;
+
+    console.log('Redirecting to Google OAuth (Web):', data.url);
+
+    // Au lieu de window.open (bloqué), on redirige l'onglet actuel
+    window.location.replace(data.url);
+
+    // La page va changer, on retourne une promesse en attente pour éviter 
+    // que l'application ne crashe avant que la redirection ne se fasse
+    return new Promise(() => {});
+
+  } catch (error) {
+    console.error('❌ Google OAuth error (Web):', error);
+    throw error;
+  }
+}
+
+/**
+ * Version Mobile/Native - Utilise WebBrowser
+ */
+export async function signInWithGoogleMobile() {
   if (!supabase) throw new Error('Supabase non configuré');
 
   try {
@@ -103,7 +142,7 @@ export async function signInWithGoogle() {
 
     if (error) throw error;
 
-    console.log('🔐 Opening Google OAuth URL:', data.url);
+    console.log('Opening Google OAuth URL (Mobile):', data.url);
 
     // 2. Ouvrir le navigateur pour l'authentification
     const result = await WebBrowser.openAuthSessionAsync(
@@ -116,7 +155,7 @@ export async function signInWithGoogle() {
       }
     );
 
-    console.log('🔐 Google OAuth result type:', result.type);
+    console.log('Google OAuth result type:', result.type);
 
     // 3. Gérer le retour
     if (result.type === 'success') {
@@ -132,8 +171,24 @@ export async function signInWithGoogle() {
       throw new Error('Erreur lors de la connexion Google');
     }
   } catch (error) {
-    console.error('❌ Google OAuth error:', error);
+    console.error(' Google OAuth error (Mobile):', error);
     throw error;
+  }
+}
+
+/**
+ * Version unifiée - Détecte automatiquement l'environnement
+ */
+export async function signInWithGoogle() {
+  if (!supabase) throw new Error('Supabase non configuré');
+
+  // Détecter si on est sur Web ou Mobile
+  const isWeb = Platform.OS === 'web' || typeof window !== 'undefined';
+
+  if (isWeb) {
+    return signInWithGoogleWeb();
+  } else {
+    return signInWithGoogleMobile();
   }
 }
 
@@ -151,7 +206,7 @@ export async function restoreSession() {
     const profile = await fetchProfile(session.user.id);
     return toAppUser(session.user, profile);
   } catch (error) {
-    console.log('❌ Session restore error:', error);
+    console.log('Session restore error:', error);
     return null;
   }
 }
@@ -214,6 +269,9 @@ export function translateAuthError(error) {
   }
   if (msg.includes('cancelled') || msg.includes('cancel')) {
     return 'Connexion annulée.';
+  }
+  if (msg.includes('popup') || msg.includes('blocked')) {
+    return 'La fenêtre de connexion a été bloquée. Autorisez les popups et réessayez.';
   }
   
   return error?.message || 'Une erreur est survenue. Réessaie.';
