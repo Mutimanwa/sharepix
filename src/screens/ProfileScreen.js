@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Linking, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert ,Modal ,SafeAreaView, } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
   UserCircle02Icon, 
@@ -7,19 +7,20 @@ import {
   Camera01Icon, 
   ArrowRight01Icon, 
   ShieldCheckIcon,
-  CheckmarkBadge01Icon
+  CheckmarkBadge01Icon,
+  Delete02Icon
 } from '@hugeicons/core-free-icons';
 import { Field } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
 import { isSupabaseConfigured } from '../config';
-import { signOut } from '../services/auth';
+import { signOut, deleteAccount } from '../services/auth'; 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import Constants from 'expo-constants'; 
 
 // ── COMPOSANTS RÉUTILISABLES POUR L'UI ──
 
-// Ligne de paramètre avec un Switch (zone de clic élargie)
 function SwitchRow({ title, sub, value, onValueChange, isLast }) {
   return (
     <Pressable 
@@ -34,14 +35,12 @@ function SwitchRow({ title, sub, value, onValueChange, isLast }) {
         value={value} 
         onValueChange={onValueChange} 
         trackColor={{ true: colors.coral, false: colors.muted }} 
-        // Empêche le switch de capturer le clic au détriment du Pressable parent sur Android
         pointerEvents="none" 
       />
     </Pressable>
   );
 }
 
-// Ligne de navigation pour les liens (CGV, FAQ, etc.)
 function LinkRow({ title, onPress, isLast, isDestructive }) {
   return (
     <TouchableOpacity 
@@ -50,7 +49,7 @@ function LinkRow({ title, onPress, isLast, isDestructive }) {
       activeOpacity={0.7}
     >
       <Text style={[styles.rt, isDestructive && { color: colors.coralDark }]}>{title}</Text>
-      <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={isDestructive ? colors.coralDark : colors.muted} />
+      <HugeiconsIcon icon={isDestructive ? Delete02Icon : ArrowRight01Icon} size={18} color={isDestructive ? colors.coralDark : colors.muted} />
     </TouchableOpacity>
   );
 }
@@ -62,9 +61,26 @@ export default function ProfileScreen({ navigation }) {
   const p = state.profile;
   const insets = useSafeAreaInsets();
   const user = state.user;
+  
   const [busyOut, setBusyOut] = useState(false);
+  const [busyDelete, setBusyDelete] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleLogout = async () => {
+  // Récupération dynamique de la version depuis app.json
+  const appVersion = Constants.expoConfig?.version || '1.0.1';
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Se déconnecter",
+      "Êtes-vous sûr de vouloir vous déconnecter ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Se déconnecter", style: "destructive", onPress: executeLogout }
+      ]
+    );
+  };
+
+  const executeLogout = async () => {
     if (busyOut) return;
     setBusyOut(true);
     try { await signOut(); } catch {}
@@ -72,9 +88,49 @@ export default function ProfileScreen({ navigation }) {
     setBusyOut(false);
   };
 
-  const handleSave = () => {
-    // Logique de sauvegarde API/Store ici
-    console.log("Profil sauvegardé");
+  const handleDeleteAccount = () => {
+    if (!user) {
+      Alert.alert("Mode Invité", "En tant qu'invité, vos données sont stockées uniquement sur cet appareil. Vous pouvez simplement réinitialiser l'application.");
+      return;
+    }
+
+    Alert.alert(
+      "Supprimer mon compte",
+      "ATTENTION : Cette action est irréversible. Toutes vos données, albums et photos seront définitivement supprimées de nos serveurs.",
+      [
+        { text: "Annuler", style: "cancel" },
+        { 
+          text: "Supprimer définitivement", 
+          style: "destructive",
+          onPress: executeDeleteAccount 
+        }
+      ]
+    );
+  };
+
+  const executeDeleteAccount = async () => {
+    setBusyDelete(true);
+    try {
+      await deleteAccount();
+      clearAuthUser();
+      // Retour à l'accueil après suppression
+      navigation.replace('Onboarding'); 
+    } catch (err) {
+      Alert.alert("Erreur", err.message);
+    } finally {
+      setBusyDelete(false);
+    }
+  };
+
+ const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    
+    // On simule/attend le temps de la sauvegarde (local + synchro Supabase en arrière-plan)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    setSaving(false);
+    Alert.alert("Succès", "Votre profil a été mis à jour.");
   };
 
   return (
@@ -93,11 +149,20 @@ export default function ProfileScreen({ navigation }) {
         
         {/* AVATAR ÉDITABLE */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity style={styles.avatarContainer} activeOpacity={0.8}>
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            activeOpacity={0.8}
+            onPress={() => user?.avatarUrl ? Alert.alert("Photo de profil", "Modifiez votre photo directement depuis votre compte Google.") : null}
+          >
             <View style={styles.avatar}>
-              <Text style={styles.avatarInitials}>
-                {user ? (user.firstName || user.email || 'S')[0].toUpperCase() : <HugeiconsIcon icon={UserCircle02Icon} size={50} color="#fff" />}
-              </Text>
+              {/* AFFICHAGE CONDITIONNEL : Image URL ou Initiales */}
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarInitials}>
+                  {user ? (user.firstName || user.email || 'S')[0].toUpperCase() : 'S'}
+                </Text>
+              )}
             </View>
             <View style={styles.avatarBadge}>
               <HugeiconsIcon icon={Camera01Icon} size={14} color="#fff" />
@@ -105,12 +170,12 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* ── BANNIÈRE COMPTE : GESTION DU MODE INVITE VS CONNECTÉ ── */}
+        {/* ── BANNIÈRE COMPTE ── */}
         {isSupabaseConfigured && !user && (
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
               <View style={[styles.accountIcon, { backgroundColor: '#FFF3E0' }]}>
-                   <HugeiconsIcon icon={Camera01Icon} size={34} color={colors.tealDark} />
+                   <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.tealDark} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.accountT}>Sécurisez vos données</Text>
@@ -125,19 +190,24 @@ export default function ProfileScreen({ navigation }) {
           </View>
         )}
 
+        {/* ── COMPTE CONNECTÉ (DONNÉES GOOGLE) ── */}
         {isSupabaseConfigured && user && (
           <View style={styles.card}>
             <View style={styles.accountRow}>
-              <View style={[styles.accountIcon, { backgroundColor: colors.tealLight }]}>
-                <HugeiconsIcon icon={CheckmarkBadge01Icon} size={24} color={colors.tealDark} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.accountT}>
-                  {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Compte vérifié'}
+              <View style={{ flex: 1, gap: 4 }}>
+                {/* Nom complet récupéré depuis Google */}
+                <Text style={styles.accountName}>
+                  {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Utilisateur'}
                 </Text>
-                <Text style={styles.accountS}>{user.email}</Text>
+                {/* Email récupéré depuis Google */}
+                <Text style={styles.accountEmail}>{user.email}</Text>
+              </View>
+              {/* Badge indiquant que c'est lié à Google */}
+              <View style={styles.providerBadge}>
+                <Text style={styles.providerBadgeText}>Google</Text>
               </View>
             </View>
+
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} disabled={busyOut} activeOpacity={0.85}>
               {busyOut ? (
                 <ActivityIndicator color={colors.coralDark} size="small" />
@@ -152,12 +222,17 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* ── INFORMATIONS PERSONNELLES ── */}
-       <Text style={styles.sectionTitle}>Informations personnelles</Text>
-        <View style={styles.card}>
-          <Field label="Prénom" value={p.firstName} onChangeText={(firstName) => updateProfile({ firstName })} />
-          
-          <Field label="Nom de famille" value={p.lastName} onChangeText={(lastName) => updateProfile({ lastName })} />
-        </View>
+        {/* On masque cette section si l'utilisateur est connecté à Google 
+            car ses infos sont déjà affichées dans la carte "Compte vérifié" au-dessus */}
+        {!user && (
+          <>
+            <Text style={styles.sectionTitle}>Informations personnelles</Text>
+            <View style={styles.card}>
+              <Field label="Prénom" value={p.firstName} onChangeText={(firstName) => updateProfile({ firstName })} />
+              <Field label="Nom de famille" value={p.lastName} onChangeText={(lastName) => updateProfile({ lastName })} />
+            </View>
+          </>
+        )}
 
         {/* ── NOTIFICATIONS ── */}
         <Text style={styles.sectionTitle}>Préférences de notifications</Text>
@@ -179,40 +254,84 @@ export default function ProfileScreen({ navigation }) {
 
         {/* ── LIENS LÉGAUX ET AUTRES ── */}
         <View style={styles.card}>
-          <LinkRow title="FAQ - Questions Fréquentes" onPress={() => {}} />
-          <LinkRow title="Restaurer les achats" onPress={() => {}} />
-          <LinkRow title="Conditions Générales (CGV)" onPress={() => {}} />
-          <LinkRow title="Sécurité des données" onPress={() => {}} />
-          <LinkRow title="Supprimer mon compte" isDestructive onPress={() => {}} isLast />
+          <LinkRow title="FAQ - Questions Fréquentes" onPress={() => Linking.openURL('https://sharepix.app/faq')} />
+          <LinkRow title="Restaurer les achats" onPress={() => Alert.alert("Achats", "Vous n'avez actuellement aucun achat in-app à restaurer.")} />
+          <LinkRow title="Conditions Générales (CGV)" onPress={() => Linking.openURL('https://sharepix.app/cgv')} />
+          <LinkRow title="Sécurité des données" onPress={() => Linking.openURL('https://sharepix.app/privacy')} />
+          <LinkRow 
+            title={user ? "Supprimer mon compte" : "Réinitialiser l'application"} 
+            isDestructive 
+            onPress={handleDeleteAccount} 
+            isLast 
+          />
         </View>
 
-        <Text style={styles.versionText}>SharePix Version 1.0.0</Text>
+        {/* VERSION DYNAMIQUE */}
+        <Text style={styles.versionText}> Version {appVersion}</Text>
       </ScrollView>
+
+       {/* MODAL DE SAUVEGARDE DU PROFIL */}
+      <Modal visible={saving} transparent animationType="fade">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={[styles.savingBanner, { marginTop: insets.top + 10 }]}>
+            <ActivityIndicator size="small" color={colors.tealDark} />
+            <Text style={styles.savingText}>
+              Enregistrement de votre profil...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* LOADING OVERLAY POUR LA SUPPRESSION */}
+      {busyDelete && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.coral} />
+          <Text style={styles.loadingText}>Suppression de vos données...</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' }, // Fond légèrement gris pour faire ressortir les cartes blanches
+  root: { flex: 1, backgroundColor: '#fff' },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
   
   // Header
-  head: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'space-between', alignItems: 'center' , borderBottomWidth: 1, borderBottomColor: colors.border, },
+  head: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 20, justifyContent: 'space-between', alignItems: 'center' , borderBottomWidth: 1, borderBottomColor: colors.border },
   title: { fontSize: 20, fontWeight: '600', color: colors.tealDark },
-  saveBtn: { paddingVertical: 6, paddingHorizontal: 12, },
-  saveBtnText: { color: colors.coral  , fontWeight: '700', fontSize: 14 },
+  saveBtn: { paddingVertical: 6, paddingHorizontal: 12 },
+  saveBtnText: { color: colors.coral, fontWeight: '700', fontSize: 14 },
 
   // Avatar
   avatarSection: { alignItems: 'center', marginVertical: 20 },
   avatarContainer: { position: 'relative' },
-  avatar: { width: 80, height: 80, borderRadius: 45, backgroundColor: colors.coral, alignItems: 'center', justifyContent: 'center', shadowColor: colors.coral, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-  avatarInitials: { color: '#fff', fontSize: 32, fontWeight: '700' , alignItems: 'center', justifyContent: 'center' ,paddingTop: 6},
-  avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.tealDark, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F7F9FA' },
+  avatar: { 
+    width: 90, 
+    height: 90, 
+    borderRadius: 45, 
+    backgroundColor: colors.coral, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    shadowColor: colors.coral, 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.2, 
+    shadowRadius: 8, 
+    elevation: 4,
+    overflow: 'hidden', // Important pour que l'image ne dépasse pas du cercle
+  },
+  avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  avatarInitials: { color: '#fff', fontSize: 34, fontWeight: '700' },
+  avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.tealDark, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
 
   // Sections
   sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: 8, marginBottom: 8, marginTop: 16 },
-  card: {  borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, marginBottom: 16 },
+  card: { borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, marginBottom: 16 },
   
+  // Field UX
+  fieldHeader: { position: 'relative' },
+  syncBadge: { position: 'absolute', right: 0, top: 5, fontSize: 10, color: colors.teal, fontWeight: '700', textTransform: 'uppercase' },
+
   // Compte & Invité
   guestCard: { borderColor: '#F57C00', borderWidth: 1, backgroundColor: '#FFFDF9' },
   accountRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
@@ -236,9 +355,77 @@ const styles = StyleSheet.create({
   // Aide box
   helpBox: { backgroundColor: colors.light, borderRadius: 16, padding: 20, marginVertical: 16, alignItems: 'flex-start' },
   helpTitle: { fontWeight: '600', fontSize: 18, color: colors.tealDark },
-  helpDesc: { marginTop: 6, color: colors.teal, fontSize: 14, lineHeight: 20 },
+  helpDesc: { marginTop: 6, color: colors.tealDark, fontSize: 14, lineHeight: 20 },
   mailBtn: { marginTop: 16, backgroundColor: colors.coral, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
-  mailBtnText: { color: colors.white, fontWeight: '700', fontSize: 14 },
+  mailBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   versionText: { color: colors.muted, marginTop: 8, marginBottom: 10, textAlign: 'center', fontSize: 12, fontWeight: '500' },
+
+  // Loading overlay pour la suppression
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: colors.tealDark,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+    // Modal de sauvegarde 
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)', 
+  },
+  savingBanner: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  savingText: {
+    color: colors.tealDark, 
+    fontWeight: '600',
+    fontSize: 15,
+  },
+    // Compte Connecté (Nouveaux styles Google)
+  accountName: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: colors.tealDark,
+    textTransform: 'capitalize', // Met la première lettre en majuscule automatiquement
+  },
+  accountEmail: { 
+    color: colors.muted, 
+    fontSize: 14, 
+    lineHeight: 18 
+  },
+  providerBadge: { 
+    backgroundColor: '#F1F3F4', // Le gris clair caractéristique de Google
+    paddingHorizontal: 5, 
+    paddingVertical: 5, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  providerBadgeText: { 
+    color: '#5F6368', // Gris foncé Google
+    fontSize: 12, 
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
 });

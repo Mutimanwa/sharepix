@@ -9,12 +9,15 @@ import { Platform } from 'react-native';
 function toAppUser(supaUser, profile) {
   if (!supaUser) return null;
   const meta = supaUser.user_metadata || {};
+  
   return {
     id: supaUser.id,
     email: supaUser.email || '',
-    firstName: profile?.first_name ?? meta?.first_name ?? '',
-    lastName: profile?.last_name ?? meta?.last_name ?? '',
-    avatarUrl: profile?.avatar_url ?? null,
+    // On prend le prénom depuis le profil, sinon depuis les metadatas Google, sinon on découpe le nom complet
+    firstName: profile?.first_name ?? meta?.first_name ?? (meta?.full_name || '').split(' ')[0] ?? '',
+    lastName: profile?.last_name ?? meta?.last_name ?? (meta?.full_name || '').split(' ').slice(1).join(' ') ?? '',
+    // ON REGARDE ICI : D'abord le profil custom, SINON les metadatas Google ('picture' ou 'avatar_url')
+    avatarUrl: profile?.avatar_url ?? meta?.avatar_url ?? meta?.picture ?? null,
   };
 }
 

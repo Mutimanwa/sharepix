@@ -75,7 +75,7 @@ export default function PhotoScreen({ route, navigation }) {
   // REFS
   // -------------------------------------------------------
 
-  const horizontalScrollRef = useRef(null); // <-- RENOMMÉ POUR LA SCROLLVIEW
+  const horizontalScrollRef = useRef(null);
   const commentInputRef = useRef(null);
 
 
@@ -703,7 +703,6 @@ export default function PhotoScreen({ route, navigation }) {
   // -------------------------------------------------------
 
   return (
-    // RETIRÉ edges={['bottom']} pour ne pas bloquer le clavier
     <SafeAreaView
       style={styles.root}
       edges={['top']}
