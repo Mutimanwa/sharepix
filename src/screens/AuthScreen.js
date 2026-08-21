@@ -10,7 +10,6 @@ import {
   View,
   Dimensions,
   Alert,
-  Linking,
   TextInput
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -89,36 +88,6 @@ export default function AuthScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { setAuthUser } = useStore();
   const isLogin = mode === 'login';
-
-  // Gestion du deep link OAuth
-  useEffect(() => {
-    const handleDeepLink = async ({ url }) => {
-      console.log('🔗 Deep link received in AuthScreen:', url);
-      // Si l'URL contient des tokens, la session sera restaurée automatiquement
-      // On peut simplement vérifier la session après un court délai
-      if (url && url.includes('access_token')) {
-        console.log('🔐 OAuth callback detected, checking session...');
-        // Attendre que la session soit traitée par Supabase
-        setTimeout(() => {
-          // La session sera restaurée par le StoreProvider
-          navigation.replace('Main');
-        }, 1000);
-      }
-    };
-
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-    
-    // Vérifier si l'application a été ouverte avec une URL
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [navigation]);
 
   const validate = () => {
     setError('');

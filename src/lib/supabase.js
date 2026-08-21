@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from '../config';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 
 // Le client Supabase avec gestion du deep link
 export const supabase = isSupabaseConfigured
@@ -11,8 +12,9 @@ export const supabase = isSupabaseConfigured
         storage: AsyncStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false,
-        // Permet de traiter les URLs de callback
+        // SUR LE WEB : doit être true pour lire le ?code= après redirection Google
+        // SUR MOBILE : false car géré par le deep linking natif
+        detectSessionInUrl: Platform.OS === 'web', 
         flowType: 'pkce',
       },
     })

@@ -55,13 +55,13 @@ const linking = {
   // Fonction pour obtenir l'URL initiale
   async getInitialURL() {
     const url = await Linking.getInitialURL();
-    console.log('🔗 Initial URL:', url);
+    console.log('Initial URL:', url);
     return url;
   },
   // Fonction pour écouter les changements d'URL
   subscribe(listener) {
     const onReceiveURL = ({ url }) => {
-      console.log('🔗 URL received:', url);
+      console.log('URL received:', url);
       listener(url);
     };
     const subscription = Linking.addEventListener('url', onReceiveURL);
@@ -125,13 +125,13 @@ export default function App() {
   useEffect(() => {
     // Fonction pour traiter les URLs reçues
     const handleDeepLink = async ({ url }) => {
-      console.log('🔗 App received deep link:', url);
+      console.log('App received deep link:', url);
       
       if (!url) return;
       
       // Vérifier si c'est un callback OAuth
       if (url.includes('access_token') || url.includes('refresh_token')) {
-        console.log('🔐 OAuth callback detected at app level');
+        console.log('OAuth callback detected at app level');
         
         // Extraire les tokens de l'URL
         const params = new URLSearchParams(url.split('?')[1]);
@@ -139,7 +139,7 @@ export default function App() {
         const refreshToken = params.get('refresh_token');
         
         if (accessToken && refreshToken) {
-          console.log('🔐 OAuth tokens found, session will be restored');
+          console.log('OAuth tokens found, session will be restored');
           
           // Un délai permet à Supabase de traiter les tokens
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -154,7 +154,7 @@ export default function App() {
         // Extraire l'ID de l'album pour navigation ultérieure
         const match = url.match(/\/album\/([^/?]+)/);
         if (match) {
-          console.log('📁 Album ID from deep link:', match[1]);
+          console.log('Album ID from deep link:', match[1]);
           // Navigation sera gérée par le router
         }
       }

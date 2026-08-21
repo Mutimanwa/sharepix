@@ -198,15 +198,42 @@ export async function restoreSession() {
   if (!supabase) return null;
   
   try {
-    const { data } = await supabase.auth.getSession();
-    const session = data?.session;
-    
-    if (!session?.user) return null;
-    
-    const profile = await fetchProfile(session.user.id);
-    return toAppUser(session.user, profile);
+    return new Promise((resolve) => {
+      let resolved = false;
+      
+      // Fonction pour terminer la promesse proprement
+      const finish = (user) => {
+        if (resolved) return;
+        resolved = true;
+        resolve(user);
+      };
+
+      // 1. Vérifier immédiatement si une session existe déjà en cache
+      supabase.auth.getSession().then(async ({ data }) => {
+        if (data?.session) {
+          const profile = await fetchProfile(data.session.user.id);
+          finish(toAppUser(data.session.user, profile));
+          return;
+        }
+      });
+
+      // 2. Écouter les changements (C'est ici que le Web va capturer l'échange du code)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          const profile = await fetchProfile(session.user.id);
+          finish(toAppUser(session.user, profile));
+        }
+      });
+
+      // 3. Sécurité : au bout de 2.5 secondes, si toujours rien, on abandonne
+      setTimeout(() => {
+        subscription.unsubscribe();
+        finish(null);
+      }, 2500);
+
+    });
   } catch (error) {
-    console.log('Session restore error:', error);
+    console.log('❌ Session restore error:', error);
     return null;
   }
 }
@@ -218,7 +245,7 @@ export async function signOut() {
   try {
     await supabase.auth.signOut();
   } catch (error) {
-    console.log('❌ Sign out error:', error);
+    console.log('Sign out error:', error);
   }
 }
 
@@ -234,7 +261,7 @@ export async function syncProfile(userId, { firstName, lastName }) {
       updated_at: new Date().toISOString(),
     });
   } catch (error) {
-    console.log('❌ Profile sync error:', error);
+    console.log('Profile sync error:', error);
   }
 }
 
