@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from './config';
-import { restoreSession, syncProfile } from './services/auth';
+import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
+import { supabase } from './lib/supabase'; // <-- AJOUT POUR LE CLOUD
 
 const KEY = 'sharepix.v1';
 
@@ -9,8 +10,8 @@ const defaultState = {
   onboarded: false,
   favTipSeen: false,
   // — Runtime auth (jamais persisté dans AsyncStorage) —
-  authChecked: false, // true quand on sait si une session Supabase existe
-  user: null,         // utilisateur Supabase connecté ({id, email, firstName, lastName})
+  authChecked: false, 
+  user: null,         
   profile: {
     firstName: '',
     lastName: '',
@@ -56,17 +57,18 @@ export function StoreProvider({ children }) {
     })();
   }, []);
 
-  // 2. Restauration de la session Supabase
+  // 2. Initialisation Auth (Anonyme si besoin)
   useEffect(() => {
     let cancelled = false;
     
     (async () => {
       try {
         if (isSupabaseConfigured) {
-          console.log('🔄 Restoring Supabase session...');
-          const user = await restoreSession();
+          console.log('🔄 Initializing auth...');
+          const user = await initializeAuth();
+          
           if (!cancelled && user) {
-            console.log('✅ Session restored:', user.email);
+            console.log(`✅ Auth ready (${user.isAnonymous ? 'Anonymous' : 'Logged In'}):`, user.email || user.id);
             setState((s) => ({
               ...s,
               user,
@@ -76,16 +78,14 @@ export function StoreProvider({ children }) {
                 lastName: user.lastName || s.profile.lastName,
               },
             }));
-          } else if (!cancelled) {
-            console.log('ℹ️ No session found');
           }
         }
       } catch (error) {
-        console.log('❌ Session restore error:', error);
+        console.log('❌ Auth init error:', error);
       }
+      
       if (!cancelled) {
         setState((s) => ({ ...s, authChecked: true }));
-        console.log('🔐 Auth checked:', state.user ? 'connected' : 'not connected');
       }
     })();
 
@@ -108,10 +108,8 @@ export function StoreProvider({ children }) {
       state,
       
       setOnboarded: () => setState((s) => ({ ...s, onboarded: true })),
-      
       dismissFavTip: () => setState((s) => ({ ...s, favTipSeen: true })),
       
-      // Connecte l'utilisateur Supabase et recopie son prénom/nom dans le profil local
       setAuthUser: (user) => {
         console.log('👤 Setting auth user:', user?.email);
         setState((s) => ({
@@ -132,7 +130,6 @@ export function StoreProvider({ children }) {
       
       updateProfile: (p) => {
         setState((s) => ({ ...s, profile: { ...s.profile, ...p } }));
-        // Synchro douce vers la table `profiles` si connecté
         if (state.user?.id) {
           const merged = { ...state.profile, ...p };
           syncProfile(state.user.id, {
@@ -142,8 +139,45 @@ export function StoreProvider({ children }) {
         }
       },
       
-      createAlbum: ({ name, firstName }) => {
-        const album = {
+      // ── CLOUD & LOCAL : Créer un album ──
+      createAlbum: async ({ name, firstName }) => {
+        // 1. Essai de création dans le Cloud (Supabase)
+        if (supabase && state.user?.id) {
+          const code = code8();
+          const { data, error } = await supabase
+            .from('albums')
+            .insert({
+              name: name,
+              code: code,
+              user_id: state.user.id,
+              creator_name: firstName,
+            })
+            .select()
+            .single();
+
+          if (!error && data) {
+            // Formatage de l'album cloud pour qu'il ressemble à un album local
+            const cloudAlbum = {
+              id: data.id,
+              name: data.name,
+              code: data.code,
+              photos: [],
+              createdAt: new Date(data.created_at).getTime(),
+              members: firstName ? [{ name: firstName, role: 'admin' }] : [],
+            };
+            
+            setState((s) => ({
+              ...s,
+              profile: { ...s.profile, firstName: firstName || s.profile.firstName },
+              albums: [cloudAlbum, ...s.albums],
+            }));
+            return cloudAlbum;
+          }
+          console.log('⚠️ Cloud creation failed, falling back to local');
+        }
+
+        // 2. Fallback 100% Local (si pas internet, ou si Supabase non configuré)
+        const localAlbum = {
           id: Date.now().toString(),
           name,
           code: code8(),
@@ -154,15 +188,47 @@ export function StoreProvider({ children }) {
         setState((s) => ({
           ...s,
           profile: { ...s.profile, firstName: firstName || s.profile.firstName },
-          albums: [album, ...s.albums],
+          albums: [localAlbum, ...s.albums],
         }));
-        return album;
+        return localAlbum;
       },
       
-      joinAlbum: (code) => {
+      // ── CLOUD & LOCAL : Rejoindre un album ──
+      joinAlbum: async (code) => {
+        // 1. Essai de recherche dans le Cloud
+        if (supabase) {
+          const { data, error } = await supabase
+            .from('albums')
+            .select('*')
+            .eq('code', code.toUpperCase())
+            .single();
+
+          if (!error && data) {
+            const cloudAlbum = {
+              id: data.id,
+              name: data.name,
+              code: data.code,
+              photos: [], // Les photos seront chargées en entrant dans l'album
+              createdAt: new Date(data.created_at).getTime(),
+              members: data.creator_name ? [{ name: data.creator_name, role: 'admin' }] : [],
+            };
+            
+            // On l'ajoute au state local s'il n'y est pas déjà
+            setState((s) => {
+              if (s.albums.find((a) => a.id === cloudAlbum.id)) return s; // Déjà présent
+              return { ...s, albums: [cloudAlbum, ...s.albums] };
+            });
+            
+            return cloudAlbum;
+          }
+        }
+
+        // 2. Fallback local (pour les vieux albums créés avant la mise en ligne)
         const found = state.albums.find((a) => a.code.toUpperCase() === code.toUpperCase());
         return found || null;
       },
+      
+      // ── 100% LOCAL : Actions sur les photos (pour l'instant) ──
       
       addPhoto: (albumId, uri) => {
         setState((s) => ({

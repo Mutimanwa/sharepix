@@ -60,7 +60,7 @@ export default function ProfileScreen({ navigation }) {
   const { state, updateProfile, clearAuthUser } = useStore();
   const p = state.profile;
   const insets = useSafeAreaInsets();
-  const user = state.user;
+  const isAnonymous = user?.isAnonymous;
   
   const [busyOut, setBusyOut] = useState(false);
   const [busyDelete, setBusyDelete] = useState(false);
@@ -171,7 +171,7 @@ export default function ProfileScreen({ navigation }) {
         </View>
 
         {/* ── BANNIÈRE COMPTE ── */}
-        {isSupabaseConfigured && !user && (
+        {isSupabaseConfigured && isAnonymous && (
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
               <View style={[styles.accountIcon, { backgroundColor: '#FFF3E0' }]}>
@@ -191,7 +191,7 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* ── COMPTE CONNECTÉ (DONNÉES GOOGLE) ── */}
-        {isSupabaseConfigured && user && (
+        {isSupabaseConfigured && !isAnonymous && (
           <View style={styles.card}>
             <View style={styles.accountRow}>
               <View style={{ flex: 1, gap: 4 }}>

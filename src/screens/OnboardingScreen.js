@@ -6,6 +6,7 @@ import {
   Dimensions,
   FlatList,
   TouchableOpacity,
+  Alert, // <-- AJOUT
 } from 'react-native';
 import { colors } from '../theme';
 
@@ -45,12 +46,17 @@ export default function OnboardingScreen({ navigation }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [first, setFirst] = useState('');
-  const { createAlbum, setOnboarded, state } = useStore();
+  
+  // <-- AJOUT des states de chargement
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingJoin, setLoadingJoin] = useState(false);
+  
+  // <-- AJOUT de joinAlbum dans le destructuring
+  const { createAlbum, joinAlbum, setOnboarded, state } = useStore();
   const insets = useSafeAreaInsets();
 
   const goHome = () => {
     setOnboarded();
-    // Backend configuré mais pas de session -> on passe par l'auth d'abord
     if (isSupabaseConfigured && !state.user) {
       console.log('➡️ Onboarding -> Auth (Supabase configured, no user)');
       navigation.replace('Auth');
@@ -117,7 +123,7 @@ export default function OnboardingScreen({ navigation }) {
         />
       </View>
 
-      {/* Sheets avec SafeArea intégré */}
+      {/* Sheet Rejoindre */}
       <Sheet
         visible={join}
         onClose={() => {
@@ -130,16 +136,29 @@ export default function OnboardingScreen({ navigation }) {
         <Text style={styles.center}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
         {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
         <CoralButton
-          title="Continuer"
-          disabled={code.length < 8}
-          onPress={() => {
-            setJoin(false);
-            setCode('');
-            goHome();
+          title={loadingJoin ? "Recherche en cours..." : "Continuer"}
+          disabled={code.length < 8 || loadingJoin}
+          onPress={async () => {
+            setLoadingJoin(true);
+            try {
+              const album = await joinAlbum(code);
+              if (!album) {
+                Alert.alert("Introuvable", "Ce code d'album n'existe pas ou a été supprimé.");
+                return;
+              }
+              setJoin(false);
+              setCode('');
+              goHome();
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de rejoindre l'album.");
+            } finally {
+              setLoadingJoin(false);
+            }
           }}
         />
       </Sheet>
 
+      {/* Sheet Créer */}
       <Sheet
         visible={create}
         onClose={() => setCreate(false)}
@@ -159,12 +178,19 @@ export default function OnboardingScreen({ navigation }) {
         />
         <Text style={styles.center}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton
-          title="Créer un album"
-          disabled={!name.trim() || !first.trim()}
-          onPress={() => {
-            createAlbum({ name: name.trim(), firstName: first.trim() });
-            setCreate(false);
-            goHome();
+          title={loadingCreate ? "Création en cours..." : "Créer un album"}
+          disabled={!name.trim() || !first.trim() || loadingCreate}
+          onPress={async () => {
+            setLoadingCreate(true);
+            try {
+              await createAlbum({ name: name.trim(), firstName: first.trim() });
+              setCreate(false);
+              goHome();
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de créer l'album.");
+            } finally {
+              setLoadingCreate(false);
+            }
           }}
         />
       </Sheet>

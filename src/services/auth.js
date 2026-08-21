@@ -18,7 +18,29 @@ function toAppUser(supaUser, profile) {
     lastName: profile?.last_name ?? meta?.last_name ?? (meta?.full_name || '').split(' ').slice(1).join(' ') ?? '',
     // ON REGARDE ICI : D'abord le profil custom, SINON les metadatas Google ('picture' ou 'avatar_url')
     avatarUrl: profile?.avatar_url ?? meta?.avatar_url ?? meta?.picture ?? null,
+    isAnonymous: supaUser.is_anonymous ?? false,
   };
+}
+
+// ── Initialisation Automatique (Anonyme ou Réel) ─────────────────────
+
+export async function initializeAuth() {
+  if (!supabase) return null;
+  
+  // 1. Essayer de restaurer une vraie session (Google/Email)
+  let user = await restoreSession();
+  
+  // 2. Si personne n'est connecté, on crée le compte fantôme
+  if (!user) {
+    console.log('No session found, creating anonymous account...');
+    const { data, error } = await supabase.auth.signInAnonymously();
+    
+    if (!error && data.user) {
+      user = toAppUser(data.user, null);
+    }
+  }
+  
+  return user;
 }
 
 async function fetchProfile(userId) {
