@@ -8,6 +8,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Alert, // <-- AJOUT
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
@@ -29,13 +30,18 @@ const suggestions = [
 
 export default function HomeScreen() {
   const nav = useNavigation();
-  const { state, createAlbum } = useStore();
+  const { state, createAlbum, joinAlbum } = useStore(); 
+  const insets = useSafeAreaInsets();
+  
   const [create, setCreate] = useState(false);
   const [join, setJoin] = useState(false);
   const [name, setName] = useState('');
   const [first, setFirst] = useState(state.profile.firstName);
   const [code, setCode] = useState('');
-   const insets = useSafeAreaInsets();
+  
+  // <-- AJOUT des states de chargement
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingJoin, setLoadingJoin] = useState(false);
 
   return (
     <Page style={[styles.root ,{ paddingTop: insets.top }]} edges={['top', 'left', 'right']}>
@@ -45,8 +51,6 @@ export default function HomeScreen() {
           <Logo size={36} />
           <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
         </View> 
-
-
 
         {/* Actions Buttons */}
         <View style={[styles.actions,{paddingBottom: 10}]}>
@@ -93,7 +97,6 @@ export default function HomeScreen() {
                   <Text style={styles.ideaT}>{s.title}</Text>
                   <Text style={styles.ideaS}>{s.sub}</Text>
                 </View>
-              
               </TouchableOpacity>
             );
           })}
@@ -134,7 +137,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* Sheets avec gestion du clavier */}
+      {/* Sheet Créer */}
       <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album">
         <Field 
           label="Nom de l'album" 
@@ -149,16 +152,24 @@ export default function HomeScreen() {
         />
         <Text style={styles.sheetHint}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton
-          title="Créer un album"
-          disabled={!name.trim()}
-          onPress={() => {
-            const alb = createAlbum({ name: name.trim(), firstName: first.trim() });
-            setCreate(false);
-            nav.navigate('Album', { id: alb.id });
+          title={loadingCreate ? "Création en cours..." : "Créer un album"}
+          disabled={!name.trim() || !first.trim() || loadingCreate}
+          onPress={async () => {
+            setLoadingCreate(true);
+            try {
+              const alb = await createAlbum({ name: name.trim(), firstName: first.trim() });
+              setCreate(false);
+              nav.navigate('Album', { id: alb.id });
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de créer l'album.");
+            } finally {
+              setLoadingCreate(false);
+            }
           }}
         />
       </Sheet>
 
+      {/* Sheet Rejoindre */}
       <Sheet
         visible={join}
         onClose={() => {
@@ -170,16 +181,24 @@ export default function HomeScreen() {
         <Text style={styles.sheetHint}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
         {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
         <CoralButton 
-          title="Continuer" 
-          disabled={code.length < 8} 
-          onPress={() => {
-            const album = state.albums.find(a => a.code === code);
-            if (album) {
-              setJoin(false);
-              setCode('');
-              nav.navigate('Album', { id: album.id });
-            } else {
-              alert('Code invalide');
+          title={loadingJoin ? "Recherche..." : "Continuer"} 
+          disabled={code.length < 8 || loadingJoin} 
+          onPress={async () => {
+            setLoadingJoin(true);
+            try {
+              // Utilise la fonction cloud du store au lieu de chercher localement
+              const album = await joinAlbum(code);
+              if (album) {
+                setJoin(false);
+                setCode('');
+                nav.navigate('Album', { id: album.id });
+              } else {
+                Alert.alert("Introuvable", "Ce code d'album n'existe pas ou a été supprimé.");
+              }
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de rejoindre l'album.");
+            } finally {
+              setLoadingJoin(false);
             }
           }}
         />
