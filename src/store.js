@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from './config';
 import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
 import { supabase } from './lib/supabase'; // <-- AJOUT POUR LE CLOUD
+import { Alert } from 'react-native';
 
 const KEY = 'sharepix.v1';
 
@@ -228,30 +229,99 @@ export function StoreProvider({ children }) {
         return found || null;
       },
       
-      // ── 100% LOCAL : Actions sur les photos (pour l'instant) ──
-      
-      addPhoto: (albumId, uri) => {
-        setState((s) => ({
-          ...s,
-          albums: s.albums.map((a) =>
-            a.id === albumId
-              ? {
-                  ...a,
-                  photos: [
-                    {
-                      id: Date.now().toString() + Math.random(),
-                      uri,
-                      createdAt: Date.now(),
-                      liked: false,
-                      favorite: false,
-                      comments: [],
-                    },
-                    ...a.photos,
-                  ],
-                }
-              : a
-          ),
-        }));
+          // ── CLOUD & LOCAL : Ajouter une photo ──
+      addPhoto: async (albumId, uri) => {
+        // 1. Si pas de connexion cloud, on garde l'ancien système local (pour démo hors-ligne)
+        if (!supabase || !state.user?.id) {
+          setState((s) => ({
+            ...s,
+            albums: s.albums.map((a) =>
+              a.id === albumId
+                ? {
+                    ...a,
+                    photos: [
+                      {
+                        id: Date.now().toString() + Math.random(),
+                        uri, // URI locale (file://...)
+                        createdAt: Date.now(),
+                        liked: false,
+                        favorite: false,
+                        comments: [],
+                      },
+                      ...a.photos,
+                    ],
+                  }
+                : a
+            ),
+          }));
+          return;
+        }
+
+        // 2. SYSTÈME CLOUD
+        try {
+           // Préparation du fichier (Compatible Web Data URI et Mobile File)
+          let fileToUpload;
+
+          if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+            // SUR LE WEB : On convertit le Data URI en objet Blob que Supabase comprend parfaitement
+            const response = await fetch(uri);
+            fileToUpload = await response.blob();
+          } else {
+            // SUR MOBILE (iOS/Android) : On garde le format fichier classique
+            fileToUpload = {
+              uri: uri,
+              type: 'image/jpeg', 
+              name: `${Date.now()}.jpg`
+            };
+          }
+
+          // Étape A : Uploader le fichier physique dans le bucket Supabase
+          const filePath = `${albumId}/${Date.now()}.jpg`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('album-photos')
+            .upload(filePath, fileToUpload, { contentType: 'image/jpeg', upsert: false });
+
+          if (uploadError) throw new Error("Erreur lors de l'envoi de l'image.");
+
+          // Étape B : Récupérer l'URL publique de l'image uploadée
+          const { data: urlData } = supabase.storage.from('album-photos').getPublicUrl(uploadData.path);
+          const publicUrl = urlData.publicUrl;
+
+          // Étape C : Créer l'entrée dans la table SQL 'photos'
+          const { data: photoData, error: dbError } = await supabase
+            .from('photos')
+            .insert({
+              album_id: albumId,
+              storage_path: uploadData.path,
+            })
+            .select()
+            .single();
+
+          if (dbError) throw new Error("Erreur d'enregistrement en base de données.");
+
+          // Étape D : Mettre à jour le state local avec l'URL du cloud
+          const newPhoto = {
+            id: photoData.id,
+            uri: publicUrl, // On remplace l'URI locale par l'URL Cloud !
+            createdAt: Date.now(),
+            liked: false,
+            favorite: false,
+            comments: [],
+          };
+
+          setState((s) => ({
+            ...s,
+            albums: s.albums.map((a) =>
+              a.id === albumId ? { ...a, photos: [newPhoto, ...a.photos] } : a
+            ),
+          }));
+
+          return newPhoto;
+
+        } catch (error) {
+          console.error("Erreur upload photo:", error);
+          Alert.alert("Erreur réseau", error.message || "Impossible d'envoyer la photo.");
+        }
       },
       
       toggleLike: (albumId, photoId) => {

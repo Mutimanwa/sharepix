@@ -58,8 +58,8 @@ export default function OnboardingScreen({ navigation }) {
   const goHome = () => {
     setOnboarded();
     if (isSupabaseConfigured && !state.user) {
-      console.log('➡️ Onboarding -> Auth (Supabase configured, no user)');
-      navigation.replace('Auth');
+      console.log('➡️ Onboarding -> Main (Supabase configured, no user)');
+      navigation.replace('Main');
     } else {
       console.log('➡️ Onboarding -> Main');
       navigation.replace('Main');

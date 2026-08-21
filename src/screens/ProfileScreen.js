@@ -60,6 +60,7 @@ export default function ProfileScreen({ navigation }) {
   const { state, updateProfile, clearAuthUser } = useStore();
   const p = state.profile;
   const insets = useSafeAreaInsets();
+  const user = state.user;
   const isAnonymous = user?.isAnonymous;
   
   const [busyOut, setBusyOut] = useState(false);
@@ -224,7 +225,7 @@ export default function ProfileScreen({ navigation }) {
         {/* ── INFORMATIONS PERSONNELLES ── */}
         {/* On masque cette section si l'utilisateur est connecté à Google 
             car ses infos sont déjà affichées dans la carte "Compte vérifié" au-dessus */}
-        {!user && (
+        {isAnonymous && (
           <>
             <Text style={styles.sectionTitle}>Informations personnelles</Text>
             <View style={styles.card}>
