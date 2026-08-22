@@ -23,7 +23,6 @@ import AlbumScreen from './src/screens/AlbumScreen';
 import PhotoScreen from './src/screens/PhotoScreen';
 import MenuScreen from './src/screens/MenuScreen';
 import {
-  FiltersScreen,
   QRScreen,
   MembersScreen,
   PremiumScreen,
@@ -49,7 +48,6 @@ const linking = {
       Members: 'members/:id',
       Premium: 'premium',
       PcUpload: 'pc-upload',
-      Filters: 'filters',
     },
   },
   // Fonction pour obtenir l'URL initiale
@@ -195,11 +193,6 @@ export default function App() {
             <Stack.Screen name="Album" component={AlbumScreen} />
             <Stack.Screen name="Photo" component={PhotoScreen} />
             <Stack.Screen name="Menu" component={MenuScreen} />
-            <Stack.Screen 
-              name="Filters" 
-              component={FiltersScreen} 
-              options={{ presentation: 'modal' }} 
-            />
             <Stack.Screen name="QR" component={QRScreen} />
             <Stack.Screen name="Members" component={MembersScreen} />
             <Stack.Screen name="Premium" component={PremiumScreen} />

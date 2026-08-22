@@ -618,7 +618,10 @@ export default function AlbumScreen({ route, navigation }) {
               hint="Définitif, pour tous les membres"
               danger
               last
-              onPress={() => setConfirmDeleteAlbum(true)}
+              onPress={() => {
+                setMenuModal(false);
+                setConfirmDeleteAlbum(true);
+              }}
             />
           ) : (
             <Row
@@ -626,7 +629,10 @@ export default function AlbumScreen({ route, navigation }) {
               title="Quitter l'album"
               hint="Vous pourrez revenir avec le code"
               last
-              onPress={() => setConfirmLeave(true)}
+              onPress={() => {
+                setMenuModal(false);
+                setConfirmLeave(true);
+              }}
             />
           )}
         </View>
