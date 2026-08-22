@@ -12,6 +12,7 @@ import {
   ScrollView,
   SafeAreaView,
   Dimensions,
+  Animated
 } from 'react-native';
 import { colors } from '../theme';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
@@ -19,6 +20,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { TouchableWithoutFeedback } from 'react-native';
 
 const LOGO = require('../../assets/sharepix-logo.png');
 
@@ -150,7 +152,7 @@ export function Sheet({
         <View style={[styles.sheet , { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.sheetHead}>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Text style={{ fontSize: 22 }}>✕</Text>
+              <Text style={{ fontSize: 15 }}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.sheetTitle}>{title}</Text>
             <View style={{ width: 22 }} />
@@ -170,6 +172,30 @@ export function Sheet({
     </Modal>
   );
 }
+
+export function RightModal({ visible, onClose, children, width = '82%' }) {
+  const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: visible ? 0 : SCREEN_WIDTH,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose} style={{ flex: 1 }}>
+        <View style={styles.rightOverlay} />
+      </TouchableWithoutFeedback>
+      <Animated.View style={[styles.rightContainer, { width, transform: [{ translateX: slideAnim }] }]}>
+        {children}
+      </Animated.View>
+    </Modal>
+  );
+}
+
 
 // Page avec SafeArea par défaut
 export function Page({ children, style = {}, edges = ['top', 'left', 'right'] }) {
@@ -387,5 +413,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginEnd: 10
-  }
+  },
+    // Right Modal (Menu coulissant)
+  rightOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)', 
+  },
+  rightContainer: {
+    height: '100%',
+    backgroundColor: '#fff',
+    borderLeftWidth: 1,
+    borderLeftColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: -5, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    elevation: 10,
+  },
 });

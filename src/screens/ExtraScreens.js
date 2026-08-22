@@ -14,7 +14,7 @@ import {
   Tick02Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import { BackButton, CoralButton, SmallButton, Page } from '../components/UI';
+import { BackButton, CoralButton, SmallButton, Page, Sheet } from '../components/UI';
 import { useStore } from '../store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -88,7 +88,7 @@ export function FiltersScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
+    <Sheet title="Filtre" visible={filtre} onClose={() => setFilter(false)} >
       <View style={styles.head}>
         <BackButton variant="close" onPress={() => navigation.goBack()} />
         <Text style={styles.headTitle}>Filtre</Text>
@@ -148,7 +148,7 @@ export function FiltersScreen({ navigation }) {
           color={dirty ? colors.coral : '#D5D8D8'}
         />
       </View>
-    </Page>
+    </Sheet>
   );
 }
 
@@ -281,7 +281,7 @@ export function PcUploadScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   root: { flex: 1,},
   head: {
     flexDirection: 'row',
