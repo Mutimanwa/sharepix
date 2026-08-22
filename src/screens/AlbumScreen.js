@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,9 @@ import { colors } from '../theme';
 import { CoralButton, BackButton, Sheet, RightModal, Logo } from '../components/UI';
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
 import { useStore } from '../store';
+// ── SUPABASE ALBUMS : intégration ──
+import { subscribeAlbumChanges } from '../services/albums';
+// ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
 
 const TABS = [
@@ -94,10 +97,27 @@ export default function AlbumScreen({ route, navigation }) {
   const [copied, setCopied] = useState(false);
 
   // ── SUPABASE ALBUMS : intégration ──
-  // Recharge les photos cloud à chaque fois que l'écran reprend le focus.
+  // À l'entrée sur l'album : refresh immédiat, puis abonnement Realtime.
+  // Le Realtime dit "ça a changé" ; la Data API redonne les données (api.md 13.38).
+  // refreshRef évite de recréer le canal à chaque setState du store.
+  const refreshRef = useRef(refreshAlbumPhotos);
+  refreshRef.current = refreshAlbumPhotos;
+
   useFocusEffect(
     useCallback(() => {
-      if (album?.cloud) refreshAlbumPhotos(id);
+      if (!album?.cloud) return undefined;
+      refreshRef.current(id);
+
+      let timer = null;
+      const unsubscribe = subscribeAlbumChanges(id, () => {
+        clearTimeout(timer); // debounce : max 1 refresh / 500 ms
+        timer = setTimeout(() => refreshRef.current(id), 500);
+      });
+
+      return () => {
+        clearTimeout(timer);
+        unsubscribe();
+      };
     }, [id, album?.cloud])
   );
   // ── SUPABASE ALBUMS : fin ──
@@ -618,10 +638,7 @@ export default function AlbumScreen({ route, navigation }) {
               hint="Définitif, pour tous les membres"
               danger
               last
-              onPress={() => {
-                setMenuModal(false);
-                setConfirmDeleteAlbum(true);
-              }}
+              onPress={() => setConfirmDeleteAlbum(true)}
             />
           ) : (
             <Row
@@ -629,10 +646,7 @@ export default function AlbumScreen({ route, navigation }) {
               title="Quitter l'album"
               hint="Vous pourrez revenir avec le code"
               last
-              onPress={() => {
-                setMenuModal(false);
-                setConfirmLeave(true);
-              }}
+              onPress={() => setConfirmLeave(true)}
             />
           )}
         </View>

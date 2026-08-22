@@ -16,6 +16,9 @@ import {
   cloudDeleteAlbum,
   cloudRenameAlbum,
   cloudLeaveAlbum,
+  cloudFetchInteractions,
+  cloudAddComment,
+  cloudSetLike,
 } from './services/albums';
 // ── SUPABASE ALBUMS : fin ──
 import { Alert } from 'react-native';
@@ -370,6 +373,13 @@ export function StoreProvider({ children }) {
       },
       
       toggleLike: (albumId, photoId) => {
+        // ── SUPABASE ALBUMS : intégration ──
+        // Toggle local immédiat + synchro cloud en arrière-plan (upsert/delete)
+        const photo = state.albums
+          .find((a) => a.id === albumId)
+          ?.photos.find((p) => p.id === photoId);
+        if (photo?.cloud) cloudSetLike(photoId, !photo.liked).catch(() => {});
+        // ── SUPABASE ALBUMS : fin ──
         setState((s) => ({
           ...s,
           albums: s.albums.map((a) =>
@@ -402,32 +412,49 @@ export function StoreProvider({ children }) {
       },
       
       addComment: (albumId, photoId, text) => {
-        setState((s) => ({
-          ...s,
-          albums: s.albums.map((a) =>
-            a.id !== albumId
-              ? a
-              : {
-                  ...a,
-                  photos: a.photos.map((p) =>
-                    p.id === photoId
-                      ? {
-                          ...p,
-                          comments: [
-                            ...p.comments,
-                            {
-                              id: Date.now().toString(),
-                              author: s.profile.firstName || 'Vous',
-                              text,
-                              createdAt: Date.now(),
-                            },
-                          ],
-                        }
-                      : p
-                  ),
-                }
-          ),
-        }));
+        // ── SUPABASE ALBUMS : intégration ──
+        // 1. Ajout local immédiat (id temporaire) — l'UI ne freeze jamais.
+        // 2. Envoi cloud en arrière-plan : à la réponse, l'id temporaire
+        //    est remplacé par l'id serveur et le commentaire passe cloud:true.
+        const tempId = `tmp-${Date.now()}`;
+        const author = state.profile.firstName || 'Vous';
+        const addLocal = (id, cloud) =>
+          setState((s) => ({
+            ...s,
+            albums: s.albums.map((a) =>
+              a.id !== albumId
+                ? a
+                : {
+                    ...a,
+                    photos: a.photos.map((p) =>
+                      p.id === photoId
+                        ? {
+                            ...p,
+                            comments: [
+                              ...p.comments.filter((c) => c.id !== tempId),
+                              { id, author, text, createdAt: Date.now(), cloud },
+                            ],
+                          }
+                        : p
+                    ),
+                  }
+            ),
+          }));
+
+        const photo = state.albums
+          .find((a) => a.id === albumId)
+          ?.photos.find((p) => p.id === photoId);
+
+        addLocal(tempId, false);
+
+        if (photo?.cloud) {
+          cloudAddComment(photoId, text, author === 'Vous' ? '' : author)
+            .then(({ data }) => {
+              if (data) addLocal(data.id, true); // remplace la copie temporaire
+            })
+            .catch(() => {}); // reste local si hors-ligne, synchro à la reconnexion
+        }
+        // ── SUPABASE ALBUMS : fin ──
       },
       
       // ── SUPABASE ALBUMS : intégration ──
@@ -439,17 +466,27 @@ export function StoreProvider({ children }) {
         if (!album?.cloud) return;
         const { data: cloudPhotos, error } = await cloudFetchAlbumPhotos(albumId);
         if (error) return;
+
+        // Commentaires + likes cloud de ces photos
+        const photoIds = cloudPhotos.map((p) => p.id);
+        const { comments: cloudComments, likes: myLikes } =
+          await cloudFetchInteractions(photoIds);
+
         setState((s) => ({
           ...s,
           albums: s.albums.map((a) => {
             if (a.id !== albumId) return a;
             const localOnly = a.photos.filter((p) => !p.cloud);
-            // Préserve les likes/favoris/commentaires locaux sur les photos déjà connues
             const merged = cloudPhotos.map((cp) => {
               const prev = a.photos.find((p) => p.id === cp.id);
-              return prev
-                ? { ...cp, liked: prev.liked, favorite: prev.favorite, comments: prev.comments }
-                : cp;
+              // Commentaires cloud + ceux encore purement locaux (hors-ligne)
+              const localComments = (prev?.comments || []).filter((c) => !c.cloud);
+              return {
+                ...cp,
+                liked: myLikes.has(cp.id),
+                favorite: prev?.favorite ?? false, // les favoris restent personnels
+                comments: [...(cloudComments[cp.id] || []), ...localComments],
+              };
             });
             return { ...a, photos: [...merged, ...localOnly] };
           }),

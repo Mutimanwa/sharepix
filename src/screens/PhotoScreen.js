@@ -25,6 +25,9 @@ import * as FileSystem from 'expo-file-system/legacy'; // API classique (downloa
 import * as Sharing from 'expo-sharing';
 import { colors } from '../theme';
 import { useStore } from '../store';
+// ── SUPABASE ALBUMS : intégration ──
+import { subscribeAlbumChanges } from '../services/albums';
+// ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
 import { BackButton, Sheet } from '../components/UI';
 
@@ -51,7 +54,14 @@ function formatAgo(ts) {
 
 export default function PhotoScreen({ route, navigation }) {
   const { albumId, photoId } = route.params;
-  const { state, toggleLike, toggleFavorite, addComment, deletePhoto } = useStore();
+  const {
+    state,
+    toggleLike,
+    toggleFavorite,
+    addComment,
+    deletePhoto,
+    refreshAlbumPhotos, // ── SUPABASE ALBUMS : intégration ──
+  } = useStore();
   const insets = useSafeAreaInsets();
 
   const carouselRef = useRef(null);
@@ -84,6 +94,26 @@ export default function PhotoScreen({ route, navigation }) {
     setText('');
     setLikedComments({});
   }, [safeIndex]);
+
+  // ── SUPABASE ALBUMS : intégration ──
+  // Abonnement Realtime tant que la photo est à l'écran :
+  // commentaire / like / nouvelle photo d'un autre membre -> refresh.
+  const refreshRef = useRef(refreshAlbumPhotos);
+  refreshRef.current = refreshAlbumPhotos;
+
+  useEffect(() => {
+    if (!album?.cloud) return undefined;
+    let timer = null;
+    const unsubscribe = subscribeAlbumChanges(albumId, () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => refreshRef.current(albumId), 500);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [albumId, album?.cloud]);
+  // ── SUPABASE ALBUMS : fin ──
 
   // ── Album/photo introuvable ────────────────────────────────────────────
   if (!album || photos.length === 0 || initialIndex < 0) {
@@ -491,7 +521,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: SCREEN_WIDTH,
     height: IMAGE_HEIGHT,
-    backgroundColor: '#000',
+    backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
   },

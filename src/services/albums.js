@@ -156,4 +156,121 @@ export async function cloudDeletePhoto(photo) {
   const { error } = await supabase.from('photos').delete().eq('id', photo.id);
   return { error };
 }
+
+// ── Interactions (likes + commentaires) ──────────────────────────────
+
+export function mapCloudComment(row) {
+  return {
+    id: row.id,
+    author: row.author_name || 'Membre',
+    text: row.content,
+    createdAt: new Date(row.created_at).getTime(),
+    cloud: true,
+  };
+}
+
+/**
+ * Charge les commentaires + les likes DE L'UTILISATEUR pour une liste de
+ * photos (appelé par refreshAlbumPhotos).
+ * → { comments: { [photoId]: Comment[] }, likes: Set<photoId>, error }
+ */
+export async function cloudFetchInteractions(photoIds) {
+  const empty = { comments: {}, likes: new Set(), error: null };
+  if (!supabase || !photoIds?.length) return empty;
+
+  const { data: cData, error: cErr } = await supabase
+    .from('photo_comments')
+    .select('*')
+    .in('photo_id', photoIds)
+    .order('created_at', { ascending: true });
+
+  // La RLS filtre automatiquement : on ne récupère que SES likes.
+  // getSession() lit le token en local (pas d'appel réseau).
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id || '';
+  const { data: lData } = await supabase
+    .from('photo_likes')
+    .select('photo_id')
+    .in('photo_id', photoIds)
+    .eq('user_id', uid);
+
+  const comments = {};
+  (cData || []).forEach((r) => {
+    (comments[r.photo_id] = comments[r.photo_id] || []).push(mapCloudComment(r));
+  });
+
+  return { comments, likes: new Set((lData || []).map((r) => r.photo_id)), error: cErr };
+}
+
+/** Ajoute un commentaire (renvoie la ligne créée, ou null en échec). */
+export async function cloudAddComment(photoId, text, authorName) {
+  if (!supabase || !isCloudId(photoId)) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('photo_comments')
+    .insert({ photo_id: photoId, content: text, author_name: authorName || '' })
+    .select()
+    .single();
+  return { data, error };
+}
+
+/** Pose ou retire le like de l'utilisateur courant. */
+export async function cloudSetLike(photoId, liked) {
+  if (!supabase || !isCloudId(photoId)) return { error: null };
+  if (liked) {
+    // upsert : ré-exécution idempotente (pas de doublon possible, PK photo+user)
+    const { error } = await supabase
+      .from('photo_likes')
+      .upsert({ photo_id: photoId });
+    return { error };
+  }
+  const { error } = await supabase
+    .from('photo_likes')
+    .delete()
+    .eq('photo_id', photoId);
+  return { error };
+}
+
+// ── Realtime ─────────────────────────────────────────────────────────
+
+/**
+ * S'abonne aux changements d'un album (photos + commentaires + likes +
+ * la ligne album elle-même pour renommage/suppression).
+ * La fonction `onChange` est appelée à chaque événement (à toi de
+ * debouncer / rafraîchir). Retourne la fonction de désabonnement.
+ *
+ * Note : photos/albums sont filtrés côté serveur ; comments/likes
+ * n'ont pas de album_id → filtrage RLS côté Supabase (tu ne recevras
+ * que les événements des albums dont tu es membre).
+ */
+export function subscribeAlbumChanges(albumId, onChange) {
+  if (!supabase || !isCloudId(albumId)) return () => {};
+
+  // Nom de canal UNIQUE par abonné : supabase-js peut rendre un canal déjà
+  // souscrit si le nom est identique (écrans Album + Photo en même temps),
+  // et ".on()" après "subscribe()" lève une erreur.
+  const topic = `album:${albumId}:${Math.random().toString(36).slice(2, 8)}`;
+
+  const channel = supabase
+    .channel(topic)
+    // Photos de CET album (filtre serveur possible : colonne album_id)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'photos', filter: `album_id=eq.${albumId}` },
+      onChange
+    )
+    // Renommage / suppression de l'album lui-même
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'albums', filter: `id=eq.${albumId}` },
+      onChange
+    )
+    // Commentaires + likes (filtrés par la RLS Realtime, pas de colonne album_id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_comments' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_likes' }, onChange)
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
 // ── SUPABASE ALBUMS : fin ──
