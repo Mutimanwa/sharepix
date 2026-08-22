@@ -46,9 +46,12 @@ export function isCodeCollision(error) {
  * Le code est validé côté serveur ; l'appartenance est créée (ou ignorée
  * si déjà membre). Erreur 'CODE_INCONNU' si le code n'existe pas.
  */
-export async function cloudJoinAlbum(code) {
+export async function cloudJoinAlbum(code, memberName) {
   if (!supabase) return { data: null, error: new Error('Supabase non configuré') };
-  const { data, error } = await supabase.rpc('join_album_by_code', { p_code: code });
+  const { data, error } = await supabase.rpc('join_album_by_code', {
+    p_code: code,
+    p_member_name: memberName || '',
+  });
   if (error && String(error.message || '').includes('CODE_INCONNU')) {
     return { data: null, error: Object.assign(error, { isUnknownCode: true }) };
   }
@@ -131,6 +134,7 @@ export function mapCloudPhoto(row) {
     cloud: true,
     createdAt: new Date(row.created_at).getTime(),
     liked: false,
+    likesCount: 0,
     favorite: false,
     comments: [],
   };
@@ -163,19 +167,22 @@ export function mapCloudComment(row) {
   return {
     id: row.id,
     author: row.author_name || 'Membre',
+    authorId: row.author_id, // droit de suppression côté UI
+    parentId: row.parent_id || null, // réponse ?
     text: row.content,
     createdAt: new Date(row.created_at).getTime(),
+    replies: [],
     cloud: true,
   };
 }
 
 /**
- * Charge les commentaires + les likes DE L'UTILISATEUR pour une liste de
- * photos (appelé par refreshAlbumPhotos).
- * → { comments: { [photoId]: Comment[] }, likes: Set<photoId>, error }
+ * Charge commentaires (arborescence) + likes (compteurs + les miens)
+ * pour une liste de photos. Appelé par refreshAlbumPhotos.
+ * → { comments: { [photoId]: Comment[] }, likes: Set, likeCounts: {}, error }
  */
 export async function cloudFetchInteractions(photoIds) {
-  const empty = { comments: {}, likes: new Set(), error: null };
+  const empty = { comments: {}, likes: new Set(), likeCounts: {}, error: null };
   if (!supabase || !photoIds?.length) return empty;
 
   const { data: cData, error: cErr } = await supabase
@@ -184,43 +191,69 @@ export async function cloudFetchInteractions(photoIds) {
     .in('photo_id', photoIds)
     .order('created_at', { ascending: true });
 
-  // La RLS filtre automatiquement : on ne récupère que SES likes.
-  // getSession() lit le token en local (pas d'appel réseau).
+  // ── Arborescence : racines (parent_id null) + réponses rattachées ──
+  const comments = {};
+  const byPhoto = {};
+  (cData || []).forEach((r) => {
+    (byPhoto[r.photo_id] = byPhoto[r.photo_id] || []).push(mapCloudComment(r));
+  });
+  Object.entries(byPhoto).forEach(([photoId, list]) => {
+    const byId = {};
+    list.forEach((c) => (byId[c.id] = c));
+    const roots = [];
+    list.forEach((c) => {
+      if (c.parentId && byId[c.parentId]) byId[c.parentId].replies.push(c);
+      else roots.push(c); // parent supprimé/inconnu → remonté au premier niveau
+    });
+    comments[photoId] = roots;
+  });
+
+  // ── Likes : compteurs (tous) + état "moi" ──
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id || '';
   const { data: lData } = await supabase
     .from('photo_likes')
-    .select('photo_id')
-    .in('photo_id', photoIds)
-    .eq('user_id', uid);
+    .select('photo_id, user_id')
+    .in('photo_id', photoIds);
 
-  const comments = {};
-  (cData || []).forEach((r) => {
-    (comments[r.photo_id] = comments[r.photo_id] || []).push(mapCloudComment(r));
+  const likes = new Set();
+  const likeCounts = {};
+  (lData || []).forEach((r) => {
+    likeCounts[r.photo_id] = (likeCounts[r.photo_id] || 0) + 1;
+    if (r.user_id === uid) likes.add(r.photo_id);
   });
 
-  return { comments, likes: new Set((lData || []).map((r) => r.photo_id)), error: cErr };
+  return { comments, likes, likeCounts, error: cErr };
 }
 
-/** Ajoute un commentaire (renvoie la ligne créée, ou null en échec). */
-export async function cloudAddComment(photoId, text, authorName) {
+/** Ajoute un commentaire (ou une réponse si parentId est fourni). */
+export async function cloudAddComment(photoId, text, authorName, parentId = null) {
   if (!supabase || !isCloudId(photoId)) return { data: null, error: null };
+  const row = { photo_id: photoId, content: text, author_name: authorName || '' };
+  if (parentId && isCloudId(parentId)) row.parent_id = parentId;
   const { data, error } = await supabase
     .from('photo_comments')
-    .insert({ photo_id: photoId, content: text, author_name: authorName || '' })
+    .insert(row)
     .select()
     .single();
   return { data, error };
 }
 
-/** Pose ou retire le like de l'utilisateur courant. */
-export async function cloudSetLike(photoId, liked) {
+/** Supprime un commentaire (et ses réponses en cascade). Policy : auteur ou owner. */
+export async function cloudDeleteComment(commentId) {
+  if (!supabase || !isCloudId(commentId)) return { error: null };
+  const { error } = await supabase.from('photo_comments').delete().eq('id', commentId);
+  return { error };
+}
+
+/** Pose ou retire le like de l'utilisateur courant (avec son prénom affiché). */
+export async function cloudSetLike(photoId, liked, userName = '') {
   if (!supabase || !isCloudId(photoId)) return { error: null };
   if (liked) {
     // upsert : ré-exécution idempotente (pas de doublon possible, PK photo+user)
     const { error } = await supabase
       .from('photo_likes')
-      .upsert({ photo_id: photoId });
+      .upsert({ photo_id: photoId, user_name: userName || '' });
     return { error };
   }
   const { error } = await supabase
@@ -267,10 +300,78 @@ export function subscribeAlbumChanges(albumId, onChange) {
     // Commentaires + likes (filtrés par la RLS Realtime, pas de colonne album_id)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_comments' }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_likes' }, onChange)
+    // Membres de CET album (colonne album_id -> filtre serveur possible)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'album_members', filter: `album_id=eq.${albumId}` },
+      onChange
+    )
     .subscribe();
 
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+// ── Membres ──────────────────────────────────────────────────────────
+
+/** Normalise une ligne album_members -> membre de l'app. */
+export function mapCloudMember(row) {
+  return {
+    userId: row.user_id,
+    name: row.member_name || 'Membre',
+    role: row.role, // 'owner' | 'member'
+    joinedAt: new Date(row.joined_at).getTime(),
+    cloud: true,
+  };
+}
+
+/** Membres réels d'un album (propriétaire en premier, puis ordre d'arrivée). */
+export async function cloudFetchAlbumMembers(albumId) {
+  if (!supabase || !isCloudId(albumId)) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('album_members')
+    .select('*')
+    .eq('album_id', albumId)
+    .order('joined_at', { ascending: true });
+  const members = (data || []).map(mapCloudMember);
+  members.sort((a, b) => (a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : a.joinedAt - b.joinedAt));
+  return { data: members, error };
+}
+
+/** Le propriétaire retire un membre (policy : role member + son album). */
+export async function cloudRemoveMember(albumId, userId) {
+  if (!supabase || !isCloudId(albumId)) return { error: null };
+  const { error } = await supabase
+    .from('album_members')
+    .delete()
+    .eq('album_id', albumId)
+    .eq('user_id', userId);
+  return { error };
+}
+
+// ── Centre d'activités ───────────────────────────────────────────────
+
+export function mapCloudActivity(row) {
+  return {
+    // Clé composite : un même type peut se répéter sur une même photo
+    id: `${row.kind}:${row.album_id}:${row.photo_id || ''}:${row.actor_name}:${row.created_at}`,
+    kind: row.kind, // member_joined | photo_added | comment_added | photo_liked
+    actor: row.actor_name || 'Un membre',
+    albumName: row.album_name || '',
+    albumId: row.album_id,
+    photoId: row.photo_id,
+    at: new Date(row.created_at).getTime(),
+  };
+}
+
+/**
+ * Flux d'activité : ce que les AUTRES membres ont fait sur mes albums,
+ * du plus récent au plus ancien (RPC my_activity).
+ */
+export async function cloudFetchActivity(limit = 50) {
+  if (!supabase) return { data: [], error: null };
+  const { data, error } = await supabase.rpc('my_activity', { p_limit: limit });
+  return { data: (data || []).map(mapCloudActivity), error };
 }
 // ── SUPABASE ALBUMS : fin ──

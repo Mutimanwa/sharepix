@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,16 +13,20 @@ import {
   Diamond01Icon,
   Video01Icon,
   Image01Icon,
-  UserMultipleIcon,
   Copy01Icon,
   Tick02Icon,
+  Delete02Icon,
 } from '@hugeicons/core-free-icons';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme';
-import { BackButton, CoralButton, Page } from '../components/UI';
+import { BackButton, CoralButton, Page, Sheet } from '../components/UI';
 import { useStore } from '../store';
+// ── SUPABASE ALBUMS : intégration ──
+import { subscribeAlbumChanges } from '../services/albums';
+// ── SUPABASE ALBUMS : fin ──
 
 // ─────────────────────────────────────────────────────────────
 // En-tête uniforme des écrans secondaires
@@ -106,13 +110,43 @@ export function QRScreen({ route, navigation }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Membres : liste réelle quand elle existe, sinon état vide.
+// Membres : liste RÉELLE (cloud) + retrait par le propriétaire.
+// Refresh au focus + Realtime (arrivée/départ en direct).
 // ─────────────────────────────────────────────────────────────
 export function MembersScreen({ route, navigation }) {
-  const album = useStore().state.albums.find((a) => a.id === route.params.id);
+  const { state, refreshAlbumMembers, removeAlbumMember } = useStore();
+  const album = state.albums.find((a) => a.id === route.params.id);
   const insets = useSafeAreaInsets();
   const [copied, setCopied] = useState(false);
+  const [confirm, setConfirm] = useState(null); // membre à retirer
+
+  const myId = state.user?.id;
+  // Un album local hors-ligne appartient toujours à l'utilisateur
+  const isOwner = !album?.cloud || album?.ownerId === myId;
   const members = album?.members || [];
+
+  // ── SUPABASE ALBUMS : intégration ──
+  // Au focus : chargement des membres réels + abonnement Realtime.
+  const refreshRef = useRef(refreshAlbumMembers);
+  refreshRef.current = refreshAlbumMembers;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!album?.cloud) return undefined;
+      refreshRef.current(route.params.id);
+
+      let timer = null;
+      const unsubscribe = subscribeAlbumChanges(route.params.id, () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => refreshRef.current(route.params.id), 400);
+      });
+      return () => {
+        clearTimeout(timer);
+        unsubscribe();
+      };
+    }, [route.params.id, album?.cloud])
+  );
+  // ── SUPABASE ALBUMS : fin ──
 
   if (!album) {
     return (
@@ -131,6 +165,8 @@ export function MembersScreen({ route, navigation }) {
     setTimeout(() => setCopied(false), 1600);
   };
 
+  const isOwnerRole = (m) => m.role === 'owner' || m.role === 'admin';
+
   return (
     <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
@@ -140,27 +176,44 @@ export function MembersScreen({ route, navigation }) {
       >
         {members.length > 0 && (
           <View style={styles.card}>
-            {members.map((m, i) => (
-              <View
-                key={`${m.name}-${i}`}
-                style={[styles.memberRow, i === members.length - 1 && { borderBottomWidth: 0 }]}
-              >
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.memberAvatarTxt}>
-                    {(m.name || 'M')[0].toUpperCase()}
-                  </Text>
+            <Text style={styles.membersCount}>
+              {members.length} membre{members.length > 1 ? 's' : ''}
+            </Text>
+            {members.map((m, i) => {
+              const me = m.userId === myId;
+              return (
+                <View
+                  key={m.userId || `${m.name}-${i}`}
+                  style={[styles.memberRow, i === members.length - 1 && { borderBottomWidth: 0 }]}
+                >
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarTxt}>
+                      {(m.name || 'M')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowT}>
+                      {m.name}
+                      {me ? ' (vous)' : ''}
+                    </Text>
+                    <Text style={styles.rowH}>
+                      {isOwnerRole(m) ? 'Propriétaire' : 'Membre'}
+                    </Text>
+                  </View>
+                  {/* Le propriétaire peut retirer un membre (jamais lui-même) */}
+                  {isOwner && !me && !isOwnerRole(m) && (
+                    <TouchableOpacity
+                      style={styles.memberRemove}
+                      onPress={() => setConfirm(m)}
+                      hitSlop={8}
+                      activeOpacity={0.7}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={18} color={colors.coral} />
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowT}>{m.name}</Text>
-                  <Text style={styles.rowH}>
-                    {m.role === 'admin' ? 'Propriétaire' : 'Membre'}
-                  </Text>
-                </View>
-                {m.role === 'admin' && (
-                  <HugeiconsIcon icon={UserMultipleIcon} size={18} color={colors.teal} />
-                )}
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -189,6 +242,36 @@ export function MembersScreen({ route, navigation }) {
           />
         </View>
       </ScrollView>
+
+      {/* Confirmation retrait d'un membre */}
+      <Sheet
+        title="Retirer un membre"
+        visible={!!confirm}
+        onClose={() => setConfirm(null)}
+      >
+        <View style={styles.confirmIco}>
+          <HugeiconsIcon icon={Delete02Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.emptyH}>Retirer {confirm?.name} ?</Text>
+        <Text style={styles.hintCenter}>
+          {confirm?.name} n'aura plus accès à « {album.name} » ni à ses photos.
+        </Text>
+        <CoralButton
+          title="Retirer de l'album"
+          onPress={() => {
+            removeAlbumMember(album.id, confirm.userId);
+            setConfirm(null);
+          }}
+          style={{ marginTop: 16, marginHorizontal: 8 }}
+        />
+        <CoralButton
+          title="Annuler"
+          color={colors.light}
+          textColor={colors.tealDark}
+          onPress={() => setConfirm(null)}
+          style={{ marginHorizontal: 8 }}
+        />
+      </Sheet>
     </Page>
   );
 }
@@ -339,6 +422,16 @@ const styles = StyleSheet.create({
   // Membres
   membersScroll: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden' },
+  membersCount: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    color: colors.muted,
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -358,6 +451,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   memberAvatarTxt: { fontWeight: '800', color: colors.tealDark },
+  memberRemove: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmIco: {
+    alignSelf: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 10,
+  },
   emptyCard: { backgroundColor: '#fff', borderRadius: 22, padding: 24, alignItems: 'center' },
   emptyH: { fontSize: 20, fontWeight: '600', textAlign: 'center', color: colors.tealDark },
 

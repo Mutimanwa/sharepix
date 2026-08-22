@@ -61,6 +61,8 @@ export default function PhotoScreen({ route, navigation }) {
     addComment,
     deletePhoto,
     refreshAlbumPhotos, // ── SUPABASE ALBUMS : intégration ──
+    addReply, // ── SUPABASE ALBUMS : intégration ──
+    deleteComment, // ── SUPABASE ALBUMS : intégration ──
   } = useStore();
   const insets = useSafeAreaInsets();
 
@@ -82,7 +84,6 @@ export default function PhotoScreen({ route, navigation }) {
   const [tip, setTip] = useState(!globalHasSeenTip);
   const [likedComments, setLikedComments] = useState({});
   const [replyTo, setReplyTo] = useState(null);
-  const [localReplies, setLocalReplies] = useState({});
   const [downloading, setDownloading] = useState(false);
 
   // Garde-fou si la liste rétrécit (suppression, synchro)
@@ -141,22 +142,17 @@ export default function PhotoScreen({ route, navigation }) {
     const value = text.trim();
     if (!value || !currentPhoto) return;
 
+    // ── SUPABASE ALBUMS : intégration ──
+    // Les réponses passent par le store (cloud via parent_id) comme
+    // les commentaires racines — plus de stockage local séparé.
     if (replyTo) {
-      const reply = {
-        id: `reply-${Date.now()}`,
-        author: state.profile.firstName || 'Vous',
-        text: value,
-        parentId: replyTo.id,
-      };
-      setLocalReplies((prev) => ({
-        ...prev,
-        [replyTo.id]: [...(prev[replyTo.id] || []), reply],
-      }));
+      addReply(albumId, currentPhoto.id, replyTo.id, value);
       setReplyTo(null);
       setText('');
       Keyboard.dismiss();
       return;
     }
+    // ── SUPABASE ALBUMS : fin ──
 
     addComment(albumId, currentPhoto.id, value);
     setText('');
@@ -211,11 +207,22 @@ export default function PhotoScreen({ route, navigation }) {
 
   const comments = currentPhoto?.comments || [];
 
+  // ── SUPABASE ALBUMS : intégration ──
+  // Droit de suppression : auteur du commentaire, ou propriétaire de
+  // l'album. Localement, tout commentaire non synchronisé est à soi.
+  const canDeleteComment = (c) => {
+    if (!c.cloud) return true;
+    const albumOwner = !album?.cloud || album?.ownerId === state.user?.id;
+    return c.authorId === state.user?.id || albumOwner;
+  };
+  // ── SUPABASE ALBUMS : fin ──
+
   // ── Commentaires ───────────────────────────────────────────────────────
 
   const renderComment = ({ item: comment }) => {
     const isLiked = !!likedComments[comment.id];
-    const replies = localReplies[comment.id] || [];
+    // Réponses gérées par le store (locales OU cloud, même forme)
+    const replies = comment.replies || [];
 
     return (
       <View style={styles.commentBlock}>
@@ -242,6 +249,16 @@ export default function PhotoScreen({ route, navigation }) {
               <TouchableOpacity onPress={() => handleReply(comment)} hitSlop={8} activeOpacity={0.7}>
                 <Text style={styles.cmtAct}>Répondre</Text>
               </TouchableOpacity>
+              {/* ── SUPABASE ALBUMS : suppression (auteur / propriétaire) ── */}
+              {canDeleteComment(comment) && (
+                <TouchableOpacity
+                  onPress={() => deleteComment(albumId, currentPhoto.id, comment.id)}
+                  hitSlop={8}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.cmtAct, { color: colors.coral }]}>Supprimer</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -257,7 +274,17 @@ export default function PhotoScreen({ route, navigation }) {
                   </Text>
                 </View>
                 <View style={styles.replyBody}>
-                  <Text style={styles.replyAuthor}>{reply.author}</Text>
+                  <View style={styles.replyHead}>
+                    <Text style={styles.replyAuthor}>{reply.author}</Text>
+                    {canDeleteComment(reply) && (
+                      <TouchableOpacity
+                        onPress={() => deleteComment(albumId, currentPhoto.id, reply.id)}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.replyDelete}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                   <Text style={styles.replyText}>{reply.text}</Text>
                 </View>
               </View>
@@ -328,6 +355,8 @@ export default function PhotoScreen({ route, navigation }) {
             />
             <Text style={[styles.actLbl, currentPhoto.liked && { color: colors.coral }]}>
               J'aime
+              {/* ── SUPABASE ALBUMS : compteur de likes ── */}
+              {currentPhoto.likesCount > 0 ? ` (${currentPhoto.likesCount})` : ''}
             </Text>
           </TouchableOpacity>
 
@@ -475,7 +504,7 @@ export default function PhotoScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           style={{ flex: 1 }}
-          extraData={{ likedComments, localReplies, safeIndex, photos }}
+          extraData={{ likedComments, safeIndex, photos }}
         />
 
         {renderCommentInput()}
@@ -521,7 +550,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: SCREEN_WIDTH,
     height: IMAGE_HEIGHT,
-    backgroundColor: colors.cream,
+    backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -635,7 +664,13 @@ const styles = StyleSheet.create({
   },
   replyAvatarText: { color: colors.tealDark, fontSize: 11, fontWeight: '800' },
   replyBody: { flex: 1, backgroundColor: colors.light, borderRadius: 5, padding: 9 },
+  replyHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   replyAuthor: { color: colors.tealDark, fontSize: 12, fontWeight: '800' },
+  replyDelete: { color: colors.coral, fontSize: 12, fontWeight: '800', paddingLeft: 8 },
   replyText: { color: '#2A3A3A', fontSize: 13, lineHeight: 18, marginTop: 2 },
 
   bar: {

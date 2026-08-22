@@ -19,6 +19,9 @@ import {
   cloudFetchInteractions,
   cloudAddComment,
   cloudSetLike,
+  cloudFetchAlbumMembers,
+  cloudRemoveMember,
+  cloudDeleteComment,
 } from './services/albums';
 // ── SUPABASE ALBUMS : fin ──
 import { Alert } from 'react-native';
@@ -234,7 +237,8 @@ export function StoreProvider({ children }) {
           // ── SUPABASE ALBUMS : intégration ──
           // RPC : le code est validé côté serveur (un non-membre ne peut
           // plus lire la table albums directement grâce à la RLS).
-          const { data, error } = await cloudJoinAlbum(code);
+          // On envoie aussi le prénom pour la liste des membres.
+          const { data, error } = await cloudJoinAlbum(code, state.profile.firstName);
 
           if (!error && data) {
             const cloudAlbum = mapCloudAlbum(data);
@@ -332,6 +336,8 @@ export function StoreProvider({ children }) {
             .insert({
               album_id: albumId,
               storage_path: uploadData.path,
+              // ── SUPABASE ALBUMS : prénom pour le centre d'activités ──
+              author_name: state.profile.firstName || '',
             })
             .select()
             .single();
@@ -374,11 +380,15 @@ export function StoreProvider({ children }) {
       
       toggleLike: (albumId, photoId) => {
         // ── SUPABASE ALBUMS : intégration ──
-        // Toggle local immédiat + synchro cloud en arrière-plan (upsert/delete)
+        // Toggle local immédiat (compteur compris) + synchro cloud (upsert/delete)
         const photo = state.albums
           .find((a) => a.id === albumId)
           ?.photos.find((p) => p.id === photoId);
-        if (photo?.cloud) cloudSetLike(photoId, !photo.liked).catch(() => {});
+        const newLiked = !photo?.liked;
+        if (photo?.cloud) {
+          // Prénom transmis pour le centre d'activités ("X a aimé…")
+          cloudSetLike(photoId, newLiked, state.profile.firstName).catch(() => {});
+        }
         // ── SUPABASE ALBUMS : fin ──
         setState((s) => ({
           ...s,
@@ -388,7 +398,13 @@ export function StoreProvider({ children }) {
               : {
                   ...a,
                   photos: a.photos.map((p) =>
-                    p.id === photoId ? { ...p, liked: !p.liked } : p
+                    p.id === photoId
+                      ? {
+                          ...p,
+                          liked: !p.liked,
+                          likesCount: Math.max(0, (p.likesCount || 0) + (newLiked ? 1 : -1)),
+                        }
+                      : p
                   ),
                 }
           ),
@@ -432,7 +448,7 @@ export function StoreProvider({ children }) {
                             ...p,
                             comments: [
                               ...p.comments.filter((c) => c.id !== tempId),
-                              { id, author, text, createdAt: Date.now(), cloud },
+                              { id, author, text, createdAt: Date.now(), replies: [], cloud },
                             ],
                           }
                         : p
@@ -456,6 +472,92 @@ export function StoreProvider({ children }) {
         }
         // ── SUPABASE ALBUMS : fin ──
       },
+
+      // ── SUPABASE ALBUMS : intégration ──
+      // Répondre à un commentaire (réponses synchronisées via parent_id).
+      addReply: (albumId, photoId, parentCommentId, text) => {
+        const tempId = `tmp-${Date.now()}`;
+        const author = state.profile.firstName || 'Vous';
+        const addLocalReply = (replyId, cloud) =>
+          setState((s) => ({
+            ...s,
+            albums: s.albums.map((a) =>
+              a.id !== albumId
+                ? a
+                : {
+                    ...a,
+                    photos: a.photos.map((p) =>
+                      p.id !== photoId
+                        ? p
+                        : {
+                            ...p,
+                            comments: p.comments.map((c) =>
+                              c.id !== parentCommentId
+                                ? c
+                                : {
+                                    ...c,
+                                    replies: [
+                                      ...(c.replies || []).filter((r) => r.id !== tempId),
+                                      { id: replyId, author, text, createdAt: Date.now(), cloud },
+                                    ],
+                                  }
+                            ),
+                          }
+                    ),
+                  }
+            ),
+          }));
+
+        const photo = state.albums
+          .find((a) => a.id === albumId)
+          ?.photos.find((p) => p.id === photoId);
+
+        addLocalReply(tempId, false);
+
+        if (photo?.cloud) {
+          cloudAddComment(photoId, text, author === 'Vous' ? '' : author, parentCommentId)
+            .then(({ data }) => {
+              if (data) addLocalReply(data.id, true);
+            })
+            .catch(() => {});
+        }
+      },
+
+      // Supprimer un commentaire (ou une réponse) : auteur ou propriétaire.
+      deleteComment: (albumId, photoId, commentId) => {
+        const photo = state.albums
+          .find((a) => a.id === albumId)
+          ?.photos.find((p) => p.id === photoId);
+        const target =
+          photo?.comments.find((c) => c.id === commentId) ||
+          photo?.comments.flatMap((c) => c.replies || []).find((r) => r.id === commentId);
+        if (target?.cloud) cloudDeleteComment(commentId).catch(() => {});
+
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) =>
+            a.id !== albumId
+              ? a
+              : {
+                  ...a,
+                  photos: a.photos.map((p) =>
+                    p.id !== photoId
+                      ? p
+                      : {
+                          ...p,
+                          comments: p.comments
+                            .filter((c) => c.id !== commentId)
+                            .map((c) => ({
+                              ...c,
+                              replies: (c.replies || []).filter((r) => r.id !== commentId),
+                            })),
+                        }
+                  ),
+                }
+          ),
+        }));
+      },
+      // ── SUPABASE ALBUMS : fin ──
       
       // ── SUPABASE ALBUMS : intégration ──
       // Charge les photos cloud d'un album (appelé à l'entrée de l'album).
@@ -467,9 +569,9 @@ export function StoreProvider({ children }) {
         const { data: cloudPhotos, error } = await cloudFetchAlbumPhotos(albumId);
         if (error) return;
 
-        // Commentaires + likes cloud de ces photos
+        // Commentaires (arborescence) + likes (compteurs + mes likes)
         const photoIds = cloudPhotos.map((p) => p.id);
-        const { comments: cloudComments, likes: myLikes } =
+        const { comments: cloudComments, likes: myLikes, likeCounts } =
           await cloudFetchInteractions(photoIds);
 
         setState((s) => ({
@@ -479,13 +581,21 @@ export function StoreProvider({ children }) {
             const localOnly = a.photos.filter((p) => !p.cloud);
             const merged = cloudPhotos.map((cp) => {
               const prev = a.photos.find((p) => p.id === cp.id);
-              // Commentaires cloud + ceux encore purement locaux (hors-ligne)
-              const localComments = (prev?.comments || []).filter((c) => !c.cloud);
+              const prevTop = prev?.comments || [];
+              // Commentaires cloud + ceux encore purement locaux (hors-ligne) ;
+              // les réponses locales non synchronisées sont conservées aussi.
+              const serverTop = (cloudComments[cp.id] || []).map((sc) => {
+                const pv = prevTop.find((c) => c.id === sc.id);
+                const localReplies = (pv?.replies || []).filter((r) => !r.cloud);
+                return { ...sc, replies: [...(sc.replies || []), ...localReplies] };
+              });
+              const localTemps = prevTop.filter((c) => !c.cloud);
               return {
                 ...cp,
                 liked: myLikes.has(cp.id),
+                likesCount: likeCounts[cp.id] || 0,
                 favorite: prev?.favorite ?? false, // les favoris restent personnels
-                comments: [...(cloudComments[cp.id] || []), ...localComments],
+                comments: [...serverTop, ...localTemps],
               };
             });
             return { ...a, photos: [...merged, ...localOnly] };
@@ -558,6 +668,35 @@ export function StoreProvider({ children }) {
           const { error } = await cloudLeaveAlbum(albumId);
           if (error) console.log('⚠️ leaveAlbum cloud error:', error.message);
         }
+      },
+
+      // Membres réels d'un album cloud (appelé à l'entrée de l'écran Membres
+      // + par le Realtime). Remplace la liste par la vérité serveur.
+      refreshAlbumMembers: async (albumId) => {
+        const album = state.albums.find((a) => a.id === albumId);
+        if (!album?.cloud) return;
+        const { data, error } = await cloudFetchAlbumMembers(albumId);
+        if (error) return;
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) =>
+            a.id === albumId && data.length ? { ...a, members: data } : a
+          ),
+        }));
+      },
+
+      // Le propriétaire retire un membre (optimiste en local + cloud).
+      removeAlbumMember: (albumId, userId) => {
+        const album = state.albums.find((a) => a.id === albumId);
+        if (album?.cloud) cloudRemoveMember(albumId, userId).catch(() => {});
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) =>
+            a.id === albumId
+              ? { ...a, members: a.members.filter((m) => m.userId !== userId) }
+              : a
+          ),
+        }));
       },
       // ── SUPABASE ALBUMS : fin ──
     }),
