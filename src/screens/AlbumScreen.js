@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,14 @@ import {
   Image,
   FlatList,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  Share
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
-import { HugeiconsIcon } from "@hugeicons/react-native";
+  Share,
+  TextInput,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
+import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   PreferenceHorizontalIcon,
   Notification03Icon,
@@ -30,158 +30,277 @@ import {
   ComputerIcon,
   PencilEdit02Icon,
   ArrowRight01Icon,
-} from "@hugeicons/core-free-icons";
-import { colors } from "../theme";
-import { CoralButton, BackButton, Sheet, Logo } from "../components/UI";
-import { EmptyPhotos, EmptyFavs, EmptyVideos } from "../components/AlbumArt";
-import { useStore } from "../store";
-import { StatusBar } from "expo-status-bar";
-import { ScrollView } from "react-native";
-import * as Clipboard from 'expo-clipboard'; 
+  Tick02Icon,
+  Delete02Icon,
+  Logout01Icon,
+} from '@hugeicons/core-free-icons';
+import { colors } from '../theme';
+import { CoralButton, BackButton, Sheet, RightModal, Logo } from '../components/UI';
+import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
+import { useStore } from '../store';
+import { StatusBar } from 'expo-status-bar';
 
 const TABS = [
-  { key: "all", label: "Tous", icon: GridViewIcon },
-  { key: "vid", label: "Vidéos", icon: Video01Icon },
-  { key: "fav", label: "Favoris", icon: FavouriteIcon },
+  { key: 'all', label: 'Tous', icon: GridViewIcon },
+  { key: 'vid', label: 'Vidéos', icon: Video01Icon },
+  { key: 'fav', label: 'Favoris', icon: FavouriteIcon },
 ];
 
-// Donnees de filtre
 const ORDERS = [
-  { key: "recent", label: "Le plus récent en premier" },
-  { key: "oldest", label: "Le plus ancien en premier" },
-  { key: "upload", label: "Dernier téléchargement" },
+  { key: 'recent', label: 'Les plus récentes en premier' },
+  { key: 'oldest', label: 'Les plus anciennes en premier' },
 ];
-
-const GROUPS = [
-  { key: "all", label: "Toutes les photos" },
-  { key: "month", label: "Mois" },
-  { key: "day", label: "Journée" },
-  { key: "hour", label: "Heure" },
-];
-
-// Menu
-   const invite = () =>
-     Share.share({
-       message: `Rejoins mon album « ${album.name} » sur SharePix. Code : ${album.code}`,
-     });
-    
-  const copyToClipboard = async () => {
-    await Clipboard.setStringAsync(album.code);
-    Alert.instance ? Alert.alert("Copié", "Code d'invitation copié !") : alert("Code d'invitation copié !");
-  };
 
 export default function AlbumScreen({ route, navigation }) {
   const { id } = route.params;
-  const { state, addPhoto } = useStore();
+  const {
+    state,
+    addPhoto,
+    refreshAlbumPhotos,
+    deletePhotos,
+    renameAlbum,
+    deleteAlbum,
+    leaveAlbum,
+  } = useStore();
   const album = state.albums.find((a) => a.id === id);
-  const [tab, setTab] = useState("all");
-  const [uploading, setUploading] = useState(false);
-  const insets = useSafeAreaInsets();
-  // Filtre states
-  const [filtre, setFilter] = useState(false);
-  const [order, setOrder] = useState("recent");
-  const [group, setGroup] = useState("all");
-  const dirty = order !== "recent" || group !== "all";
 
-  // Menu state 
-  const [menuModal ,setMenuModal] = useState(false);
+  // Retour robuste : sur le web, /album/:id peut être le seul écran
+  // de la pile (recharge, lien direct) → goBack() planterait.
+  const goBackSafe = () =>
+    navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main');
+
+  const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState('all');
+  const [uploading, setUploading] = useState(null); // { done, total } | null
+
+  // Filtre
+  const [filtre, setFilter] = useState(false);
+  const [order, setOrder] = useState('recent');
+  const orderDirty = order !== 'recent';
+
+  // Menu / gestion album
+  const [menuModal, setMenuModal] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [confirmDeleteAlbum, setConfirmDeleteAlbum] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  // Sélection multiple
+  const [selected, setSelected] = useState(null); // null = mode normal
+  const selecting = selected !== null;
+  const [confirmDeletePhotos, setConfirmDeletePhotos] = useState(false);
+
+  // Feedback copie du code
+  const [copied, setCopied] = useState(false);
+
+  // ── SUPABASE ALBUMS : intégration ──
+  // Recharge les photos cloud à chaque fois que l'écran reprend le focus.
+  useFocusEffect(
+    useCallback(() => {
+      if (album?.cloud) refreshAlbumPhotos(id);
+    }, [id, album?.cloud])
+  );
+  // ── SUPABASE ALBUMS : fin ──
+
+  // Propriétaire ? (un album local hors-ligne appartient toujours à l'utilisateur)
+  const isOwner = !album?.cloud || album?.ownerId === state.user?.id;
+
+  const photos = useMemo(() => {
+    if (!album) return [];
+    const base = tab === 'fav' ? album.photos.filter((p) => p.favorite) : album.photos;
+    return order === 'oldest'
+      ? [...base].sort((a, b) => a.createdAt - b.createdAt)
+      : [...base].sort((a, b) => b.createdAt - a.createdAt);
+  }, [album, tab, order]);
 
   if (!album) {
     return (
-      <SafeAreaView
-        style={[styles.root, { paddingTop: insets.top }]}
-        edges={["top"]}
-      >
+      <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.top}>
-          <BackButton onPress={() => navigation.goBack()} />
+          <BackButton onPress={() => goBackSafe()} />
           <Text style={styles.title}>Album</Text>
         </View>
         <View style={styles.center}>
-          <Text>Album introuvable</Text>
+          <Text style={{ color: colors.muted }}>Album introuvable</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const photos =
-    tab === "fav" ? album.photos.filter((p) => p.favorite) : album.photos;
+  // ── Actions ───────────────────────────────────────────────────────────
+
+  const invite = () =>
+    Share.share({
+      message: `Rejoins mon album « ${album.name} » sur SharePix. Code : ${album.code}`,
+    });
+
+  const copyToClipboard = async () => {
+    await Clipboard.setStringAsync(album.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
 
   const pick = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'], // nouvelle API (MediaTypeOptions est dépréciée)
       quality: 0.8,
       allowsMultipleSelection: true,
     });
-    if (res.canceled) return;
-    setUploading(true);
-    setTimeout(() => {
-      res.assets.forEach((a) => addPhoto(id, a.uri));
-      setUploading(false);
-    }, 700);
+    if (res.canceled || !res.assets?.length) return;
+    const assets = res.assets;
+    setUploading({ done: 0, total: assets.length });
+    // Upload séquentiel : progression fiable + pas de saturation réseau
+    for (let i = 0; i < assets.length; i++) {
+      await addPhoto(id, assets[i].uri);
+      setUploading({ done: i + 1, total: assets.length });
+    }
+    setUploading(null);
   };
 
-  // Row pour le menu
-  function Row({ icon, title, hint, onPress, last }) {
-  return (
-    <TouchableOpacity style={[styles.row, last && { borderBottomWidth: 0 }]} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.rowIco}>
-        <HugeiconsIcon icon={icon} size={20} color={colors.tealDark} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.rowT}>{title}</Text>
-        {hint ? <Text style={styles.rowH}>{hint}</Text> : null}
-      </View>
-      <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={colors.muted} />
-    </TouchableOpacity>
-  );
-}
+  // Sélection
+  const enterSelection = (photoId) => setSelected([photoId]);
+  const toggleSelect = (photoId) =>
+    setSelected((cur) =>
+      cur.includes(photoId) ? cur.filter((x) => x !== photoId) : [...cur, photoId]
+    );
+  const exitSelection = () => setSelected(null);
+  const selectAll = () =>
+    setSelected(selected.length === photos.length ? [] : photos.map((p) => p.id));
+
+  const confirmDeleteSelected = () => {
+    deletePhotos(id, selected);
+    setConfirmDeletePhotos(false);
+    exitSelection();
+  };
+
+  const submitRename = () => {
+    if (renameValue.trim()) renameAlbum(id, renameValue);
+    setRenameOpen(false);
+  };
+
+  const confirmDelete = async () => {
+    setConfirmDeleteAlbum(false);
+    setMenuModal(false);
+    goBackSafe();
+    await deleteAlbum(id);
+  };
+
+  const confirmLeaveAlbum = async () => {
+    setConfirmLeave(false);
+    setMenuModal(false);
+    goBackSafe();
+    await leaveAlbum(id);
+  };
+
+  // ── Sous-composants ───────────────────────────────────────────────────
+
+  function Row({ icon, title, hint, onPress, last, danger }) {
+    return (
+      <TouchableOpacity
+        style={[styles.row, last && { borderBottomWidth: 0 }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.rowIco, danger && { backgroundColor: '#FDECEA' }]}>
+          <HugeiconsIcon icon={icon} size={20} color={danger ? colors.coral : colors.tealDark} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.rowT, danger && { color: colors.coral }]}>{title}</Text>
+          {hint ? <Text style={styles.rowH}>{hint}</Text> : null}
+        </View>
+        <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={colors.muted} />
+      </TouchableOpacity>
+    );
+  }
+
+  const renderPhoto = ({ item }) => {
+    const isSel = selecting && selected.includes(item.id);
+    return (
+      <TouchableOpacity
+        style={styles.cell}
+        activeOpacity={0.85}
+        onPress={() =>
+          selecting
+            ? toggleSelect(item.id)
+            : navigation.navigate('Photo', { albumId: id, photoId: item.id })
+        }
+        onLongPress={() => !selecting && enterSelection(item.id)}
+        delayLongPress={220}
+      >
+        <Image source={{ uri: item.uri }} style={styles.thumb} />
+        {selecting && (
+          <View style={[styles.selLayer, isSel && styles.selLayerOn]}>
+            <View style={[styles.selDot, isSel && styles.selDotOn]}>
+              {isSel && <HugeiconsIcon icon={Tick02Icon} size={13} color="#fff" strokeWidth={3} />}
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  // ── Rendu ─────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView
-      style={[styles.root, { paddingTop: insets.top }]}
-      edges={["top"]}
-    >
+    <SafeAreaView style={styles.root} edges={['top']}>
       <StatusBar style="dark" />
+
       {/* Header */}
       <View style={styles.top}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <View style={styles.headText}>
-          <Text style={styles.title} numberOfLines={1}>
-            {album.name}
-          </Text>
-          <Text style={styles.meta}>
-            {album.photos.length} photo{album.photos.length > 1 ? "s" : ""}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => setFilter(true)}
-          style={styles.iconBtn}
-          activeOpacity={0.88}
-        >
-          <HugeiconsIcon
-            icon={PreferenceHorizontalIcon}
-            size={22}
-            color={colors.tealDark}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Main", { screen: "Activités" })}
-          style={styles.iconBtn}
-          hitSlop={10}
-        >
-          <HugeiconsIcon
-            icon={Notification03Icon}
-            size={22}
-            color={colors.tealDark}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setMenuModal(true)}
-          style={styles.iconBtn}
-          activeOpacity={0.88}
-        >
-          <HugeiconsIcon icon={Menu01Icon} size={22} color={colors.tealDark} />
-        </TouchableOpacity>
+        <BackButton onPress={selecting ? exitSelection : goBackSafe} />
+        {selecting ? (
+          <>
+            <Text style={[styles.title, { flex: 1 }]}>
+              {selected.length} sélectionnée{selected.length > 1 ? 's' : ''}
+            </Text>
+            <TouchableOpacity onPress={selectAll} style={styles.iconBtn} hitSlop={10}>
+              <HugeiconsIcon icon={Tick02Icon} size={22} color={colors.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => selected.length && setConfirmDeletePhotos(true)}
+              style={styles.iconBtn}
+              hitSlop={10}
+            >
+              <HugeiconsIcon
+                icon={Delete02Icon}
+                size={22}
+                color={selected.length ? colors.coral : colors.border}
+              />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <View style={styles.headText}>
+              <Text style={styles.title} numberOfLines={1}>
+                {album.name}
+              </Text>
+              <Text style={styles.meta}>
+                {album.photos.length} photo{album.photos.length > 1 ? 's' : ''}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setFilter(true)}
+              style={styles.iconBtn}
+              activeOpacity={0.88}
+            >
+              <HugeiconsIcon icon={PreferenceHorizontalIcon} size={22} color={colors.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Main', { screen: 'Activités' })}
+              style={styles.iconBtn}
+              hitSlop={10}
+            >
+              <HugeiconsIcon icon={Notification03Icon} size={22} color={colors.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMenuModal(true)}
+              style={styles.iconBtn}
+              activeOpacity={0.88}
+            >
+              <HugeiconsIcon icon={Menu01Icon} size={22} color={colors.tealDark} />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Tabs */}
@@ -189,11 +308,7 @@ export default function AlbumScreen({ route, navigation }) {
         {TABS.map((t) => {
           const on = tab === t.key;
           return (
-            <TouchableOpacity
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              style={styles.tab}
-            >
+            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={styles.tab}>
               <View style={styles.tabInner}>
                 <HugeiconsIcon
                   icon={t.icon}
@@ -203,111 +318,75 @@ export default function AlbumScreen({ route, navigation }) {
                 />
                 <Text style={[styles.tabT, on && styles.tabOn]}>{t.label}</Text>
               </View>
-              {on ? (
-                <View style={styles.line} />
-              ) : (
-                <View style={styles.lineOff} />
-              )}
+              {on ? <View style={styles.line} /> : <View style={styles.lineOff} />}
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* Content */}
+      {/* Contenu */}
       <View style={styles.contentContainer}>
-        {tab === "vid" ? (
+        {tab === 'vid' ? (
           <View style={styles.center}>
             <EmptyVideos />
-            <Text style={styles.emptyH}>
-              Passez à l'Album Premium pour ajouter des vidéos
-            </Text>
+            <Text style={styles.emptyH}>Passez à l'Album Premium pour ajouter des vidéos</Text>
             <Text style={styles.emptyP}>
               Dans un Album Premium, chaque membre peut télécharger des vidéos.
             </Text>
-            <View style={{ width: "84%", marginTop: 22 }}>
-              <CoralButton
-                title="En savoir plus"
-                onPress={() => navigation.navigate("Premium")}
-              />
+            <View style={{ width: '84%', marginTop: 22 }}>
+              <CoralButton title="En savoir plus" onPress={() => navigation.navigate('Premium')} />
             </View>
           </View>
         ) : photos.length === 0 ? (
           <View style={styles.center}>
-            {tab === "fav" ? <EmptyFavs /> : <EmptyPhotos />}
+            {tab === 'fav' ? <EmptyFavs /> : <EmptyPhotos />}
             <Text style={styles.emptyH}>
-              {tab === "fav"
+              {tab === 'fav'
                 ? "Vous n'avez pas encore enregistré de favoris"
                 : "Personne n'a encore téléchargé de photos"}
             </Text>
-            {tab !== "fav" && (
-              <Text style={styles.emptyP}>
-                Téléchargez votre première photo.
-              </Text>
-            )}
+            {tab !== 'fav' && <Text style={styles.emptyP}>Téléchargez votre première photo.</Text>}
           </View>
         ) : (
           <FlatList
             data={photos}
             numColumns={3}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{
-              paddingBottom: 100 + insets.bottom,
-              paddingTop: 4,
-            }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.cell}
-                onPress={() =>
-                  navigation.navigate("Photo", {
-                    albumId: id,
-                    photoId: item.id,
-                  })
-                }
-              >
-                <Image source={{ uri: item.uri }} style={styles.thumb} />
-              </TouchableOpacity>
-            )}
+            extraData={[selected, order]}
+            contentContainerStyle={{ paddingBottom: 110 + insets.bottom, paddingTop: 4 }}
+            renderItem={renderPhoto}
           />
         )}
       </View>
 
-      {/* FAB Button - avec padding bottom pour éviter la tab bar */}
-      {tab !== "vid" && (
-        <View
-          style={[
-            styles.fabWrap,
-            { paddingBottom: Math.max(insets.bottom, 38) },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={pick}
-            activeOpacity={0.88}
-          >
+      {/* FAB */}
+      {tab !== 'vid' && !selecting && (
+        <View style={[styles.fabWrap, { paddingBottom: Math.max(insets.bottom, 38) }]}>
+          <TouchableOpacity style={styles.fab} onPress={pick} activeOpacity={0.88}>
             <HugeiconsIcon icon={Camera01Icon} size={22} color="#fff" />
             <Text style={styles.fabTxt}>Ajouter</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Upload Banner */}
-      <Modal visible={uploading} transparent animationType="fade">
+      {/* Bannière upload avec progression */}
+      <Modal visible={!!uploading} transparent animationType="fade">
         <SafeAreaView style={styles.modalContainer}>
           <View style={[styles.banner, { marginTop: insets.top + 10 }]}>
-            <Text style={{ color: colors.tealDark, fontWeight: "600" }}>
-              Téléchargement en cours. Ne fermez pas l'appli.
+            <Text style={{ color: colors.tealDark, fontWeight: '600' }}>
+              {uploading
+                ? `Envoi ${uploading.done}/${uploading.total}… Ne fermez pas l'appli.`
+                : ''}
             </Text>
           </View>
         </SafeAreaView>
       </Modal>
 
-      {/* Filtre */}
-      <Sheet title="Filtre" visible={filtre} onClose={() => setFilter(false)}>
-        <View>
-          <Text style={styles.section}>Ordre</Text>
+      {/* Filtre (ordre réellement appliqué) */}
+      <Sheet title="Trier les photos" visible={filtre} onClose={() => setFilter(false)}>
+        <View style={{ paddingTop: 6 }}>
           <Text style={styles.hint}>
-            Toutes les photos et vidéos sont automatiquement triées par heure de
-            capture.
+            Les photos sont triées par date d'ajout à l'album.
           </Text>
           <View style={styles.card}>
             {ORDERS.map((o, i) => {
@@ -322,73 +401,147 @@ export default function AlbumScreen({ route, navigation }) {
                   ]}
                   onPress={() => setOrder(o.key)}
                 >
-                  <Text style={[styles.optTxt, on && styles.optTxtOn]}>
-                    {o.label}
-                  </Text>
+                  <Text style={[styles.optTxt, on && styles.optTxtOn]}>{o.label}</Text>
                   <View style={[styles.radio, on && styles.radioOn]} />
                 </TouchableOpacity>
               );
             })}
           </View>
-
-          <Text style={styles.section}>Grouper</Text>
-          <View style={styles.chips}>
-            {GROUPS.map((g) => {
-              const on = group === g.key;
-              return (
-                <TouchableOpacity
-                  key={g.key}
-                  style={[styles.chip, on && styles.chipOn]}
-                  onPress={() => setGroup(g.key)}
-                >
-                  <Text
-                    style={{
-                      color: on ? "#fff" : colors.tealDark,
-                      fontWeight: "700",
-                    }}
-                  >
-                    {g.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
         </View>
-
         <View style={styles.footerBtn}>
           <CoralButton
             title="Appliquer"
-            onPress={() => navigation.goBack()}
-            disabled={!dirty}
-            color={dirty ? colors.coral : "#D5D8D8"}
+            onPress={() => setFilter(false)}
+            color={colors.coral}
           />
         </View>
       </Sheet>
 
+      {/* Suppression multiple */}
+      <Sheet
+        title="Supprimer"
+        visible={confirmDeletePhotos}
+        onClose={() => setConfirmDeletePhotos(false)}
+      >
+        <View style={styles.delIco}>
+          <HugeiconsIcon icon={Delete02Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.delT}>
+          Supprimer {selected?.length || 0} photo{(selected?.length || 0) > 1 ? 's' : ''} ?
+        </Text>
+        <Text style={styles.delP}>
+          {selected?.length > 1 ? 'Elles seront' : 'Elle sera'} retirée
+          {selected?.length > 1 ? 's' : ''} pour tous les membres de l'album.
+        </Text>
+        <TouchableOpacity style={styles.ctaDanger} onPress={confirmDeleteSelected} activeOpacity={0.8}>
+          <Text style={styles.ctaTxt}>Supprimer</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.cancel}
+          onPress={() => setConfirmDeletePhotos(false)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.cancelTxt}>Annuler</Text>
+        </TouchableOpacity>
+      </Sheet>
+
+      {/* Renommer (owner) */}
+      <Sheet title="Renommer l'album" visible={renameOpen} onClose={() => setRenameOpen(false)}>
+        <View style={styles.renameWrap}>
+          <TextInput
+            style={styles.renameInput}
+            value={renameValue}
+            onChangeText={setRenameValue}
+            placeholder="Nom de l'album"
+            placeholderTextColor={colors.muted}
+            maxLength={60}
+            autoFocus
+          />
+          <CoralButton title="Enregistrer" onPress={submitRename} color={colors.coral} />
+        </View>
+      </Sheet>
+
+      {/* Supprimer l'album (owner) */}
+      <Sheet
+        title="Supprimer l'album"
+        visible={confirmDeleteAlbum}
+        onClose={() => setConfirmDeleteAlbum(false)}
+      >
+        <View style={styles.delIco}>
+          <HugeiconsIcon icon={Delete02Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.delT}>Supprimer « {album.name} » ?</Text>
+        <Text style={styles.delP}>
+          L'album et toutes ses photos seront définitivement supprimés pour tous les membres.
+        </Text>
+        <TouchableOpacity style={styles.ctaDanger} onPress={confirmDelete} activeOpacity={0.8}>
+          <Text style={styles.ctaTxt}>Supprimer définitivement</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.cancel}
+          onPress={() => setConfirmDeleteAlbum(false)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.cancelTxt}>Annuler</Text>
+        </TouchableOpacity>
+      </Sheet>
+
+      {/* Quitter l'album (membre) */}
+      <Sheet title="Quitter l'album" visible={confirmLeave} onClose={() => setConfirmLeave(false)}>
+        <View style={styles.delIco}>
+          <HugeiconsIcon icon={Logout01Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.delT}>Quitter « {album.name} » ?</Text>
+        <Text style={styles.delP}>
+          Vous n'aurez plus accès à cet album. Vous pourrez le rejoindre à nouveau avec le code
+          d'invitation.
+        </Text>
+        <TouchableOpacity style={styles.ctaDanger} onPress={confirmLeaveAlbum} activeOpacity={0.8}>
+          <Text style={styles.ctaTxt}>Quitter l'album</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.cancel} onPress={() => setConfirmLeave(false)} activeOpacity={0.8}>
+          <Text style={styles.cancelTxt}>Annuler</Text>
+        </TouchableOpacity>
+      </Sheet>
+
       {/* Menu */}
-      <RightModal title="Menu" visible={menuModal} onClose={()=> setMenuModal(false)} >
+      <RightModal title="Menu" visible={menuModal} onClose={() => setMenuModal(false)}>
         <View style={styles.hero}>
           <View style={styles.heroH}>
-            <View style={styles.cover}>
-            <Logo size={12} color="#fff" />
+            <View style={styles.coverWrap}>
+              {album.photos.length > 0 ? (
+                <Image source={{ uri: album.photos[0].uri }} style={styles.coverImg} />
+              ) : (
+                <View style={styles.cover}>
+                  <Logo size={12} color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name} numberOfLines={1}>
+                {album.name}
+              </Text>
+              <Text style={styles.meta}>
+                {album.photos.length} photo{album.photos.length > 1 ? 's' : ''} · privé
+                {album.cloud ? ' · synchronisé' : ' · local'}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.name}>{album.name}</Text>
-          <Text style={styles.meta}>
-            {album.photos.length} photo{album.photos.length > 1 ? "s" : ""} ·
-            privé
-          </Text>
-          </View>
-          </View>
-          
-          <TouchableOpacity style={styles.edit} activeOpacity={0.8}>
-            <HugeiconsIcon
-              icon={PencilEdit02Icon}
-              size={16}
-              color={colors.tealDark}
-            />
-            <Text style={styles.editTxt}>Éditer l'album</Text>
-          </TouchableOpacity>
+
+          {isOwner && (
+            <TouchableOpacity
+              style={styles.edit}
+              activeOpacity={0.8}
+              onPress={() => {
+                setRenameValue(album.name);
+                setMenuModal(false);
+                setRenameOpen(true);
+              }}
+            >
+              <HugeiconsIcon icon={PencilEdit02Icon} size={16} color={colors.tealDark} />
+              <Text style={styles.editTxt}>Renommer l'album</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -398,7 +551,7 @@ export default function AlbumScreen({ route, navigation }) {
             hint="Vidéos et qualité originale"
             onPress={() => {
               setMenuModal(false);
-              navigation.navigate("Premium")
+              navigation.navigate('Premium');
             }}
           />
           <Row
@@ -407,7 +560,7 @@ export default function AlbumScreen({ route, navigation }) {
             hint="Gérer qui a accès"
             onPress={() => {
               setMenuModal(false);
-              navigation.navigate("Members", { id: album.id })
+              navigation.navigate('Members', { id: album.id });
             }}
           />
           <Row
@@ -417,7 +570,8 @@ export default function AlbumScreen({ route, navigation }) {
             last
             onPress={() => {
               setMenuModal(false);
-              navigation.navigate("PcUpload");}}
+              navigation.navigate('PcUpload');
+            }}
           />
         </View>
 
@@ -427,156 +581,137 @@ export default function AlbumScreen({ route, navigation }) {
             Partagez le code d'invitation pour ajouter des membres à cet album.
           </Text>
           <View style={styles.codeRow}>
-            {/* Rendre le codeBox cliquable pour copier directement */}
-            <TouchableOpacity
-              style={styles.codeBox}
-              onPress={copyToClipboard}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={styles.codeBox} onPress={copyToClipboard} activeOpacity={0.7}>
               <Text style={styles.code}>{album.code}</Text>
-              <HugeiconsIcon icon={Copy01Icon} size={16} color={colors.teal} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {copied && <Text style={styles.copiedTxt}>Copié !</Text>}
+                <HugeiconsIcon
+                  icon={copied ? Tick02Icon : Copy01Icon}
+                  size={16}
+                  color={colors.teal}
+                />
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.inviteBtn}
-              onPress={invite}
-              activeOpacity={0.88}
-            >
-              <Text style={styles.inviteBtnTxt}>Invitez</Text>
+            <TouchableOpacity style={styles.inviteBtn} onPress={invite} activeOpacity={0.88}>
+              <Text style={styles.inviteBtnTxt}>Inviter</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <TouchableOpacity
           style={styles.qr}
-          onPress={
-            () => {
-            setMenuModal(false)
-            navigation.navigate("QR", { id: album.id });
-            
-          }}>
+          onPress={() => {
+            setMenuModal(false);
+            navigation.navigate('QR', { id: album.id });
+          }}
+        >
           <HugeiconsIcon icon={QrCodeIcon} size={20} color={colors.tealDark} />
           <Text style={styles.qrTxt}>Voir le code QR</Text>
         </TouchableOpacity>
+
+        {/* Zone propriétaire / membre */}
+        <View style={[styles.card, { marginTop: 12, marginBottom: 20 }]}>
+          {isOwner ? (
+            <Row
+              icon={Delete02Icon}
+              title="Supprimer l'album"
+              hint="Définitif, pour tous les membres"
+              danger
+              last
+              onPress={() => setConfirmDeleteAlbum(true)}
+            />
+          ) : (
+            <Row
+              icon={Logout01Icon}
+              title="Quitter l'album"
+              hint="Vous pourrez revenir avec le code"
+              last
+              onPress={() => setConfirmLeave(true)}
+            />
+          )}
+        </View>
       </RightModal>
-      
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.cream,
-  },
+  root: { flex: 1, backgroundColor: colors.cream },
   top: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
     paddingHorizontal: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: '#F0F0F0',
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headText: {
-    flex: 1,
-    marginLeft: 2,
-  },
-  title: {
-    fontWeight: "600",
-    fontSize: 18,
-    color: colors.tealDark,
-  },
-  meta: {
-    color: colors.muted,
-    marginTop: 1,
-    fontSize: 12,
-  },
-  contentContainer: {
-    flex: 1,
-  },
+  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headText: { flex: 1, marginLeft: 2 },
+  title: { fontWeight: '600', fontSize: 18, color: colors.tealDark },
+  meta: { color: colors.muted, marginTop: 1, fontSize: 12 },
+  contentContainer: { flex: 1 },
   tabs: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderColor: "#E4EEEE",
+    borderColor: '#E4EEEE',
   },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingTop: 12,
-  },
-  tabInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  tabT: {
-    color: colors.muted,
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  tabOn: {
-    color: colors.teal,
-  },
+  tab: { flex: 1, alignItems: 'center', paddingTop: 12 },
+  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabT: { color: colors.muted, fontWeight: '600', fontSize: 13 },
+  tabOn: { color: colors.teal },
   line: {
     height: 2.5,
     backgroundColor: colors.teal,
-    width: "56%",
+    width: '56%',
     marginTop: 10,
     borderRadius: 2,
   },
-  lineOff: {
-    height: 2.5,
-    marginTop: 10,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 28,
-  },
+  lineOff: { height: 2.5, marginTop: 10 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   emptyH: {
     fontSize: 20,
-    fontWeight: "600",
-    textAlign: "center",
+    fontWeight: '600',
+    textAlign: 'center',
     color: colors.tealDark,
     marginTop: 16,
   },
-  emptyP: {
-    marginTop: 8,
-    color: colors.muted,
-    textAlign: "center",
-    fontSize: 15,
-  },
-  cell: {
-    width: "33.33%",
-    aspectRatio: 1,
-    padding: 1.5,
-  },
-  thumb: {
-    flex: 1,
-    backgroundColor: "#DDECEC",
+  emptyP: { marginTop: 8, color: colors.muted, textAlign: 'center', fontSize: 15 },
+
+  // Grille + sélection
+  cell: { width: '33.33%', aspectRatio: 1, padding: 1.5 },
+  thumb: { flex: 1, backgroundColor: '#DDECEC', borderRadius: 4 },
+  selLayer: {
+    ...StyleSheet.absoluteFillObject,
+    margin: 1.5,
     borderRadius: 4,
+    backgroundColor: 'rgba(22,78,82,0.12)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    padding: 6,
   },
-  fabWrap: {
-    position: "absolute",
-    left: 48,
-    right: 48,
-    bottom: 30,
+  selLayerOn: { backgroundColor: 'rgba(43,163,168,0.30)' },
+  selDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  selDotOn: { backgroundColor: colors.teal, borderColor: colors.teal },
+
+  fabWrap: { position: 'absolute', left: 48, right: 48, bottom: 30 },
   fab: {
     height: 45,
     borderRadius: 28,
     backgroundColor: colors.coral,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     shadowColor: colors.tealDark,
     shadowOffset: { width: 0, height: 4 },
@@ -584,15 +719,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  fabTxt: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
+  fabTxt: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   banner: {
     backgroundColor: colors.cream,
     padding: 14,
@@ -600,11 +728,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
 
-  // Filtres
-  headTitle: { fontWeight: "600", fontSize: 18, color: colors.tealDark },
+  // Filtre
   section: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     color: colors.tealDark,
     marginTop: 18,
     paddingHorizontal: 16,
@@ -616,65 +743,88 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     lineHeight: 20,
   },
-  hintCenter: {
-    color: colors.muted,
-    textAlign: "center",
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  card: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    borderRadius: 5,
-    overflow: "hidden",
-  },
+  card: { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 5, overflow: 'hidden' },
   opt: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#E8EEEE",
+    borderColor: '#E8EEEE',
   },
-  optOn: { backgroundColor: "#F3F8F8" },
+  optOn: { backgroundColor: '#F3F8F8' },
   optTxt: { fontSize: 15, color: colors.tealDark },
-  optTxtOn: { fontWeight: "700" },
+  optTxtOn: { fontWeight: '700' },
   radio: {
     width: 18,
     height: 18,
     borderRadius: 9,
     borderWidth: 1.5,
-    borderColor: "#B5C4C4",
+    borderColor: '#B5C4C4',
   },
   radioOn: { borderWidth: 6, borderColor: colors.teal },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-  chip: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  chipOn: { backgroundColor: colors.tealDark, borderColor: colors.tealDark },
   footerBtn: {
-    marginTop: 10,
+    marginTop: 16,
     paddingHorizontal: 30,
     paddingBottom: 12,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: '#F0F0F0',
+  },
+
+  // Confirmations
+  delIco: {
+    alignSelf: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  delT: { fontSize: 20, fontWeight: '600', textAlign: 'center', color: colors.tealDark },
+  delP: { textAlign: 'center', marginVertical: 8, color: colors.muted, lineHeight: 20, paddingHorizontal: 16 },
+  ctaDanger: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginHorizontal: 16,
+  },
+  ctaTxt: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  cancel: {
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  cancelTxt: { fontWeight: '700', color: colors.tealDark },
+
+  // Renommer
+  renameWrap: { padding: 16, gap: 14 },
+  renameInput: {
+    backgroundColor: colors.light,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 50,
+    color: colors.tealDark,
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   // Menu
   hero: { alignItems: 'center', paddingHorizontal: 18, paddingBottom: 8, paddingTop: 16 },
-   cover: {
+  heroH: { flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'stretch' },
+  coverWrap: {},
+  cover: {
     width: 60,
     height: 60,
     borderRadius: 22,
@@ -682,6 +832,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  coverImg: { width: 60, height: 60, borderRadius: 22, backgroundColor: colors.border },
   name: { fontSize: 20, fontWeight: '600', color: colors.tealDark, marginTop: 1 },
   edit: {
     flexDirection: 'row',
@@ -695,25 +846,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     marginTop: 14,
-    width: 150
   },
   editTxt: { fontWeight: '600', color: colors.tealDark },
-   row: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    // paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: '#E8EEEE',
     gap: 12,
+    paddingHorizontal: 16,
   },
-
-  rowT: { fontSize: 13, fontWeight: '600', color: colors.tealDark },
+  rowIco: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowT: { fontSize: 14, fontWeight: '600', color: colors.tealDark },
   rowH: { color: colors.muted, fontSize: 12, marginTop: 2 },
   invite: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginTop: 16,  
+    marginTop: 16,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
@@ -733,6 +890,7 @@ const styles = StyleSheet.create({
     height: 45,
   },
   code: { fontSize: 16, fontWeight: '600', letterSpacing: 1.2, color: colors.tealDark },
+  copiedTxt: { color: colors.teal, fontWeight: '700', fontSize: 12 },
   inviteBtn: {
     backgroundColor: colors.coral,
     height: 40,
@@ -741,7 +899,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inviteBtnTxt: { color: '#fff', fontWeight: '600'},
+  inviteBtnTxt: { color: '#fff', fontWeight: '600' },
   qr: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -754,7 +912,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 30 
   },
   qrTxt: { fontWeight: '600', color: colors.tealDark, fontSize: 15 },
 });

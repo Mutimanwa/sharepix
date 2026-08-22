@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { TouchableWithoutFeedback } from 'react-native';
+// import { TouchableWithoutFeedback } from 'react-native';
 
 const LOGO = require('../../assets/sharepix-logo.png');
 
@@ -173,25 +173,60 @@ export function Sheet({
   );
 }
 
-export function RightModal({ visible, onClose, children, width = '82%' }) {
-  const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+export function RightModal({ visible, onClose, title, children, width = '82%' }) {
+  const insets = useSafeAreaInsets();
+  const screenW = Dimensions.get('window').width;
+  const slideAnim = useRef(new Animated.Value(screenW)).current;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: visible ? 0 : SCREEN_WIDTH,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    if (visible) {
+      setMounted(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true,
+      }).start();
+    } else if (mounted) {
+      // Animation de sortie AVANT le démontage (Modal visible={false} coupe net sinon)
+      Animated.timing(slideAnim, {
+        toValue: screenW,
+        duration: 240,
+        useNativeDriver: true,
+      }).start(() => setMounted(false));
+    }
   }, [visible]);
 
+  if (!mounted) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose} style={{ flex: 1 }}>
-        <View style={styles.rightOverlay} />
-      </TouchableWithoutFeedback>
-      <Animated.View style={[styles.rightContainer, { width, transform: [{ translateX: slideAnim }] }]}>
-        {children}
-      </Animated.View>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Pressable style={styles.rightOverlay} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.rightContainer,
+            { width, paddingTop: insets.top, transform: [{ translateX: slideAnim }] },
+          ]}
+        >
+          {title ? (
+            <View style={styles.rightHead}>
+              <Text style={styles.rightTitle}>{title}</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={12}>
+                <HugeiconsIcon size={22} color={colors.tealDark} variant="stroke" icon={Cancel01Icon} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -416,11 +451,14 @@ const styles = StyleSheet.create({
   },
     // Right Modal (Menu coulissant)
   rightOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)', 
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   rightContainer: {
-    height: '100%',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
     backgroundColor: '#fff',
     borderLeftWidth: 1,
     borderLeftColor: '#F0F0F0',
@@ -429,5 +467,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 15,
     elevation: 10,
+  },
+  rightHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  rightTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.tealDark,
   },
 });

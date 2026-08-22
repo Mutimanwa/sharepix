@@ -3,6 +3,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from './config';
 import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
 import { supabase } from './lib/supabase'; // <-- AJOUT POUR LE CLOUD
+// ── SUPABASE ALBUMS : intégration ──
+import {
+  cloudCreateAlbum,
+  cloudJoinAlbum,
+  cloudFetchMyAlbums,
+  mapCloudAlbum,
+  isCodeCollision,
+  isCloudId,
+  cloudFetchAlbumPhotos,
+  cloudDeletePhoto,
+  cloudDeleteAlbum,
+  cloudRenameAlbum,
+  cloudLeaveAlbum,
+} from './services/albums';
+// ── SUPABASE ALBUMS : fin ──
 import { Alert } from 'react-native';
 
 const KEY = 'sharepix.v1';
@@ -79,6 +94,25 @@ export function StoreProvider({ children }) {
                 lastName: user.lastName || s.profile.lastName,
               },
             }));
+
+            // ── SUPABASE ALBUMS : intégration ──
+            // Restauration cloud : après login (ou compte anonyme restauré),
+            // on récupère tous les albums dont on est membre. C'est ce qui
+            // fait réapparaître les souvenirs sur un nouvel appareil.
+            // Fusion : le cloud est la source de vérité ; les albums
+            // purement locaux (jamais synchronisés) sont conservés.
+            cloudFetchMyAlbums().then(({ data: cloudAlbums, error }) => {
+              if (cancelled || error || !cloudAlbums.length) return;
+              console.log(`☁️ ${cloudAlbums.length} album(s) restauré(s) depuis le cloud`);
+              setState((s) => {
+                const cloudIds = new Set(cloudAlbums.map((a) => a.id));
+                const localOnly = s.albums.filter(
+                  (a) => !a.cloud && !cloudIds.has(a.id)
+                );
+                return { ...s, albums: [...cloudAlbums, ...localOnly] };
+              });
+            });
+            // ── SUPABASE ALBUMS : fin ──
           }
         }
       } catch (error) {
@@ -144,37 +178,33 @@ export function StoreProvider({ children }) {
       createAlbum: async ({ name, firstName }) => {
         // 1. Essai de création dans le Cloud (Supabase)
         if (supabase && state.user?.id) {
-          const code = code8();
-          const { data, error } = await supabase
-            .from('albums')
-            .insert({
-              name: name,
-              code: code,
-              user_id: state.user.id,
-              creator_name: firstName,
-            })
-            .select()
-            .single();
+          // ── SUPABASE ALBUMS : intégration ──
+          // RPC atomique (album + membre owner). Jusqu'à 3 essais en cas
+          // de collision sur le code d'invitation (contrainte unique).
+          let cloudRow = null;
+          for (let attempt = 0; attempt < 3 && !cloudRow; attempt++) {
+            const { data, error } = await cloudCreateAlbum({
+              name,
+              code: code8(),
+              creatorName: firstName,
+            });
+            if (!error && data) cloudRow = data;
+            else if (error && !isCodeCollision(error)) {
+              console.log('⚠️ Cloud creation failed, falling back to local', error.message);
+              break;
+            }
+          }
 
-          if (!error && data) {
-            // Formatage de l'album cloud pour qu'il ressemble à un album local
-            const cloudAlbum = {
-              id: data.id,
-              name: data.name,
-              code: data.code,
-              photos: [],
-              createdAt: new Date(data.created_at).getTime(),
-              members: firstName ? [{ name: firstName, role: 'admin' }] : [],
-            };
-            
+          if (cloudRow) {
+            const cloudAlbum = mapCloudAlbum(cloudRow);
             setState((s) => ({
               ...s,
               profile: { ...s.profile, firstName: firstName || s.profile.firstName },
-              albums: [cloudAlbum, ...s.albums],
+              albums: [cloudAlbum, ...s.albums.filter((a) => a.id !== cloudAlbum.id)],
             }));
             return cloudAlbum;
           }
-          console.log('⚠️ Cloud creation failed, falling back to local');
+          // ── SUPABASE ALBUMS : fin ──
         }
 
         // 2. Fallback 100% Local (si pas internet, ou si Supabase non configuré)
@@ -197,31 +227,26 @@ export function StoreProvider({ children }) {
       // ── CLOUD & LOCAL : Rejoindre un album ──
       joinAlbum: async (code) => {
         // 1. Essai de recherche dans le Cloud
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('albums')
-            .select('*')
-            .eq('code', code.toUpperCase())
-            .single();
+        if (supabase && state.user?.id) {
+          // ── SUPABASE ALBUMS : intégration ──
+          // RPC : le code est validé côté serveur (un non-membre ne peut
+          // plus lire la table albums directement grâce à la RLS).
+          const { data, error } = await cloudJoinAlbum(code);
 
           if (!error && data) {
-            const cloudAlbum = {
-              id: data.id,
-              name: data.name,
-              code: data.code,
-              photos: [], // Les photos seront chargées en entrant dans l'album
-              createdAt: new Date(data.created_at).getTime(),
-              members: data.creator_name ? [{ name: data.creator_name, role: 'admin' }] : [],
-            };
-            
+            const cloudAlbum = mapCloudAlbum(data);
             // On l'ajoute au state local s'il n'y est pas déjà
             setState((s) => {
               if (s.albums.find((a) => a.id === cloudAlbum.id)) return s; // Déjà présent
               return { ...s, albums: [cloudAlbum, ...s.albums] };
             });
-            
             return cloudAlbum;
           }
+
+          // Code inexistant côté cloud : on continue vers le fallback local
+          // (anciens albums hors-ligne). Autre erreur (réseau...) : idem.
+          if (error) console.log('⚠️ Cloud join failed, trying local', error.message);
+          // ── SUPABASE ALBUMS : fin ──
         }
 
         // 2. Fallback local (pour les vieux albums créés avant la mise en ligne)
@@ -231,8 +256,16 @@ export function StoreProvider({ children }) {
       
           // ── CLOUD & LOCAL : Ajouter une photo ──
       addPhoto: async (albumId, uri) => {
-        // 1. Si pas de connexion cloud, on garde l'ancien système local (pour démo hors-ligne)
-        if (!supabase || !state.user?.id) {
+        // ── SUPABASE ALBUMS : intégration ──
+        // Cloud uniquement si l'album est réellement synchronisé :
+        // un album local a un id timestamp (non-UUID) que la FK
+        // photos.album_id refuserait. Les albums locaux restent 100 % local.
+        const albumTarget = state.albums.find((a) => a.id === albumId);
+        const canSyncPhoto = !!albumTarget?.cloud && isCloudId(albumId);
+        // ── SUPABASE ALBUMS : fin ──
+
+        // 1. Si pas de connexion cloud (ou album local), ancien système local
+        if (!supabase || !state.user?.id || !canSyncPhoto) {
           setState((s) => ({
             ...s,
             albums: s.albums.map((a) =>
@@ -281,7 +314,10 @@ export function StoreProvider({ children }) {
             .from('album-photos')
             .upload(filePath, fileToUpload, { contentType: 'image/jpeg', upsert: false });
 
-          if (uploadError) throw new Error("Erreur lors de l'envoi de l'image.");
+          if (uploadError) {
+            console.log('📛 storage upload error:', uploadError);
+            throw new Error(uploadError.message || "Erreur lors de l'envoi de l'image.");
+          }
 
           // Étape B : Récupérer l'URL publique de l'image uploadée
           const { data: urlData } = supabase.storage.from('album-photos').getPublicUrl(uploadData.path);
@@ -297,12 +333,21 @@ export function StoreProvider({ children }) {
             .select()
             .single();
 
-          if (dbError) throw new Error("Erreur d'enregistrement en base de données.");
+          // On garde le VRAI message Supabase (RLS, colonne manquante...)
+          // pour pouvoir diagnostiquer au lieu de deviner.
+          if (dbError) {
+            console.log('📛 photos insert error:', dbError);
+            throw new Error(dbError.message || "Erreur d'enregistrement en base de données.");
+          }
 
           // Étape D : Mettre à jour le state local avec l'URL du cloud
           const newPhoto = {
             id: photoData.id,
             uri: publicUrl, // On remplace l'URI locale par l'URL Cloud !
+            // ── SUPABASE ALBUMS : intégration ──
+            cloud: true,
+            storagePath: uploadData.path, // nécessaire pour la suppression
+            // ── SUPABASE ALBUMS : fin ──
             createdAt: Date.now(),
             liked: false,
             favorite: false,
@@ -385,7 +430,41 @@ export function StoreProvider({ children }) {
         }));
       },
       
+      // ── SUPABASE ALBUMS : intégration ──
+      // Charge les photos cloud d'un album (appelé à l'entrée de l'album).
+      // Fusion : le cloud remplace ses propres photos ; les photos locales
+      // jamais synchronisées (album hors-ligne) sont conservées.
+      refreshAlbumPhotos: async (albumId) => {
+        const album = state.albums.find((a) => a.id === albumId);
+        if (!album?.cloud) return;
+        const { data: cloudPhotos, error } = await cloudFetchAlbumPhotos(albumId);
+        if (error) return;
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) => {
+            if (a.id !== albumId) return a;
+            const localOnly = a.photos.filter((p) => !p.cloud);
+            // Préserve les likes/favoris/commentaires locaux sur les photos déjà connues
+            const merged = cloudPhotos.map((cp) => {
+              const prev = a.photos.find((p) => p.id === cp.id);
+              return prev
+                ? { ...cp, liked: prev.liked, favorite: prev.favorite, comments: prev.comments }
+                : cp;
+            });
+            return { ...a, photos: [...merged, ...localOnly] };
+          }),
+        }));
+      },
+      // ── SUPABASE ALBUMS : fin ──
+
       deletePhoto: (albumId, photoId) => {
+        // ── SUPABASE ALBUMS : intégration ──
+        // Suppression cloud en arrière-plan si la photo vient du cloud
+        // (fichier Storage + ligne SQL). L'état local est maj de suite.
+        const album = state.albums.find((a) => a.id === albumId);
+        const photo = album?.photos.find((p) => p.id === photoId);
+        if (photo?.cloud) cloudDeletePhoto(photo).catch(() => {});
+        // ── SUPABASE ALBUMS : fin ──
         setState((s) => ({
           ...s,
           albums: s.albums.map((a) =>
@@ -393,6 +472,57 @@ export function StoreProvider({ children }) {
           ),
         }));
       },
+
+      // ── SUPABASE ALBUMS : intégration ──
+      // Suppression multiple (mode sélection de l'écran Album).
+      deletePhotos: (albumId, photoIds) => {
+        const ids = new Set(photoIds);
+        const album = state.albums.find((a) => a.id === albumId);
+        (album?.photos || [])
+          .filter((p) => ids.has(p.id) && p.cloud)
+          .forEach((p) => cloudDeletePhoto(p).catch(() => {}));
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) =>
+            a.id === albumId
+              ? { ...a, photos: a.photos.filter((p) => !ids.has(p.id)) }
+              : a
+          ),
+        }));
+      },
+
+      // Renommer un album (owner). Mise à jour locale immédiate + cloud.
+      renameAlbum: (albumId, name) => {
+        const clean = String(name || '').trim();
+        if (!clean) return;
+        const album = state.albums.find((a) => a.id === albumId);
+        if (album?.cloud) cloudRenameAlbum(albumId, clean).catch(() => {});
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) => (a.id === albumId ? { ...a, name: clean } : a)),
+        }));
+      },
+
+      // Supprimer SON album (cloud : fichiers + ligne, cascade gère le reste).
+      deleteAlbum: async (albumId) => {
+        const album = state.albums.find((a) => a.id === albumId);
+        setState((s) => ({ ...s, albums: s.albums.filter((a) => a.id !== albumId) }));
+        if (album?.cloud) {
+          const { error } = await cloudDeleteAlbum(albumId);
+          if (error) console.log('⚠️ deleteAlbum cloud error:', error.message);
+        }
+      },
+
+      // Quitter un album rejoint (non propriétaire).
+      leaveAlbum: async (albumId) => {
+        const album = state.albums.find((a) => a.id === albumId);
+        setState((s) => ({ ...s, albums: s.albums.filter((a) => a.id !== albumId) }));
+        if (album?.cloud) {
+          const { error } = await cloudLeaveAlbum(albumId);
+          if (error) console.log('⚠️ leaveAlbum cloud error:', error.message);
+        }
+      },
+      // ── SUPABASE ALBUMS : fin ──
     }),
     [ready, state]
   );
