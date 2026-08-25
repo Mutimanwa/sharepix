@@ -17,13 +17,20 @@ import {
   FavouriteIcon,
   UserAdd01Icon,
   SentIcon,
+  Delete02Icon,
+  Tick02Icon,
 } from '@hugeicons/core-free-icons';
-import { CoralButton } from '../components/UI';
+import { CoralButton, BackButton } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
 import { StatusBar } from 'expo-status-bar';
 // ── SUPABASE ALBUMS : intégration ──
-import { cloudFetchActivity } from '../services/albums';
+import {
+  cloudFetchActivity,
+  cloudDismissActivity,
+  cloudDismissActivities,
+  subscribeActivityChanges,
+} from '../services/albums';
 // ── SUPABASE ALBUMS : fin ──
 
 // ── Date relative (FR) ───────────────────────────────────────────────────
@@ -77,17 +84,29 @@ export default function ActivitiesScreen({ navigation }) {
   const load = useCallback(async () => {
     const { data, error } = await cloudFetchActivity(50);
     // Diagnostic explicite : une erreur RPC/RLS ne doit plus passer inaperçue
-    // if (error) {
-    //   console.log('📛 activity error:', error.message || error);
-    // } else {
-    //   console.log(`📋 activity: ${data.length} événement(s)`);
-    // }
+    if (error) {
+      console.log('📛 activity error:', error.message || error);
+    } else {
+      console.log(`📋 activity: ${data.length} événement(s)`);
+    }
     if (!error) setItems(data);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      if (state.profile.notifications) load();
+      if (!state.profile.notifications) return undefined;
+      load();
+      // Realtime : un membre agit sur un album → l'événement apparaît ici
+      // sans tirer-pour-rafraîchir. Debounce 500 ms (comme Album/Photo).
+      let timer = null;
+      const unsubscribe = subscribeActivityChanges(() => {
+        clearTimeout(timer);
+        timer = setTimeout(load, 500);
+      });
+      return () => {
+        clearTimeout(timer);
+        unsubscribe();
+      };
     }, [load, state.profile.notifications])
   );
 
@@ -95,6 +114,31 @@ export default function ActivitiesScreen({ navigation }) {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  };
+
+  // ── SUPABASE ALBUMS : suppression (masquage pour moi uniquement) ──
+  // Une seule activité
+  const dismissOne = (item) => {
+    cloudDismissActivity(item.id).catch(() => {});
+    setItems((cur) => cur.filter((i) => i.id !== item.id));
+  };
+
+  // Mode sélection multiple (appui long, comme dans l'album)
+  const [selected, setSelected] = useState(null);
+  const selecting = selected !== null;
+
+  const enterSelection = (id) => setSelected([id]);
+  const toggleSelect = (id) =>
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const exitSelection = () => setSelected(null);
+  const selectAll = () =>
+    setSelected(selected.length === items.length ? [] : items.map((i) => i.id));
+
+  const dismissSelected = () => {
+    cloudDismissActivities(selected).catch(() => {});
+    const ids = new Set(selected);
+    setItems((cur) => cur.filter((i) => !ids.has(i.id)));
+    exitSelection();
   };
   // ── SUPABASE ALBUMS : fin ──
 
@@ -131,11 +175,16 @@ export default function ActivitiesScreen({ navigation }) {
 
   const renderItem = ({ item }) => {
     const kind = KINDS[item.kind] || KINDS.photo_added;
+    const isSel = selecting && selected.includes(item.id);
     return (
       <TouchableOpacity
-        style={styles.row}
+        style={[styles.row, isSel && styles.rowSel]}
         activeOpacity={0.75}
-        onPress={() => navigation.navigate('Album', { id: item.albumId })}
+        onPress={() =>
+          selecting ? toggleSelect(item.id) : navigation.navigate('Album', { id: item.albumId })
+        }
+        onLongPress={() => !selecting && enterSelection(item.id)}
+        delayLongPress={220}
       >
         <View style={[styles.iconBubble, { backgroundColor: `${kind.color}1A` }]}>
           <HugeiconsIcon icon={kind.icon} size={20} color={kind.color} />
@@ -148,6 +197,22 @@ export default function ActivitiesScreen({ navigation }) {
           </Text>
           <Text style={styles.rowWhen}>{formatAgo(item.at)}</Text>
         </View>
+
+        {/* Mode sélection : pastille ; sinon : suppression unitaire */}
+        {selecting ? (
+          <View style={[styles.selDot, isSel && styles.selDotOn]}>
+            {isSel && <HugeiconsIcon icon={Tick02Icon} size={12} color="#fff" strokeWidth={3} />}
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.rowDelete}
+            onPress={() => dismissOne(item)}
+            hitSlop={8}
+            activeOpacity={0.7}
+          >
+            <HugeiconsIcon icon={Delete02Icon} size={16} color={colors.muted} />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     );
   };
@@ -156,13 +221,44 @@ export default function ActivitiesScreen({ navigation }) {
     <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.header}>
-        <Text style={styles.title}>Activités</Text>
+        {selecting ? (
+          <>
+            <BackButton variant="close" onPress={exitSelection} />
+            <Text style={[styles.title, { flex: 1 }]}>
+              {selected.length} sélectionnée{selected.length > 1 ? 's' : ''}
+            </Text>
+            <TouchableOpacity onPress={selectAll} style={styles.headerBtn} hitSlop={10}>
+              <HugeiconsIcon icon={Tick02Icon} size={21} color={colors.tealDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => selected.length && dismissSelected()}
+              style={styles.headerBtn}
+              hitSlop={10}
+            >
+              <HugeiconsIcon
+                icon={Delete02Icon}
+                size={21}
+                color={selected.length ? colors.coral : colors.border}
+              />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.title, { flex: 1 }]}>Activités</Text>
+            {items.length > 0 && (
+              <TouchableOpacity onPress={() => setSelected([])} hitSlop={10}>
+                <Text style={styles.selectLink}>Sélectionner</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </View>
 
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        extraData={selected}
         contentContainerStyle={[
           items.length === 0 && styles.content,
           { paddingBottom: insets.bottom + 20 },
@@ -248,4 +344,26 @@ const styles = StyleSheet.create({
   rowActor: { fontWeight: '800' },
   rowAlbum: { fontWeight: '700', color: colors.teal },
   rowWhen: { color: colors.muted, fontSize: 12, marginTop: 3 },
+
+  // Suppression / sélection
+  rowDelete: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowSel: { backgroundColor: colors.light },
+  selDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selDotOn: { backgroundColor: colors.teal, borderColor: colors.teal },
+  headerBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  selectLink: { color: colors.teal, fontWeight: '700', fontSize: 14, padding: 6 },
 });

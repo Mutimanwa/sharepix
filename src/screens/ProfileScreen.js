@@ -185,7 +185,10 @@ export default function ProfileScreen({ navigation }) {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Auth')} activeOpacity={0.85}>
+            {/* ── SUPABASE ALBUMS : intégration ── */}
+            {/* mode 'convert' : l'AuthScreen convertira le compte invité au lieu d'en créer un nouveau */}
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Auth', { mode: 'convert' })} activeOpacity={0.85}>
+            {/* ── SUPABASE ALBUMS : fin ── */}
               <Text style={styles.primaryBtnText}>Créer mon compte sécurisé</Text>
             </TouchableOpacity>
           </View>

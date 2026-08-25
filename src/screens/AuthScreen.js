@@ -31,6 +31,10 @@ import {
   signInWithGoogle,
   translateAuthError,
 } from '../services/auth';
+// ── SUPABASE ALBUMS : intégration ──
+// Conversion invité → compte permanent (même identité, données conservées)
+import { convertAnonymousUser, linkGoogleIdentity } from '../services/auth';
+// ── SUPABASE ALBUMS : fin ──
 import { colors } from '../theme';
 import { GoogleMark, LogoImage } from '../components/UI';
 import { useStore } from '../store';
@@ -73,8 +77,16 @@ function PremiumInput({ label, icon, ...props }) {
   );
 }
 
-export default function AuthScreen({ navigation }) {
-  const [mode, setMode] = useState('login');
+export default function AuthScreen({ navigation, route }) {
+  // ── SUPABASE ALBUMS : intégration ──
+  // Mode « conversion » : ouvert depuis le profil avec { mode: 'convert' }
+  // quand l'utilisateur a un compte invité. Deux choix offerts :
+  //  - onglet inscription (défaut) : LIAISON du compte invité (Google ou
+  //    email, même id conservé → aucune donnée perdue) ;
+  //  - onglet connexion : connexion normale à un compte existant.
+  const convertMode = route?.params?.mode === 'convert';
+  // ── SUPABASE ALBUMS : fin ──
+  const [mode, setMode] = useState(convertMode ? 'register' : 'login');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -88,6 +100,10 @@ export default function AuthScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { setAuthUser } = useStore();
   const isLogin = mode === 'login';
+  // ── SUPABASE ALBUMS : intégration ──
+  // converting = onglet inscription actif dans le mode conversion
+  const converting = convertMode && !isLogin;
+  // ── SUPABASE ALBUMS : fin ──
 
   const validate = () => {
     setError('');
@@ -131,6 +147,14 @@ export default function AuthScreen({ navigation }) {
       console.log('🔐 Auth START:', isLogin ? 'login' : 'signup');
       
       let result;
+      // ── SUPABASE ALBUMS : intégration ──
+      // Onglet inscription en mode conversion : liaison du compte invité
+      // (updateUser conserve le même id → albums/photos préservés).
+      // Onglet connexion : connexion normale à un compte existant.
+      if (converting) {
+        result = await convertAnonymousUser(email, password, { firstName, lastName });
+      } else
+      // ── SUPABASE ALBUMS : fin ──
       if (isLogin) {
         result = await signInWithEmail(email, password);
       } else {
@@ -175,8 +199,12 @@ export default function AuthScreen({ navigation }) {
     try {
       console.log('🔐 Google Auth START');
       
-      // Utiliser la fonction d'authentification Google
-      const result = await signInWithGoogle();
+      // ── SUPABASE ALBUMS : intégration ──
+      // Onglet inscription en mode conversion : on LIE Google au compte
+      // invité (linkIdentity, même id → rien n'est perdu). Onglet
+      // connexion (ou écran normal) : connexion Google classique.
+      const result = converting ? await linkGoogleIdentity() : await signInWithGoogle();
+      // ── SUPABASE ALBUMS : fin ──
       
       if (result.success) {
         console.log('✅ Google Auth success, waiting for session...');
@@ -223,16 +251,29 @@ export default function AuthScreen({ navigation }) {
           {/* Hero Text */}
           <View style={styles.heroSection}>
             <Text style={styles.title}>
-              {isLogin ? 'Partagez, Découvrez, Revivez.' : 'Rejoignez l\'aventure SharePix.'}
+              {/* ── SUPABASE ALBUMS : intégration ── */}
+              {converting
+                ? 'Sécurisez vos souvenirs.'
+                : isLogin
+                  ? 'Partagez, Découvrez, Revivez.'
+                  : 'Rejoignez l\'aventure SharePix.'}
             </Text>
             <Text style={styles.subtitle}>
-              {isLogin
-                ? 'Connectez-vous pour retrouver vos souvenirs.'
-                : 'Créez un compte pour partager vos moments.'}
+              {converting
+                ? 'Liez votre compte Google ou ajoutez un email à votre compte invité : vos albums sont conservés.'
+                : convertMode
+                  ? 'Vous avez déjà un compte ? Connectez-vous. Attention : le compte invité actuel sera abandonné.'
+                  : isLogin
+                    ? 'Connectez-vous pour retrouver vos souvenirs.'
+                    : 'Créez un compte pour partager vos moments.'}
             </Text>
+            {/* ── SUPABASE ALBUMS : fin ── */}
           </View>
 
           {/* Google Button */}
+          {/* ── SUPABASE ALBUMS : intégration ── */}
+          {/* En mode conversion, ce bouton LIE Google au compte invité (voir handleGoogle) */}
+          {/* ── SUPABASE ALBUMS : fin ── */}
           <Pressable
             style={[styles.googleButton, googleLoading && styles.disabled]}
             onPress={handleGoogle}
@@ -253,7 +294,11 @@ export default function AuthScreen({ navigation }) {
           {/* Separator */}
           <View style={styles.separator}>
             <View style={styles.line} />
-            <Text style={styles.separatorText}>Ou connectez-vous avec</Text>
+            {/* ── SUPABASE ALBUMS : intégration ── */}
+            <Text style={styles.separatorText}>
+              {converting ? 'Ou avec un email et mot de passe' : 'Ou connectez-vous avec'}
+            </Text>
+            {/* ── SUPABASE ALBUMS : fin ── */}
             <View style={styles.line} />
           </View>
 
@@ -336,15 +381,24 @@ export default function AuthScreen({ navigation }) {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.submitText}>
-                  {isLogin ? 'Se connecter à SharePix' : 'S\'inscrire sur SharePix'}
+                  {/* ── SUPABASE ALBUMS : intégration ── */}
+                  {converting
+                    ? 'Sécuriser mon compte invité'
+                    : isLogin
+                      ? 'Se connecter à SharePix'
+                      : 'S\'inscrire sur SharePix'}
+                  {/* ── SUPABASE ALBUMS : fin ── */}
                 </Text>
               )}
             </Pressable>
           </View>
 
           {/* Switch */}
-          <Pressable 
-            style={styles.switchContainer} 
+          {/* ── SUPABASE ALBUMS : intégration ── */}
+          {/* En mode conversion, ce lien offre le 2e choix : connexion à un compte existant */}
+          {/* ── SUPABASE ALBUMS : fin ── */}
+          <Pressable
+            style={styles.switchContainer}
             onPress={() => {
               setError('');
               setNeedsEmailConfirm(false);

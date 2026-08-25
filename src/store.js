@@ -2,6 +2,10 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from './config';
 import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
+// ── SUPABASE ALBUMS : intégration ──
+// Détection d'une erreur OAuth renvoyée dans l'URL (ex. liaison Google refusée)
+import { consumeOAuthErrorFromUrl, translateAuthError } from './services/auth';
+// ── SUPABASE ALBUMS : fin ──
 import { supabase } from './lib/supabase'; // <-- AJOUT POUR LE CLOUD
 // ── SUPABASE ALBUMS : intégration ──
 import {
@@ -24,7 +28,7 @@ import {
   cloudDeleteComment,
 } from './services/albums';
 // ── SUPABASE ALBUMS : fin ──
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 const KEY = 'sharepix.v1';
 
@@ -87,6 +91,16 @@ export function StoreProvider({ children }) {
       try {
         if (isSupabaseConfigured) {
           console.log('🔄 Initializing auth...');
+          // ── SUPABASE ALBUMS : intégration ──
+          // Erreur OAuth renvoyée dans l'URL (liaison Google refusée…) :
+          // on la signale au lieu de restaurer la session en silence.
+          const oauthError = consumeOAuthErrorFromUrl();
+          if (oauthError && !cancelled) {
+            const msg = translateAuthError(new Error(oauthError));
+            if (Platform.OS === 'web' && typeof window !== 'undefined') window.alert(msg);
+            else Alert.alert('Connexion', msg);
+          }
+          // ── SUPABASE ALBUMS : fin ──
           const user = await initializeAuth();
           
           if (!cancelled && user) {

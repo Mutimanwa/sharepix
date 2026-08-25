@@ -354,8 +354,7 @@ export async function cloudRemoveMember(albumId, userId) {
 
 export function mapCloudActivity(row) {
   return {
-    // Clé composite : un même type peut se répéter sur une même photo
-    id: `${row.kind}:${row.album_id}:${row.photo_id || ''}:${row.actor_name}:${row.created_at}`,
+    id: row.id, // id du journal d'activité (nécessaire pour masquer)
     kind: row.kind, // member_joined | photo_added | comment_added | photo_liked
     actor: row.actor_name || 'Un membre',
     albumName: row.album_name || '',
@@ -367,11 +366,58 @@ export function mapCloudActivity(row) {
 
 /**
  * Flux d'activité : ce que les AUTRES membres ont fait sur mes albums,
- * du plus récent au plus ancien (RPC my_activity).
+ * du plus récent au plus ancien (RPC my_activity), moins les éléments
+ * que j'ai masqués (« supprimés »).
  */
 export async function cloudFetchActivity(limit = 50) {
   if (!supabase) return { data: [], error: null };
   const { data, error } = await supabase.rpc('my_activity', { p_limit: limit });
   return { data: (data || []).map(mapCloudActivity), error };
+}
+
+/** « Supprimer » une activité : la masque pour moi seulement. */
+export async function cloudDismissActivity(activityId) {
+  if (!supabase || !isCloudId(activityId)) return { error: null };
+  const { error } = await supabase
+    .from('activity_acks')
+    .upsert({ activity_id: activityId });
+  return { error };
+}
+
+/** Même chose en lot (sélection multiple). */
+export async function cloudDismissActivities(activityIds) {
+  if (!supabase || !activityIds?.length) return { error: null };
+  const rows = activityIds.filter(isCloudId).map((id) => ({ activity_id: id }));
+  if (!rows.length) return { error: null };
+  const { error } = await supabase.from('activity_acks').upsert(rows);
+  return { error };
+}
+
+/**
+ * Realtime du centre d'activités : prévient dès qu'un événement est
+ * journalisé dans activity_log (publication activée dans schema.sql §12).
+ * Pas de filtre serveur possible (l'écran agrège plusieurs albums) :
+ * la RLS Realtime limite déjà aux albums dont on est membre.
+ * `onChange` doit debouncer puis re-fetcher (cloudFetchActivity).
+ */
+export function subscribeActivityChanges(onChange) {
+  if (!supabase) return () => {};
+
+  // Topic unique : voir subscribeAlbumChanges (supabase-js rendrait un
+  // canal déjà souscrit sinon, et .on() après subscribe() lève une erreur).
+  const topic = `activity:${Math.random().toString(36).slice(2, 8)}`;
+
+  const channel = supabase
+    .channel(topic)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'activity_log' },
+      onChange
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
 // ── SUPABASE ALBUMS : fin ──

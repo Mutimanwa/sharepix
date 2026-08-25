@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -12,7 +12,7 @@ import {
   Copy01Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import { Logo, BackButton, Page } from '../components/UI';
+import { Logo, BackButton, Page, RightModal, Field, CoralButton } from '../components/UI';
 import { useStore } from '../store';
 import { StatusBar } from 'expo-status-bar';
 import * as Clipboard from 'expo-clipboard'; 
@@ -20,6 +20,23 @@ import * as Clipboard from 'expo-clipboard';
 export default function MenuScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
   const insets = useSafeAreaInsets();
+
+  // ── SUPABASE ALBUMS : intégration ──
+  // Renommage de l'album : réservé au propriétaire (policy RLS), ou à
+  // tout le monde pour un album 100 % local (jamais synchronisé).
+  const { state, renameAlbum } = useStore();
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const isOwner = !album?.cloud || !album?.ownerId || album.ownerId === state.user?.id;
+  const openRename = () => {
+    setDraftName(album?.name || '');
+    setRenaming(true);
+  };
+  const saveRename = () => {
+    renameAlbum(album.id, draftName); // cloud en arrière-plan + local immédiat
+    setRenaming(false);
+  };
+  // ── SUPABASE ALBUMS : fin ──
 
   if (!album) return null;
 
@@ -54,10 +71,15 @@ export default function MenuScreen({ route, navigation }) {
           <Text style={styles.meta}>
             {album.photos.length} photo{album.photos.length > 1 ? 's' : ''} · privé
           </Text>
-          <TouchableOpacity style={styles.edit} activeOpacity={0.8}>
-            <HugeiconsIcon icon={PencilEdit02Icon} size={16} color={colors.tealDark} />
-            <Text style={styles.editTxt}>Éditer l'album</Text>
-          </TouchableOpacity>
+          {/* ── SUPABASE ALBUMS : intégration ── */}
+          {/* Bouton câblé : ouvre la modale de renommage (owner uniquement) */}
+          {isOwner && (
+            <TouchableOpacity style={styles.edit} activeOpacity={0.8} onPress={openRename}>
+              <HugeiconsIcon icon={PencilEdit02Icon} size={16} color={colors.tealDark} />
+              <Text style={styles.editTxt}>Éditer l'album</Text>
+            </TouchableOpacity>
+          )}
+          {/* ── SUPABASE ALBUMS : fin ── */}
         </View>
 
         <View style={styles.card}>
@@ -104,6 +126,25 @@ export default function MenuScreen({ route, navigation }) {
           <Text style={styles.qrTxt}>Voir le code QR</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ── SUPABASE ALBUMS : intégration ── */}
+      {/* Renommage : local immédiat + cloud en arrière-plan (store.renameAlbum) */}
+      <RightModal visible={renaming} onClose={() => setRenaming(false)} title="Renommer l'album">
+        <Field
+          label="Nom de l'album"
+          value={draftName}
+          onChangeText={setDraftName}
+          placeholder="Ex : Anniversaire de Marie"
+          autoFocus
+        />
+        <CoralButton
+          title="Enregistrer"
+          onPress={saveRename}
+          disabled={!draftName.trim()}
+          style={{ marginTop: 16 }}
+        />
+      </RightModal>
+      {/* ── SUPABASE ALBUMS : fin ── */}
     </Page>
   );
 }
