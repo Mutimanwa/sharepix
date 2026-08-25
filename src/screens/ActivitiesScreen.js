@@ -31,6 +31,10 @@ import {
   cloudDismissActivities,
   subscribeActivityChanges,
 } from '../services/albums';
+// ── SUPABASE PUSH : intégration ──
+// Enregistrement du token Expo Push (no-op sur web / Expo Go)
+import { registerPushToken } from '../services/push';
+// ── SUPABASE PUSH : fin ──
 // ── SUPABASE ALBUMS : fin ──
 
 // ── Date relative (FR) ───────────────────────────────────────────────────
@@ -165,6 +169,10 @@ export default function ActivitiesScreen({ navigation }) {
               onPress={() => {
                 updateProfile({ notifications: true });
                 setAsked(true);
+                // ── SUPABASE PUSH : intégration ──
+                // Permission + token Expo Push (no-op sur web/émulateur)
+                registerPushToken().catch(() => {});
+                // ── SUPABASE PUSH : fin ──
               }}
             />
           </View>

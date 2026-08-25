@@ -15,6 +15,10 @@ import { useStore } from '../store';
 import { colors } from '../theme';
 import { isSupabaseConfigured } from '../config';
 import { signOut, deleteAccount } from '../services/auth'; 
+// ── SUPABASE PUSH : intégration ──
+// (Dé)enregistrement du token Expo Push selon l'interrupteur ci-dessous
+import { registerPushToken, unregisterPushToken } from '../services/push';
+// ── SUPABASE PUSH : fin ──
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants'; 
@@ -241,7 +245,18 @@ export default function ProfileScreen({ navigation }) {
         {/* ── NOTIFICATIONS ── */}
         <Text style={styles.sectionTitle}>Préférences de notifications</Text>
         <View style={styles.card}>
-          <SwitchRow title="Notifications push" value={p.notifications} onValueChange={(v) => updateProfile({ notifications: v })} />
+          {/* ── SUPABASE PUSH : intégration ── */}
+          <SwitchRow
+            title="Notifications push"
+            value={p.notifications}
+            onValueChange={(v) => {
+              updateProfile({ notifications: v });
+              // Token Expo Push : enregistré à l'activation, retiré à la désactivation
+              if (v) registerPushToken().catch(() => {});
+              else unregisterPushToken().catch(() => {});
+            }}
+          />
+          {/* ── SUPABASE PUSH : fin ── */}
           <SwitchRow title="Nouvelles Photos" sub="Quand un membre ajoute des photos" value={p.newPhotos} onValueChange={(v) => updateProfile({ newPhotos: v })} />
           <SwitchRow title="Mentions J'aime" sub="Quand quelqu'un aime vos photos" value={p.likes} onValueChange={(v) => updateProfile({ likes: v })} />
           <SwitchRow title="Commentaires" sub="Nouvelles interactions sur vos contenus" value={p.comments} onValueChange={(v) => updateProfile({ comments: v })} isLast />
