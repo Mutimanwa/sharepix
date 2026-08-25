@@ -122,14 +122,15 @@ export async function cloudLeaveAlbum(albumId) {
 
 // ── Photos cloud ─────────────────────────────────────────────────────
 
+// ── Bucket PRIVÉ (V2 sécurité) : les photos ne sont lisibles que via des
+// URLs signées, créées ici APRÈS contrôle RLS (membre de l'album requis).
+export const SIGNED_URL_TTL = 60 * 60; // 1 h — régénérées à chaque refresh
+
 /** Normalise une ligne `photos` en objet photo de l'app. */
-export function mapCloudPhoto(row) {
-  const { data: url } = supabase.storage
-    .from('album-photos')
-    .getPublicUrl(row.storage_path);
+export function mapCloudPhoto(row, signedUrl = '') {
   return {
     id: row.id,
-    uri: url?.publicUrl || '',
+    uri: signedUrl, // URL signée (1 h), pas d'URL publique
     storagePath: row.storage_path,
     cloud: true,
     createdAt: new Date(row.created_at).getTime(),
@@ -140,6 +141,32 @@ export function mapCloudPhoto(row) {
   };
 }
 
+/** Signe l'URL d'UNE photo (appelé juste après un upload, store.addPhoto). */
+export async function cloudPhotoUrl(storagePath) {
+  if (!supabase || !storagePath) return '';
+  const { data, error } = await supabase.storage
+    .from('album-photos')
+    .createSignedUrl(storagePath, SIGNED_URL_TTL);
+  if (error) console.log('📛 signed url error:', error.message);
+  return data?.signedUrl || '';
+}
+
+/** Signe EN LOT les URLs des lignes photos (une seule requête Storage). */
+async function withSignedUrls(rows) {
+  const paths = (rows || []).map((r) => r.storage_path).filter(Boolean);
+  const signed = new Map();
+  if (paths.length) {
+    const { data, error } = await supabase.storage
+      .from('album-photos')
+      .createSignedUrls(paths, SIGNED_URL_TTL);
+    if (error) console.log('📛 signed urls error:', error.message);
+    (data || []).forEach((s) => {
+      if (s?.path && s?.signedUrl) signed.set(s.path, s.signedUrl);
+    });
+  }
+  return (rows || []).map((r) => mapCloudPhoto(r, signed.get(r.storage_path) || ''));
+}
+
 /** Photos d'un album cloud, de la plus récente à la plus ancienne. */
 export async function cloudFetchAlbumPhotos(albumId) {
   if (!supabase || !isCloudId(albumId)) return { data: [], error: null };
@@ -148,7 +175,9 @@ export async function cloudFetchAlbumPhotos(albumId) {
     .select('*')
     .eq('album_id', albumId)
     .order('created_at', { ascending: false });
-  return { data: (data || []).map(mapCloudPhoto), error };
+  if (error) return { data: [], error };
+  // Bucket privé : les URLs signées sont renouvelées à chaque fetch
+  return { data: await withSignedUrls(data || []), error: null };
 }
 
 /** Supprime une photo : fichier Storage + ligne (policy : auteur ou owner). */

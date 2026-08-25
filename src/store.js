@@ -16,6 +16,7 @@ import {
   isCodeCollision,
   isCloudId,
   cloudFetchAlbumPhotos,
+  cloudPhotoUrl,
   cloudDeletePhoto,
   cloudDeleteAlbum,
   cloudRenameAlbum,
@@ -121,8 +122,13 @@ export function StoreProvider({ children }) {
             // fait réapparaître les souvenirs sur un nouvel appareil.
             // Fusion : le cloud est la source de vérité ; les albums
             // purement locaux (jamais synchronisés) sont conservés.
+            // REPARATION : tout album marqué cloud mais ABSENT du résultat
+            // est retiré (reliquats de l'époque où la RLS fuyait, albums
+            // quittés depuis un autre appareil, comptes différents selon
+            // les navigateurs…). Seule une ERREUR réseau fait tout garder,
+            // pour préserver le hors-ligne.
             cloudFetchMyAlbums().then(({ data: cloudAlbums, error }) => {
-              if (cancelled || error || !cloudAlbums.length) return;
+              if (cancelled || error) return;
               console.log(`☁️ ${cloudAlbums.length} album(s) restauré(s) depuis le cloud`);
               setState((s) => {
                 const cloudIds = new Set(cloudAlbums.map((a) => a.id));
@@ -337,12 +343,21 @@ export function StoreProvider({ children }) {
 
           if (uploadError) {
             console.log('📛 storage upload error:', uploadError);
+            // ── SUPABASE ALBUMS : intégration ──
+            // Refus RLS = on écrit dans le dossier d'un album dont on n'est
+            // pas membre (album fantôme, compte différent, accès retiré…)
+            if (/row-level security/i.test(uploadError.message || '')) {
+              throw new Error("Cet album n'est plus accessible pour ce compte (tu n'es plus membre ?).");
+            }
+            // ── SUPABASE ALBUMS : fin ──
             throw new Error(uploadError.message || "Erreur lors de l'envoi de l'image.");
           }
 
-          // Étape B : Récupérer l'URL publique de l'image uploadée
-          const { data: urlData } = supabase.storage.from('album-photos').getPublicUrl(uploadData.path);
-          const publicUrl = urlData.publicUrl;
+          // ── SUPABASE ALBUMS : intégration ──
+          // Étape B : URL SIGNÉE de l'image (bucket privé — V2 sécurité).
+          // Valable SIGNED_URL_TTL (1 h) ; régénérée au prochain refresh.
+          const publicUrl = await cloudPhotoUrl(uploadData.path);
+          // ── SUPABASE ALBUMS : fin ──
 
           // Étape C : Créer l'entrée dans la table SQL 'photos'
           const { data: photoData, error: dbError } = await supabase
