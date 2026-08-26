@@ -20,7 +20,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-// import { TouchableWithoutFeedback } from 'react-native';
+import { TouchableWithoutFeedback } from 'react-native';
 
 const LOGO = require('../../assets/sharepix-logo.png');
 
@@ -286,8 +286,7 @@ export function BackButton({ onPress, variant = 'back', style = {} }) {
 }
 
 /* Vrai "G" Google officiel en SVG */
-export function GoogleMark({ size = 20 }) {
-  return (
+export function GoogleMark({ size = 20 }) {  return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
       <Path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z" />
       <Path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
@@ -483,3 +482,4 @@ const styles = StyleSheet.create({
     color: colors.tealDark,
   },
 });
+

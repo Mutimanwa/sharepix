@@ -35,7 +35,10 @@ import {
   Logout01Icon,
 } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
-import { CoralButton, BackButton, Sheet, RightModal, Logo } from '../components/UI';
+// ── SQUELETTES : intégration ──
+import { CoralButton, BackButton, Sheet, RightModal, Logo} from '../components/UI';
+import {Skeleton, ProgressiveImage } from '../components/Skeleton'
+// ── SQUELETTES : fin ──
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
@@ -103,10 +106,17 @@ export default function AlbumScreen({ route, navigation }) {
   const refreshRef = useRef(refreshAlbumPhotos);
   refreshRef.current = refreshAlbumPhotos;
 
+  // ── SQUELETTES : intégration ──
+  // Fetch en cours ET rien à montrer → grille squelette au lieu du
+  // faux état vide « Personne n'a encore téléchargé de photos ».
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  // ── SQUELETTES : fin ──
+
   useFocusEffect(
     useCallback(() => {
       if (!album?.cloud) return undefined;
-      refreshRef.current(id);
+      setLoadingPhotos(album.photos.length === 0);
+      Promise.resolve(refreshRef.current(id)).finally(() => setLoadingPhotos(false));
 
       let timer = null;
       const unsubscribe = subscribeAlbumChanges(id, () => {
@@ -247,7 +257,8 @@ export default function AlbumScreen({ route, navigation }) {
         onLongPress={() => !selecting && enterSelection(item.id)}
         delayLongPress={220}
       >
-        <Image source={{ uri: item.uri }} style={styles.thumb} />
+        {/* ── SQUELETTES : tuile fantôme jusqu'à onLoad, puis fondu ── */}
+        <ProgressiveImage uri={item.uri} style={styles.thumb} />
         {selecting && (
           <View style={[styles.selLayer, isSel && styles.selLayerOn]}>
             <View style={[styles.selDot, isSel && styles.selDotOn]}>
@@ -356,6 +367,15 @@ export default function AlbumScreen({ route, navigation }) {
             <View style={{ width: '84%', marginTop: 22 }}>
               <CoralButton title="En savoir plus" onPress={() => navigation.navigate('Premium')} />
             </View>
+          </View>
+        ) : photos.length === 0 && loadingPhotos ? (
+          // ── SQUELETTES : grille fantôme pendant le 1er fetch cloud ──
+          <View style={styles.skelGrid}>
+            {Array.from({ length: 9 }).map((_, i) => (
+              <View key={i} style={styles.cell}>
+                <Skeleton width="100%" height="100%" radius={4} />
+              </View>
+            ))}
           </View>
         ) : photos.length === 0 ? (
           <View style={styles.center}>
@@ -530,7 +550,8 @@ export default function AlbumScreen({ route, navigation }) {
           <View style={styles.heroH}>
             <View style={styles.coverWrap}>
               {album.photos.length > 0 ? (
-                <Image source={{ uri: album.photos[0].uri }} style={styles.coverImg} />
+                // ── SQUELETTES : couverture progressive ──
+                <ProgressiveImage uri={album.photos[0].uri} style={styles.coverImg} />
               ) : (
                 <View style={styles.cover}>
                   <Logo size={12} color="#fff" />
@@ -702,6 +723,8 @@ const styles = StyleSheet.create({
   // Grille + sélection
   cell: { width: '33.33%', aspectRatio: 1, padding: 1.5 },
   thumb: { flex: 1, backgroundColor: '#DDECEC', borderRadius: 4 },
+  // ── SQUELETTES : grille fantôme (mêmes dimensions que la vraie) ──
+  skelGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingTop: 4 },
   selLayer: {
     ...StyleSheet.absoluteFillObject,
     margin: 1.5,

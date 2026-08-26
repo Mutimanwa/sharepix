@@ -13,6 +13,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
 import { CoralButton, Field, Logo, Sheet, Page, SmallButton } from '../components/UI';
+// ── SQUELETTES : intégration ──
+// Couvertures d'albums : pulsation jusqu'à onLoad, puis révélation en fondu
+import { ProgressiveImage } from '../components/Skeleton';
+// ── SQUELETTES : fin ──
 import CodeBoxes from '../components/CodeBoxes';
 import { IconVacances, IconFamille, IconBebe, IconSpecial } from '../components/HomeArt';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -122,7 +126,9 @@ export default function HomeScreen() {
               <TouchableOpacity key={a.id} style={styles.album} onPress={() => nav.navigate('Album', { id: a.id })}>
                 <View style={styles.cover}>
                   {a.photos[0] ? (
-                    <Image source={{ uri: a.photos[0].uri }} style={styles.coverImg} />
+                    // ── SQUELETTES : intégration ──
+                    <ProgressiveImage uri={a.photos[0].uri} style={styles.coverImg} radius={5} />
+                    // ── SQUELETTES : fin ──
                   ) : (
                     <Image source={require('../../assets/empty/photo.png')} style={{ width: 150, height: 150 }} />
                   )}

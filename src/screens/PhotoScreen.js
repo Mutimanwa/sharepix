@@ -29,7 +29,10 @@ import { useStore } from '../store';
 import { subscribeAlbumChanges } from '../services/albums';
 // ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
-import { BackButton, Sheet } from '../components/UI';
+// ── SQUELETTES : intégration ──
+import { BackButton, Sheet,  } from '../components/UI';
+import {ProgressiveImage} from '../components/Skeleton'
+// ── SQUELETTES : fin ──
 
 // ── Dimensions ───────────────────────────────────────────────────────────
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -327,7 +330,13 @@ export default function PhotoScreen({ route, navigation }) {
         }}
         renderItem={({ item: photo }) => (
           <View style={styles.imageContainer}>
-            <Image source={{ uri: photo.uri }} style={styles.img} resizeMode="contain" />
+            {/* ── SQUELETTES : voile sombre pulsant jusqu'à onLoad (fond noir) ── */}
+            <ProgressiveImage
+              uri={photo.uri}
+              style={styles.img}
+              resizeMode="contain"
+              color="#2A2A2A"
+            />
           </View>
         )}
       />
