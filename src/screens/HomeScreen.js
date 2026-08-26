@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
   Alert, // <-- AJOUT
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors } from '../theme';
 import { CoralButton, Field, Logo, Sheet, Page, SmallButton } from '../components/UI';
 // ── SQUELETTES : intégration ──
@@ -34,6 +34,7 @@ const suggestions = [
 
 export default function HomeScreen() {
   const nav = useNavigation();
+  const route = useRoute(); // ── DEEP LINK QR : param ?code= du scan ──
   const { state, createAlbum, joinAlbum } = useStore(); 
   const insets = useSafeAreaInsets();
   
@@ -46,6 +47,56 @@ export default function HomeScreen() {
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
+
+  // ── DEEP LINK QR : intégration ──
+  // Jointure factorisée : utilisée par le bouton "Continuer" ET par
+  // l'arrivée d'un lien sharepix://join?code=XXXXXXXX (QR scanné).
+  const submitJoin = async (codeToUse) => {
+    const finalCode = String(codeToUse || code).trim().toUpperCase();
+    if (finalCode.length < 8 || loadingJoin) return;
+    setLoadingJoin(true);
+    try {
+      // Utilise la fonction cloud du store au lieu de chercher localement
+      const album = await joinAlbum(finalCode);
+      if (album) {
+        setJoin(false);
+        setCode('');
+        nav.navigate('Album', { id: album.id });
+      } else if (!state.user?.id) {
+        // Session absente (hors-ligne ?) : code cloud invérifiable
+        Alert.alert('Réseau', "Impossible de vérifier le code pour l'instant. Vérifiez votre connexion puis réessayez.");
+      } else {
+        Alert.alert('Introuvable', "Ce code d'album n'existe pas ou a été supprimé.");
+      }
+    } catch (err) {
+      Alert.alert('Erreur', err.message || "Impossible de rejoindre l'album.");
+    } finally {
+      setLoadingJoin(false);
+    }
+  };
+
+  // Lien sharepix://join?code=XXXXXXXX (QR scanné) :
+  // 1. pré-remplit les cases + ouvre la feuille "Rejoindre"
+  // 2. auto-submit dès que la session est prête (au 1er démarrage l'auth
+  //    anonyme peut encore être en cours → on garde le code en attente)
+  const pendingJoin = useRef(null);
+  useEffect(() => {
+    const incoming = route.params?.code;
+    if (incoming) {
+      pendingJoin.current = String(incoming).trim().toUpperCase();
+      setCode(pendingJoin.current);
+      setJoin(true);
+      // paramètre consommé : ne pas relancer le flux à la navigation suivante
+      nav.setParams({ code: undefined });
+    }
+    if (pendingJoin.current && state.authChecked) {
+      const toSubmit = pendingJoin.current;
+      pendingJoin.current = null;
+      submitJoin(toSubmit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.code, state.authChecked]);
+  // ── DEEP LINK QR : fin ──
 
   return (
     <Page style={[styles.root ,{ paddingTop: insets.top }]} edges={['top', 'left', 'right']}>
@@ -191,25 +242,9 @@ export default function HomeScreen() {
         {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
         <CoralButton 
           title={loadingJoin ? "Recherche..." : "Continuer"} 
-          disabled={code.length < 8 || loadingJoin} 
-          onPress={async () => {
-            setLoadingJoin(true);
-            try {
-              // Utilise la fonction cloud du store au lieu de chercher localement
-              const album = await joinAlbum(code);
-              if (album) {
-                setJoin(false);
-                setCode('');
-                nav.navigate('Album', { id: album.id });
-              } else {
-                Alert.alert("Introuvable", "Ce code d'album n'existe pas ou a été supprimé.");
-              }
-            } catch (err) {
-              Alert.alert("Erreur", err.message || "Impossible de rejoindre l'album.");
-            } finally {
-              setLoadingJoin(false);
-            }
-          }}
+          disabled={code.length < 8 || loadingJoin}
+          // ── DEEP LINK QR : logique factorisée dans submitJoin (voir plus haut) ──
+          onPress={() => submitJoin()}
         />
       </Sheet>
     </Page>

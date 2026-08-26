@@ -44,15 +44,22 @@ function ScreenHead({ title, onBack }) {
 // ─────────────────────────────────────────────────────────────
 // Partage / copie du code d'invitation (réutilisé par QR + Membres)
 // ─────────────────────────────────────────────────────────────
+// ── DEEP LINK QR : intégration ──
+// Lien d'invitation complet (ouvre l'app directement sur "Rejoindre").
+export function albumJoinLink(album) {
+  return `sharepix://join?code=${album?.code}`;
+}
+
 function shareAlbum(album) {
   return Share.share({
-    message: `Rejoins mon album « ${album?.name} » sur SharePix. Code : ${album?.code}`,
+    message: `Rejoins mon album « ${album?.name} » sur SharePix : ${albumJoinLink(album)}\n(ou entre le code ${album?.code} dans l'app)`,
   });
 }
 
 // ─────────────────────────────────────────────────────────────
-// QR réel : encode le code d'invitation à 8 caractères.
-// Un scan (appareil photo natif) affiche le code, copiable.
+// QR réel : encode le LIEN sharepix://join?code=XXXXXXXX.
+// Un scan (appareil photo natif) ouvre SharePix directement sur la
+// feuille "Rejoindre", code pré-rempli + recherche automatique.
 // ─────────────────────────────────────────────────────────────
 export function QRScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
@@ -84,11 +91,12 @@ export function QRScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.qrCard}>
-          <QRCode value={album.code} size={200} color={colors.tealDeep} backgroundColor="#fff" />
+          {/* ── DEEP LINK QR : le QR porte le lien, pas le code nu ── */}
+          <QRCode value={albumJoinLink(album)} size={200} color={colors.tealDeep} backgroundColor="#fff" />
         </View>
         <Text style={styles.albumName}>{album.name}</Text>
         <Text style={styles.hintCenter}>
-          Scannez ce code avec l'appareil photo pour récupérer le code d'invitation.
+          Scannez ce code avec l'appareil photo : SharePix s'ouvre directement sur la page Rejoindre.
         </Text>
 
         <TouchableOpacity style={styles.codeBox} onPress={copy} activeOpacity={0.7}>

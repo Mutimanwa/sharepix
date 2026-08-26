@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { StoreProvider } from './src/store';
 import { colors } from './src/theme';
@@ -33,14 +34,30 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // ── Configuration du Deep Linking ──
+// ── DEEP LINK QR : intégration ──
+const prefixes = ['sharepix://', 'https://sharepix.app'];
+// Sur le web, l'origine courante est aussi un prefix valide : permet de
+// tester les liens directement dans le navigateur
+// (ex. http://localhost:8081/join?code=ABCDEFGH).
+if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
+  prefixes.push(window.location.origin);
+}
+// ── DEEP LINK QR : fin ──
 const linking = {
-  prefixes: ['sharepix://', 'https://sharepix.app'],
+  prefixes,
   config: {
     screens: {
       Splash: 'splash',
       Onboarding: 'onboarding',
       Auth: 'auth',
-      Main: 'main',
+      // ── DEEP LINK QR : sharepix://join?code=XXXXXXXX → onglet Accueil
+      // (HomeScreen ouvre la feuille "Rejoindre" pré-remplie + auto-submit) ──
+      Main: {
+        screens: {
+          Accueil: 'join',
+        },
+      },
+      // ── DEEP LINK QR : fin ──
       Album: 'album/:id',
       Photo: 'photo/:albumId/:photoId',
       Menu: 'menu/:id',
