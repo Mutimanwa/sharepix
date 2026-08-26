@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from './config';
 import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
@@ -27,6 +27,8 @@ import {
   cloudFetchAlbumMembers,
   cloudRemoveMember,
   cloudDeleteComment,
+  cloudFetchAlbumsSummary,
+  subscribePhotosSummary,
 } from './services/albums';
 // ── SUPABASE ALBUMS : fin ──
 import { Alert, Platform } from 'react-native';
@@ -162,6 +164,48 @@ export function StoreProvider({ children }) {
       AsyncStorage.setItem(KEY, JSON.stringify(toPersist)).catch(() => {});
     }
   }, [state, ready]);
+
+  // ── SUPABASE ALBUMS : intégration ──
+  // 4. Realtime de l'écran d'accueil : dès qu'une photo est ajoutée ou
+  // supprimée dans N'IMPORTE QUEL album dont on est membre (par soi ou un
+  // autre membre), on rafraîchit les compteurs + couvertures. Un seul
+  // canal global ; la RLS Realtime filtre ce qu'on a le droit de voir.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const summaryTimer = useRef(null);
+  useEffect(() => {
+    if (!state.user?.id) return undefined; // connecté (anonyme inclus) seulement
+    const unsub = subscribePhotosSummary(() => {
+      // Debounce : une rafale d'uploads (ex. 10 photos d'un coup) ne
+      // déclenche qu'UN refresh du résumé, 600 ms après le dernier event.
+      clearTimeout(summaryTimer.current);
+      summaryTimer.current = setTimeout(async () => {
+        const ids = stateRef.current.albums
+          .filter((a) => a.cloud && isCloudId(a.id))
+          .map((a) => a.id);
+        if (!ids.length) return;
+        const { data } = await cloudFetchAlbumsSummary(ids);
+        if (!data.length) return;
+        setState((s) => ({
+          ...s,
+          albums: s.albums.map((a) => {
+            const sum = data.find((d) => d.id === a.id);
+            // On ne touche qu'au résumé : si l'album est ouvert, ses photos
+            // sont déjà rafraîchies par l'abonnement de l'écran Album.
+            return sum ? { ...a, photoCount: sum.photoCount, coverUrl: sum.coverUrl } : a;
+          }),
+        }));
+      }, 600);
+    });
+    return () => {
+      clearTimeout(summaryTimer.current);
+      unsub();
+    };
+  }, [state.user?.id]);
+  // ── SUPABASE ALBUMS : fin ──
 
   const api = useMemo(
     () => ({
@@ -310,6 +354,9 @@ export function StoreProvider({ children }) {
                       },
                       ...a.photos,
                     ],
+                    // Résumé accueil : la nouvelle photo devient la couverture
+                    photoCount: a.photos.length + 1,
+                    coverUrl: uri,
                   }
                 : a
             ),
@@ -395,7 +442,15 @@ export function StoreProvider({ children }) {
           setState((s) => ({
             ...s,
             albums: s.albums.map((a) =>
-              a.id === albumId ? { ...a, photos: [newPhoto, ...a.photos] } : a
+              a.id === albumId
+                ? {
+                    ...a,
+                    photos: [newPhoto, ...a.photos],
+                    // Résumé accueil : compteur +1, nouvelle couverture
+                    photoCount: a.photos.length + 1,
+                    coverUrl: newPhoto.uri || a.coverUrl || '',
+                  }
+                : a
             ),
           }));
 
@@ -627,7 +682,14 @@ export function StoreProvider({ children }) {
                 comments: [...serverTop, ...localTemps],
               };
             });
-            return { ...a, photos: [...merged, ...localOnly] };
+            const allPhotos = [...merged, ...localOnly];
+            // ── Résumé accueil resynchronisé (compteur + couverture) ──
+            return {
+              ...a,
+              photos: allPhotos,
+              photoCount: allPhotos.length,
+              coverUrl: allPhotos[0]?.uri || '',
+            };
           }),
         }));
       },
@@ -643,9 +705,12 @@ export function StoreProvider({ children }) {
         // ── SUPABASE ALBUMS : fin ──
         setState((s) => ({
           ...s,
-          albums: s.albums.map((a) =>
-            a.id === albumId ? { ...a, photos: a.photos.filter((p) => p.id !== photoId) } : a
-          ),
+          albums: s.albums.map((a) => {
+            if (a.id !== albumId) return a;
+            const photos = a.photos.filter((p) => p.id !== photoId);
+            // Résumé accueil resynchronisé (compteur + nouvelle couverture)
+            return { ...a, photos, photoCount: photos.length, coverUrl: photos[0]?.uri || '' };
+          }),
         }));
       },
 
@@ -659,11 +724,12 @@ export function StoreProvider({ children }) {
           .forEach((p) => cloudDeletePhoto(p).catch(() => {}));
         setState((s) => ({
           ...s,
-          albums: s.albums.map((a) =>
-            a.id === albumId
-              ? { ...a, photos: a.photos.filter((p) => !ids.has(p.id)) }
-              : a
-          ),
+          albums: s.albums.map((a) => {
+            if (a.id !== albumId) return a;
+            const photos = a.photos.filter((p) => !ids.has(p.id));
+            // Résumé accueil resynchronisé (compteur + nouvelle couverture)
+            return { ...a, photos, photoCount: photos.length, coverUrl: photos[0]?.uri || '' };
+          }),
         }));
       },
 

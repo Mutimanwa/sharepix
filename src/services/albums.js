@@ -16,6 +16,11 @@ export function mapCloudAlbum(row) {
     code: row.code,
     ownerId: row.user_id, // propriétaire (droits de gestion)
     photos: [], // chargées à l'entrée dans l'album
+    // ── Résumé pour l'écran d'accueil (SANS entrer dans l'album) ──
+    // Remplis par cloudFetchMyAlbums ; resynchronisés par le store
+    // (refreshAlbumPhotos / addPhoto / deletePhoto…).
+    photoCount: 0, // nombre réel de photos
+    coverUrl: '', // URL signée de la photo la plus récente (couverture)
     createdAt: new Date(row.created_at).getTime(),
     members: row.creator_name ? [{ name: row.creator_name, role: 'admin' }] : [],
     cloud: true,
@@ -69,7 +74,70 @@ export async function cloudFetchMyAlbums() {
     .from('albums')
     .select('*')
     .order('created_at', { ascending: false });
-  return { data: (data || []).map(mapCloudAlbum), error };
+  if (error) return { data: [], error };
+  const albums = (data || []).map(mapCloudAlbum);
+  // Compteurs + couvertures dès l'accueil : l'utilisateur voit le contenu
+  // de chaque album SANS avoir à y entrer.
+  await fillAlbumsSummary(albums);
+  return { data: albums, error: null };
+}
+
+/**
+ * Complète EN PLACE une liste d'albums cloud avec, pour chacun :
+ *  - photoCount : nombre réel de photos
+ *  - coverUrl   : URL signée (1 h) de la photo la plus récente
+ * Coût fixe : 1 requête SQL + 1 requête de signature, quel que soit
+ * le nombre d'albums (pas de requête par album).
+ */
+async function fillAlbumsSummary(albums) {
+  const ids = albums.map((a) => a.id).filter(isCloudId);
+  if (!ids.length) return;
+  const { data: rows, error } = await supabase
+    .from('photos')
+    .select('album_id, storage_path, created_at')
+    .in('album_id', ids)
+    .order('created_at', { ascending: false }); // la 1re vue = la plus récente
+  if (error) {
+    console.log('📛 albums summary error:', error.message);
+    return; // échec silencieux : l'accueil affiche juste les albums sans compteur
+  }
+  const counts = {};
+  const covers = new Map(); // album_id -> storage_path de la photo la plus récente
+  (rows || []).forEach((r) => {
+    counts[r.album_id] = (counts[r.album_id] || 0) + 1;
+    if (!covers.has(r.album_id)) covers.set(r.album_id, r.storage_path);
+  });
+  // Bucket privé : on signe EN LOT les chemins de couverture (1 requête)
+  const signed = new Map();
+  const paths = [...covers.values()].filter(Boolean);
+  if (paths.length) {
+    const { data: sData, error: sErr } = await supabase.storage
+      .from('album-photos')
+      .createSignedUrls(paths, SIGNED_URL_TTL);
+    if (sErr) console.log('📛 signed covers error:', sErr.message);
+    (sData || []).forEach((s) => {
+      if (s?.path && s?.signedUrl) signed.set(s.path, s.signedUrl);
+    });
+  }
+  albums.forEach((a) => {
+    a.photoCount = counts[a.id] || 0;
+    a.coverUrl = signed.get(covers.get(a.id)) || '';
+  });
+}
+
+/**
+ * Résumé SEUL (sans re-fetcher les albums) : utilisé par le Realtime de
+ * l'écran d'accueil pour rafraîchir compteurs + couvertures en direct.
+ * → { data: [{ id, photoCount, coverUrl }] }
+ */
+export async function cloudFetchAlbumsSummary(albumIds) {
+  const albums = (albumIds || []).filter(isCloudId).map((id) => ({ id }));
+  if (!supabase || !albums.length) return { data: [], error: null };
+  await fillAlbumsSummary(albums);
+  return {
+    data: albums.map((a) => ({ id: a.id, photoCount: a.photoCount, coverUrl: a.coverUrl })),
+    error: null,
+  };
 }
 
 // ── Gestion de l'album (owner / membre) ──────────────────────────────
@@ -335,6 +403,32 @@ export function subscribeAlbumChanges(albumId, onChange) {
       { event: '*', schema: 'public', table: 'album_members', filter: `album_id=eq.${albumId}` },
       onChange
     )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Realtime de l'écran d'accueil : UN abonnement global à la table photos.
+ * La RLS Realtime ne laisse passer que les événements des albums dont on
+ * est membre (pas de filtre serveur nécessaire). `onChange` est appelée à
+ * chaque INSERT/DELETE (sur DELETE, payload.old ne contient que la PK :
+ * on ne peut pas toujours y lire album_id — d'où un refresh global du
+ * résumé côté store, débouncé).
+ * Retourne la fonction de désabonnement.
+ */
+export function subscribePhotosSummary(onChange) {
+  if (!supabase) return () => {};
+
+  // Topic unique : voir subscribeAlbumChanges (supabase-js rendrait un
+  // canal déjà souscrit sinon, et .on() après subscribe() lève une erreur).
+  const topic = `photos-summary:${Math.random().toString(36).slice(2, 8)}`;
+
+  const channel = supabase
+    .channel(topic)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'photos' }, onChange)
     .subscribe();
 
   return () => {

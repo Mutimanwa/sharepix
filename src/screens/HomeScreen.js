@@ -125,9 +125,11 @@ export default function HomeScreen() {
             {state.albums.map((a) => (
               <TouchableOpacity key={a.id} style={styles.album} onPress={() => nav.navigate('Album', { id: a.id })}>
                 <View style={styles.cover}>
-                  {a.photos[0] ? (
+                  {/* ── COUVERTURE ACCUEIL : photos chargées (album déjà ouvert)
+                      sinon couverture cloud pré-signée au boot (coverUrl) ── */}
+                  {(a.photos[0]?.uri || a.coverUrl) ? (
                     // ── SQUELETTES : intégration ──
-                    <ProgressiveImage uri={a.photos[0].uri} style={styles.coverImg} radius={5} />
+                    <ProgressiveImage uri={a.photos[0]?.uri || a.coverUrl} style={styles.coverImg} radius={5} />
                     // ── SQUELETTES : fin ──
                   ) : (
                     <Image source={require('../../assets/empty/photo.png')} style={{ width: 150, height: 150 }} />
@@ -135,7 +137,8 @@ export default function HomeScreen() {
                 </View>
                 <Text style={styles.albumName} numberOfLines={1}>{a.name}</Text>
                 <Text style={styles.albumMeta}>
-                  {a.photos.length} photo{a.photos.length > 1 ? 's' : ''}
+                  {/* photos chargées (album ouvert) sinon compteur cloud pré-chargé (photoCount) */}
+                  {a.photos.length || a.photoCount || 0} photo{(a.photos.length || a.photoCount || 0) > 1 ? 's' : ''}
                 </Text>
               </TouchableOpacity>
             ))}
