@@ -3,11 +3,18 @@ import { View, Text, StyleSheet, Animated, Easing, useWindowDimensions } from 'r
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme';
+// ── SUPABASE AUTH : intégration ──
+import { useStore } from '../store';
+import { isSupabaseConfigured } from '../config';
+// ── SUPABASE AUTH : fin ──
 
 const LOGO = require('../../assets/sharepix-logo.png');
 
 export default function SplashScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  // ── SUPABASE AUTH : on a besoin de savoir si une session existe ──
+  const { ready, authChecked, state } = useStore();
+  // ── SUPABASE AUTH : fin ──
   const { width, height } = useWindowDimensions();
   const logoSize = Math.min(176, Math.round(width * 0.42));
   const stage = Math.round(logoSize * 1.55);
@@ -20,6 +27,8 @@ export default function SplashScreen({ navigation }) {
   const d1 = useRef(new Animated.Value(0)).current;
   const d2 = useRef(new Animated.Value(0)).current;
   const d3 = useRef(new Animated.Value(0)).current;
+  // ── SUPABASE AUTH : évite toute double navigation ──
+  const navigated = useRef(false);
 
   useEffect(() => {
     Animated.sequence([
@@ -63,9 +72,7 @@ export default function SplashScreen({ navigation }) {
     b2.start();
     b3.start();
 
-    const t = setTimeout(() => navigation.replace('Onboarding'), 2800);
     return () => {
-      clearTimeout(t);
       loopPulse.stop();
       w1.stop();
       w2.stop();
@@ -74,6 +81,44 @@ export default function SplashScreen({ navigation }) {
       b3.stop();
     };
   }, [navigation, pop, pulse, ring, ring2, fadeIn, d1, d2, d3]);
+
+  // ── SUPABASE AUTH : intégration ─────────────────────────────────────────
+  // Routage intelligent (remplace l'ancien setTimeout fixe vers Onboarding).
+  // - attend le store local (ready, rapide) puis la session Supabase (authChecked)
+  // - SÉCURITÉ anti-blocage : si la session tarde (réseau KO, store local pas
+  //   à jour...), on bascule quand même en mode local après 5 s (offline-first)
+  //
+  // Routage :
+  //   - pas onboarded                    -> Onboarding
+  //   - checkAuth && configuré && invité -> Auth
+  //   - sinon                            -> Main
+  useEffect(() => {
+    if (!ready) return; // attend le store local (rapide, AsyncStorage)
+      console.log('SPLASH STATE:', {
+    ready,
+    authChecked,
+    onboarded: state.onboarded,
+    user: state.user,
+    supabase: isSupabaseConfigured,
+  });
+    const decide = (checkAuth) => {
+      if (navigated.current) return;
+      navigated.current = true;
+      if (!state.onboarded) navigation.replace('Onboarding');
+      else if (checkAuth && isSupabaseConfigured && !state.user) navigation.replace('Auth');
+      else navigation.replace('Main');
+    };
+
+    if (authChecked) {
+      // Session connue : petit délai pour profiter de l'animation
+      const t = setTimeout(() => decide(true), 2200);
+      return () => clearTimeout(t);
+    }
+    // Session en cours de restauration : repli local garanti
+    const t = setTimeout(() => decide(false), 5000);
+    return () => clearTimeout(t);
+  }, [ready, authChecked, state.onboarded, state.user, navigation]);
+  // ── SUPABASE AUTH : fin ──
 
   const logoScale = Animated.multiply(
     pop.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] }),
@@ -124,7 +169,7 @@ export default function SplashScreen({ navigation }) {
         </Animated.View>
       </View>
 
-      <Animated.View style={[styles.footer, { opacity: fadeIn, paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <Animated.View style={[styles.footer, { opacity: fadeIn, paddingBottom: Math.max(insets.bottom) }]}>
         <Text style={styles.by}>Created by</Text>
         <Text style={styles.restart}>RESTART</Text>
       </Animated.View>
@@ -167,7 +212,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   restart: {
-    color: '#fff',
+    color: colors.tealDark,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 4,

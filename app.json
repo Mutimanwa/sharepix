@@ -2,22 +2,45 @@
   "expo": {
     "name": "SharePix",
     "slug": "sharepix",
+    "scheme": "sharepix",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/sharepix-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.sharepix.mobile"
+      "bundleIdentifier": "app.sharepix.mobile",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["sharepix"]
+          }
+        ]
+      }
     },
     "android": {
       "package": "app.sharepix.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#0E3A3E",
+        "backgroundColor": "#F3F8F8",
         "foregroundImage": "./assets/sharepix-icon.png"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO"
+      ],
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "sharepix"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -28,12 +51,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0E3A3E",
+          "backgroundColor": "#F3F8F8",
           "image": "./assets/sharepix-logo.png",
           "imageWidth": 200
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

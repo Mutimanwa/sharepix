@@ -1,230 +1,322 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Rect } from 'react-native-svg';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Share,
+  ScrollView,
+  Image,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-  Download01Icon,
-  UserMultipleIcon,
   Diamond01Icon,
   Video01Icon,
   Image01Icon,
-  ComputerIcon,
-  QrCodeIcon,
+  Copy01Icon,
   Tick02Icon,
+  Delete02Icon,
 } from '@hugeicons/core-free-icons';
-import { colors } from '../theme';
-import { BackButton, CoralButton, SmallButton, Page } from '../components/UI';
-import { useStore } from '../store';
+import QRCode from 'react-native-qrcode-svg';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from '@react-navigation/native';
+import { colors } from '../theme';
+import { BackButton, CoralButton, Page, Sheet } from '../components/UI';
+import { useStore } from '../store';
+// ── SUPABASE ALBUMS : intégration ──
+import { subscribeAlbumChanges } from '../services/albums';
+// ── SUPABASE ALBUMS : fin ──
 
-const ORDERS = [
-  { key: 'recent', label: 'Le plus récent en premier' },
-  { key: 'oldest', label: 'Le plus ancien en premier' },
-  { key: 'upload', label: 'Dernier téléchargement' },
-];
-
-const GROUPS = [
-  { key: 'all', label: 'Toutes les photos' },
-  { key: 'month', label: 'Mois' },
-  { key: 'day', label: 'Journée' },
-  { key: 'hour', label: 'Heure' },
-];
-
-function ScreenHead({ title, onBack, right }) {
+// ─────────────────────────────────────────────────────────────
+// En-tête uniforme des écrans secondaires
+// ─────────────────────────────────────────────────────────────
+function ScreenHead({ title, onBack }) {
   return (
     <View style={styles.head}>
       <BackButton onPress={onBack} />
       <Text style={styles.headTitle}>{title}</Text>
-      {right || <View style={{ width: 44 }} />}
+      <View style={{ width: 44 }} />
     </View>
   );
 }
 
-function QrMark({ size = 196 }) {
-  const cells = [
-    [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1],
-    [1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1],
-    [1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
-    [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-    [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0],
-    [0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1],
-    [1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1],
-    [1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1],
-    [1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1],
-    [1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0],
-    [1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1],
-  ];
-  const gap = size / 13;
+// ─────────────────────────────────────────────────────────────
+// Partage / copie du code d'invitation (réutilisé par QR + Membres)
+// ─────────────────────────────────────────────────────────────
+// ── DEEP LINK QR : intégration ──
+// Lien d'invitation complet (ouvre l'app directement sur "Rejoindre").
+export function albumJoinLink(album) {
+  return `sharepix://join?code=${album?.code}`;
+}
+
+function shareAlbum(album) {
+  return Share.share({
+    message: `Rejoins mon album « ${album?.name} » sur SharePix : ${albumJoinLink(album)}\n(ou entre le code ${album?.code} dans l'app)`,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// QR réel : encode le LIEN sharepix://join?code=XXXXXXXX.
+// Un scan (appareil photo natif) ouvre SharePix directement sur la
+// feuille "Rejoindre", code pré-rempli + recherche automatique.
+// ─────────────────────────────────────────────────────────────
+export function QRScreen({ route, navigation }) {
+  const album = useStore().state.albums.find((a) => a.id === route.params.id);
+  const insets = useSafeAreaInsets();
+  const [copied, setCopied] = useState(false);
+
+  if (!album) {
+    return (
+      <Page style={styles.root} edges={['top']}>
+        <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
+        <View style={styles.center}>
+          <Text style={styles.hintCenter}>Album introuvable</Text>
+        </View>
+      </Page>
+    );
+  }
+
+  const copy = async () => {
+    await Clipboard.setStringAsync(album.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Rect width={size} height={size} rx={16} fill="#fff" />
-      {cells.map((row, y) =>
-        row.map((v, x) =>
-          v ? (
-            <Rect
-              key={`${x}-${y}`}
-              x={x * gap + 2}
-              y={y * gap + 2}
-              width={gap - 2}
-              height={gap - 2}
-              rx={1.2}
-              fill={colors.tealDeep}
-            />
-          ) : null
-        )
-      )}
-    </Svg>
+    <Page style={styles.root} edges={['top']}>
+      <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
+      <ScrollView
+        contentContainerStyle={[styles.qrContainer, { paddingBottom: insets.bottom + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.qrCard}>
+          {/* ── DEEP LINK QR : le QR porte le lien, pas le code nu ── */}
+          <QRCode value={albumJoinLink(album)} size={200} color={colors.tealDeep} backgroundColor="#fff" />
+        </View>
+        <Text style={styles.albumName}>{album.name}</Text>
+        <Text style={styles.hintCenter}>
+          Scannez ce code avec l'appareil photo : SharePix s'ouvre directement sur la page Rejoindre.
+        </Text>
+
+        <TouchableOpacity style={styles.codeBox} onPress={copy} activeOpacity={0.7}>
+          <Text style={styles.code}>{album.code}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {copied && <Text style={styles.copiedTxt}>Copié !</Text>}
+            <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={16} color={colors.teal} />
+          </View>
+        </TouchableOpacity>
+
+        <CoralButton
+          title="Partager le code"
+          onPress={() => shareAlbum(album)}
+          style={{ marginTop: 18, width: '100%' }}
+        />
+      </ScrollView>
+    </Page>
   );
 }
 
-export function FiltersScreen({ navigation }) {
-  const [order, setOrder] = useState('recent');
-  const [group, setGroup] = useState('all');
-  const dirty = order !== 'recent' || group !== 'all';
+// ─────────────────────────────────────────────────────────────
+// Membres : liste RÉELLE (cloud) + retrait par le propriétaire.
+// Refresh au focus + Realtime (arrivée/départ en direct).
+// ─────────────────────────────────────────────────────────────
+export function MembersScreen({ route, navigation }) {
+  const { state, refreshAlbumMembers, removeAlbumMember } = useStore();
+  const album = state.albums.find((a) => a.id === route.params.id);
   const insets = useSafeAreaInsets();
+  const [copied, setCopied] = useState(false);
+  const [confirm, setConfirm] = useState(null); // membre à retirer
+
+  const myId = state.user?.id;
+  // Un album local hors-ligne appartient toujours à l'utilisateur
+  const isOwner = !album?.cloud || album?.ownerId === myId;
+  const members = album?.members || [];
+
+  // ── SUPABASE ALBUMS : intégration ──
+  // Au focus : chargement des membres réels + abonnement Realtime.
+  const refreshRef = useRef(refreshAlbumMembers);
+  refreshRef.current = refreshAlbumMembers;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!album?.cloud) return undefined;
+      refreshRef.current(route.params.id);
+
+      let timer = null;
+      const unsubscribe = subscribeAlbumChanges(route.params.id, () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => refreshRef.current(route.params.id), 400);
+      });
+      return () => {
+        clearTimeout(timer);
+        unsubscribe();
+      };
+    }, [route.params.id, album?.cloud])
+  );
+  // ── SUPABASE ALBUMS : fin ──
+
+  if (!album) {
+    return (
+      <Page style={styles.root} edges={['top']}>
+        <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
+        <View style={styles.center}>
+          <Text style={styles.hintCenter}>Album introuvable</Text>
+        </View>
+      </Page>
+    );
+  }
+
+  const copy = async () => {
+    await Clipboard.setStringAsync(album.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  const isOwnerRole = (m) => m.role === 'owner' || m.role === 'admin';
 
   return (
-    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
-      <View style={styles.head}>
-        <BackButton variant="close" onPress={() => navigation.goBack()} />
-        <Text style={styles.headTitle}>Filtre</Text>
-        <TouchableOpacity
-          onPress={() => {
-            setOrder('recent');
-            setGroup('all');
-          }}
-          disabled={!dirty}
-          style={{ width: 88, alignItems: 'flex-end', paddingRight: 8 }}
-        >
-          <Text style={[styles.reset, !dirty && { opacity: 0.3 }]}>Réinitialiser</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView 
-        contentContainerStyle={{ paddingBottom: 20 }} 
+    <Page style={styles.root} edges={['top']}>
+      <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
+      <ScrollView
+        contentContainerStyle={[styles.membersScroll, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.section}>Ordre</Text>
-        <Text style={styles.hint}>Toutes les photos et vidéos sont automatiquement triées par heure de capture.</Text>
-        <View style={styles.card}>
-          {ORDERS.map((o, i) => {
-            const on = order === o.key;
-            return (
-              <TouchableOpacity
-                key={o.key}
-                style={[styles.opt, i === ORDERS.length - 1 && { borderBottomWidth: 0 }, on && styles.optOn]}
-                onPress={() => setOrder(o.key)}
-              >
-                <Text style={[styles.optTxt, on && styles.optTxtOn]}>{o.label}</Text>
-                <View style={[styles.radio, on && styles.radioOn]} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {members.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.membersCount}>
+              {members.length} membre{members.length > 1 ? 's' : ''}
+            </Text>
+            {members.map((m, i) => {
+              const me = m.userId === myId;
+              return (
+                <View
+                  key={m.userId || `${m.name}-${i}`}
+                  style={[styles.memberRow, i === members.length - 1 && { borderBottomWidth: 0 }]}
+                >
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarTxt}>
+                      {(m.name || 'M')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowT}>
+                      {m.name}
+                      {me ? ' (vous)' : ''}
+                    </Text>
+                    <Text style={styles.rowH}>
+                      {isOwnerRole(m) ? 'Propriétaire' : 'Membre'}
+                    </Text>
+                  </View>
+                  {/* Le propriétaire peut retirer un membre (jamais lui-même) */}
+                  {isOwner && !me && !isOwnerRole(m) && (
+                    <TouchableOpacity
+                      style={styles.memberRemove}
+                      onPress={() => setConfirm(m)}
+                      hitSlop={8}
+                      activeOpacity={0.7}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={18} color={colors.coral} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-        <Text style={styles.section}>Grouper</Text>
-        <View style={styles.chips}>
-          {GROUPS.map((g) => {
-            const on = group === g.key;
-            return (
-              <TouchableOpacity key={g.key} style={[styles.chip, on && styles.chipOn]} onPress={() => setGroup(g.key)}>
-                <Text style={{ color: on ? '#fff' : colors.tealDark, fontWeight: '700' }}>{g.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.emptyCard}>
+          <Image
+            source={require('../../assets/empty/members.png')}
+            style={{ width: 190, height: 190 }}
+          />
+          <Text style={styles.emptyH}>
+            {members.length > 0 ? 'Agrandir le cercle' : 'Pas encore de membres'}
+          </Text>
+          <Text style={styles.hintCenter}>
+            Partagez le code d'invitation pour ajouter vos proches à « {album.name} ».
+          </Text>
+          <TouchableOpacity style={styles.codeBox} onPress={copy} activeOpacity={0.7}>
+            <Text style={styles.code}>{album.code}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {copied && <Text style={styles.copiedTxt}>Copié !</Text>}
+              <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={16} color={colors.teal} />
+            </View>
+          </TouchableOpacity>
+          <CoralButton
+            title="Inviter"
+            onPress={() => shareAlbum(album)}
+            style={{ marginTop: 16, width: '100%' }}
+          />
         </View>
       </ScrollView>
 
-      <View style={styles.footerBtn}>
+      {/* Confirmation retrait d'un membre */}
+      <Sheet
+        title="Retirer un membre"
+        visible={!!confirm}
+        onClose={() => setConfirm(null)}
+      >
+        <View style={styles.confirmIco}>
+          <HugeiconsIcon icon={Delete02Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.emptyH}>Retirer {confirm?.name} ?</Text>
+        <Text style={styles.hintCenter}>
+          {confirm?.name} n'aura plus accès à « {album.name} » ni à ses photos.
+        </Text>
         <CoralButton
-          title="Appliquer"
-          onPress={() => navigation.goBack()}
-          disabled={!dirty}
-          color={dirty ? colors.coral : '#D5D8D8'}
+          title="Retirer de l'album"
+          onPress={() => {
+            removeAlbumMember(album.id, confirm.userId);
+            setConfirm(null);
+          }}
+          style={{ marginTop: 16, marginHorizontal: 8 }}
         />
-      </View>
+        <CoralButton
+          title="Annuler"
+          color={colors.light}
+          textColor={colors.tealDark}
+          onPress={() => setConfirm(null)}
+          style={{ marginHorizontal: 8 }}
+        />
+      </Sheet>
     </Page>
   );
 }
 
-export function QRScreen({ route, navigation }) {
-  const album = useStore().state.albums.find((a) => a.id === route.params.id);
-  return (
-    <Page style={[styles.root , {paddingTop: insets.top  , paddingBottom: insets.bottom }]} edges={['top']}>
-      <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
-      <View style={styles.qrContainer}>
-        <View style={styles.qrCard}>
-          <QrMark />
-        </View>
-        <Text style={styles.albumName}>{album?.name}</Text>
-        <Text style={styles.hintCenter}>Ce code QR mène directement à l'album SharePix</Text>
-        <CoralButton
-          title="Enregistrer comme image"
-          onPress={() => {}}
-          style={{ marginTop: 22 }}
-        />
-      </View>
-    </Page>
-  );
-}
-
-export function MembersScreen({ route, navigation }) {
-  const album = useStore().state.albums.find((a) => a.id === route.params.id);
-  return (
-    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
-      <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
-      <View style={styles.membersContainer}>
-        <View style={styles.emptyCard}>
-          <View style={styles.iconBubble}>
-            <HugeiconsIcon icon={UserMultipleIcon} size={32} color={colors.teal} />
-          </View>
-          <Text style={styles.emptyH}>Pas encore de membres</Text>
-          <Text style={styles.hintCenter}>
-            Partagez le code d'invitation pour ajouter vos proches à « {album?.name} ».
-          </Text>
-          <View style={styles.codeBox}>
-            <Text style={styles.code}>{album?.code}</Text>
-          </View>
-          <CoralButton
-            title="Inviter"
-            onPress={() =>
-              Share.share({
-                message: `Rejoins mon album « ${album?.name} » sur SharePix. Code : ${album?.code}`,
-              })
-            }
-            style={{ marginTop: 16 }}
-          />
-        </View>
-      </View>
-    </Page>
-  );
-}
+// ─────────────────────────────────────────────────────────────
+// Premium (vitrine — pas de paiement branché pour le moment)
+// ─────────────────────────────────────────────────────────────
+const PERKS = [
+  { icon: Video01Icon, title: 'Vidéos illimitées', hint: 'Chaque membre peut déposer des films' },
+  { icon: Image01Icon, title: 'Qualité originale', hint: 'Aucun recadrage, aucun tassement' },
+  { icon: Diamond01Icon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
+];
 
 export function PremiumScreen({ navigation }) {
-  const perks = [
-    { icon: Video01Icon, title: 'Vidéos illimitées', hint: 'Chaque membre peut déposer des films' },
-    { icon: Image01Icon, title: 'Qualité originale', hint: 'Aucun recadrage, aucun tassement' },
-    { icon: Diamond01Icon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
-  ];
+  const insets = useSafeAreaInsets();
   return (
-    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Album Premium" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.hero}>
           <View style={styles.cover}>
             <HugeiconsIcon icon={Diamond01Icon} size={36} color="#fff" />
           </View>
           <Text style={styles.albumName}>Passez à Premium</Text>
-          <Text style={styles.hintCenter}>Vidéos, qualité originale et plus d'espace pour vos événements.</Text>
+          <Text style={styles.hintCenter}>
+            Vidéos, qualité originale et plus d'espace pour vos événements.
+          </Text>
         </View>
         <View style={styles.card}>
-          {perks.map((p, i) => (
-            <View key={p.title} style={[styles.perk, i === perks.length - 1 && { borderBottomWidth: 0 }]}>
+          {PERKS.map((p, i) => (
+            <View
+              key={p.title}
+              style={[styles.perk, i === PERKS.length - 1 && { borderBottomWidth: 0 }]}
+            >
               <View style={styles.rowIco}>
                 <HugeiconsIcon icon={p.icon} size={20} color={colors.tealDark} />
               </View>
@@ -237,49 +329,60 @@ export function PremiumScreen({ navigation }) {
           ))}
         </View>
         <View style={styles.warn}>
-          <Text style={styles.warnT}>Le Play Store n'est pas disponible pour le moment. Réessayez plus tard.</Text>
+          <Text style={styles.warnT}>
+            Le Play Store n'est pas disponible pour le moment. Réessayez plus tard.
+          </Text>
         </View>
       </ScrollView>
     </Page>
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Téléchargement PC (guide pas à pas)
+// ─────────────────────────────────────────────────────────────
+const STEPS = [
+  {
+    image: require('../../assets/ilustration/webdevise.png'),
+    title: 'Ouvrez web.sharepix.app',
+    hint: 'Sur l\'ordinateur, dans votre navigateur.',
+  },
+  {
+    image: require('../../assets/ilustration/qrcode.png'),
+    title: 'Scannez le QR affiché',
+    hint: 'Tenez le téléphone devant l\'écran pour lier l\'album.',
+  },
+];
+
 export function PcUploadScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   return (
-    <Page style={[styles.root , {paddingTop: insets.top , paddingBottom: insets.bottom }]} edges={['top']}>
+    <Page style={styles.root} edges={['top']}>
       <ScreenHead title="Téléchargement PC" onBack={() => navigation.goBack()} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+      >
         <Text style={styles.lead}>
           Ajoutez photos et vidéos à l'album depuis le navigateur de votre ordinateur.
         </Text>
-        <View style={styles.stepCard}>
-          <View style={styles.n}><Text style={styles.nTxt}>1</Text></View>
-          <HugeiconsIcon icon={ComputerIcon} size={200} color={colors.teal} />
-          <Text style={styles.stepT}>Ouvrez web.sharepix.app</Text>
-          <Text style={styles.rowH}>Sur l'ordinateur, dans votre navigateur.</Text>
-        </View>
-        <View style={styles.stepCard}>
-          <View style={styles.n}><Text style={styles.nTxt}>2</Text></View>
-          <HugeiconsIcon icon={QrCodeIcon} size={200} color={colors.coral} />
-          <Text style={styles.stepT}>Scannez le QR affiché</Text>
-          <Text style={styles.rowH}>Tenez le téléphone devant l'écran pour lier l'album.</Text>
-        </View>
-        
+        {STEPS.map((s, i) => (
+          <View key={s.title} style={styles.stepCard}>
+            <View style={styles.n}>
+              <Text style={styles.nTxt}>{i + 1}</Text>
+            </View>
+            <Image source={s.image} style={{ width: 200, height: 200 }} />
+            <Text style={styles.stepT}>{s.title}</Text>
+            <Text style={styles.rowH}>{s.hint}</Text>
+          </View>
+        ))}
       </ScrollView>
-
-      <View style={styles.footerBtn} >
-          <CoralButton
-          title="Scanner le QR code"
-          onPress={() => {}}
-        />
-      </View>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1,},
+  root: { flex: 1 },
   head: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -288,92 +391,97 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   headTitle: { fontWeight: '600', fontSize: 18, color: colors.tealDark },
-  reset: { color: colors.coral, fontWeight: '700' },
-  section: { fontSize: 18, fontWeight: '600', color: colors.tealDark, marginTop: 18, paddingHorizontal: 16 },
-  hint: { color: colors.muted, marginTop: 6, marginBottom: 10, paddingHorizontal: 16, lineHeight: 20 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
   hintCenter: { color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 20 },
-  card: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  opt: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E8EEEE',
-  },
-  optOn: { backgroundColor: '#F3F8F8' },
-  optTxt: { fontSize: 15, color: colors.tealDark },
-  optTxtOn: { fontWeight: '700' },
-  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: '#B5C4C4' },
-  radioOn: { borderWidth: 6, borderColor: colors.teal },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginTop: 12 },
-  chip: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  chipOn: { backgroundColor: colors.tealDark, borderColor: colors.tealDark },
-  footerBtn: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  qrContainer: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    marginTop:100,
-  },
+
+  // QR
+  qrContainer: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 60 },
   qrCard: {
     padding: 18,
     borderRadius: 5,
+    backgroundColor: '#fff',
     shadowColor: '#164E52',
     shadowOpacity: 0.08,
     shadowRadius: 5,
     elevation: 3,
   },
-  albumName: { fontSize: 22, fontWeight: '600', marginTop: 18, color: colors.tealDark, textAlign: 'center' },
-  membersContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
+  albumName: {
+    fontSize: 22,
+    fontWeight: '600',
+    marginTop: 18,
+    color: colors.tealDark,
+    textAlign: 'center',
   },
-  emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 24,
-    alignItems: 'center',
-  },
-  iconBubble: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: colors.light,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  emptyH: { fontSize: 22, fontWeight: '600', textAlign: 'center', color: colors.tealDark },
   codeBox: {
-    marginTop: 16,
+    marginTop: 18,
     backgroundColor: colors.light,
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  code: { fontWeight: '700', letterSpacing: 2, color: colors.tealDark, fontSize: 16 },
+  copiedTxt: { color: colors.teal, fontWeight: '700', fontSize: 12 },
+
+  // Membres
+  membersScroll: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
+  card: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden' },
+  membersCount: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    color: colors.muted,
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E8EEEE',
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.light,
+    borderWidth: 1,
+    borderColor: colors.teal,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  code: { fontWeight: '700', letterSpacing: 2, color: colors.tealDark, fontSize: 16 },
+  memberAvatarTxt: { fontWeight: '800', color: colors.tealDark },
+  memberRemove: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmIco: {
+    alignSelf: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  emptyCard: { backgroundColor: '#fff', borderRadius: 22, padding: 24, alignItems: 'center' },
+  emptyH: { fontSize: 20, fontWeight: '600', textAlign: 'center', color: colors.tealDark },
+
+  // Premium / partagé
   hero: { alignItems: 'center', marginBottom: 18 },
   cover: {
     width: 84,
@@ -399,17 +507,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowT: { fontSize: 16, fontWeight: '700', color: colors.tealDark },
+  rowT: { fontSize: 15, fontWeight: '700', color: colors.tealDark },
   rowH: { color: colors.muted, fontSize: 12, marginTop: 2 },
   warn: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 16 },
   warnT: { textAlign: 'center', color: colors.tealDark, lineHeight: 22 },
+
+  // PC upload
   lead: { fontSize: 16, lineHeight: 23, color: colors.tealDark, marginBottom: 14 },
-  stepCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 12,
-  },
+  stepCard: { backgroundColor: '#fff', borderRadius: 18, padding: 18, marginBottom: 12 },
   n: {
     width: 28,
     height: 28,
@@ -420,5 +525,5 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   nTxt: { fontWeight: '800', color: colors.tealDark },
-  stepT: { fontWeight: '800', fontSize: 16, color: colors.tealDark, marginTop: 8 },
+  stepT: { fontWeight: '700', fontSize: 16, color: colors.tealDark, marginTop: 8 },
 });

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,17 @@ import {
   ScrollView,
   SafeAreaView,
   Dimensions,
+  Animated
 } from 'react-native';
 import { colors } from '../theme';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { TouchableWithoutFeedback } from 'react-native';
+
+const LOGO = require('../../assets/sharepix-logo.png');
 
 const { width } = Dimensions.get('window');
 
@@ -29,7 +35,7 @@ export function Logo({ size = 42, color = colors.ink }) {
 }
 
 export function LogoImage({ size = 42 }) {
-  return <Image source={require('../../assets/sharepix-logo.png')} style={{ width: size, height: size }} />;
+  return (<Image source={LOGO} style={{ width: size, height: size }} />)
 }
 
 // Bouton uniforme avec taille fixe
@@ -136,17 +142,17 @@ export function Sheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} style={[insets.bottom]} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}
         keyboardVerticalOffset={keyboardVerticalOffset}
       >
         <Pressable style={styles.sheetOverlay} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet , { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.sheetHead}>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Text style={{ fontSize: 22 }}>✕</Text>
+              <Text style={{ fontSize: 15 }}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.sheetTitle}>{title}</Text>
             <View style={{ width: 22 }} />
@@ -154,7 +160,7 @@ export function Sheet({
           <ScrollView 
             ref={scrollRef}
             style={styles.sheetContent}
-            contentContainerStyle={styles.sheetContentContainer}
+            contentContainerStyle={[styles.sheetContentContainer , { paddingBottom: Math.max(insets.bottom, 20) }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             scrollEnabled={true}
@@ -166,6 +172,65 @@ export function Sheet({
     </Modal>
   );
 }
+
+export function RightModal({ visible, onClose, title, children, width = '82%' }) {
+  const insets = useSafeAreaInsets();
+  const screenW = Dimensions.get('window').width;
+  const slideAnim = useRef(new Animated.Value(screenW)).current;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true,
+      }).start();
+    } else if (mounted) {
+      // Animation de sortie AVANT le démontage (Modal visible={false} coupe net sinon)
+      Animated.timing(slideAnim, {
+        toValue: screenW,
+        duration: 240,
+        useNativeDriver: true,
+      }).start(() => setMounted(false));
+    }
+  }, [visible]);
+
+  if (!mounted) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Pressable style={styles.rightOverlay} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.rightContainer,
+            { width, paddingTop: insets.top, transform: [{ translateX: slideAnim }] },
+          ]}
+        >
+          {title ? (
+            <View style={styles.rightHead}>
+              <Text style={styles.rightTitle}>{title}</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={12}>
+                <HugeiconsIcon size={22} color={colors.tealDark} variant="stroke" icon={Cancel01Icon} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 
 // Page avec SafeArea par défaut
 export function Page({ children, style = {}, edges = ['top', 'left', 'right'] }) {
@@ -220,6 +285,16 @@ export function BackButton({ onPress, variant = 'back', style = {} }) {
   );
 }
 
+/* Vrai "G" Google officiel en SVG */
+export function GoogleMark({ size = 20 }) {  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z" />
+      <Path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <Path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <Path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z" />
+    </Svg>
+  );
+}
 const styles = StyleSheet.create({
   // Page
   page: {
@@ -372,5 +447,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginEnd: 10
-  }
+  },
+    // Right Modal (Menu coulissant)
+  rightOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  rightContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderLeftWidth: 1,
+    borderLeftColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: -5, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  rightHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  rightTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.tealDark,
+  },
 });
+

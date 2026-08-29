@@ -1,0 +1,9 @@
+# Config minimale pour la CLI Supabase (supabase/link non nécessaire avec
+# project_id renseigné ici). Les fonctions sont appelées par nos webhooks
+# avec un secret partagé en header plutôt qu'un JWT utilisateur.
+project_id = "bpillwvvxqiduxtkftuh"
+
+[functions.activity-push]
+# Le Database Webhook n'envoie pas de JWT utilisateur : on sécurise à la
+# place par le header x-webhook-secret (vérifié dans index.ts).
+verify_jwt = false

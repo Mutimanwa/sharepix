@@ -6,13 +6,15 @@ import {
   Dimensions,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
+  Alert, // <-- AJOUT
 } from 'react-native';
 import { colors } from '../theme';
-import { CoralButton, Logo, Sheet, Field, FullPage } from '../components/UI';
+
+import { CoralButton, Logo, Sheet, Field } from '../components/UI';
 import { ArtShare, ArtPrivate, ArtQuality } from '../components/OnboardingArt';
 import CodeBoxes from '../components/CodeBoxes';
 import { useStore } from '../store';
+import { isSupabaseConfigured } from '../config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -44,12 +46,24 @@ export default function OnboardingScreen({ navigation }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [first, setFirst] = useState('');
-  const { createAlbum, setOnboarded } = useStore();
+  
+  // <-- AJOUT des states de chargement
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingJoin, setLoadingJoin] = useState(false);
+  
+  // <-- AJOUT de joinAlbum dans le destructuring
+  const { createAlbum, joinAlbum, setOnboarded, state } = useStore();
   const insets = useSafeAreaInsets();
 
   const goHome = () => {
     setOnboarded();
-    navigation.replace('Main');
+    if (isSupabaseConfigured && !state.user) {
+      console.log('➡️ Onboarding -> Main (Supabase configured, no user)');
+      navigation.replace('Main');
+    } else {
+      console.log('➡️ Onboarding -> Main');
+      navigation.replace('Main');
+    }
   };
 
   const onScroll = (e) => {
@@ -61,7 +75,7 @@ export default function OnboardingScreen({ navigation }) {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar style='dark' />
       <View style={styles.brand}>
-        <Logo size={64} />
+        <Logo size={44} />
       </View>
 
       <FlatList
@@ -78,7 +92,7 @@ export default function OnboardingScreen({ navigation }) {
           return (
             <View style={styles.page}>
               <View style={styles.artWrap}>
-                <Art size={Math.min(280, width - 64)} />
+                <Art size={Math.min(300, width - 64)} />
               </View>
               <Text style={styles.title}>{item.title}</Text>
             </View>
@@ -109,7 +123,7 @@ export default function OnboardingScreen({ navigation }) {
         />
       </View>
 
-      {/* Sheets avec SafeArea intégré */}
+      {/* Sheet Rejoindre */}
       <Sheet
         visible={join}
         onClose={() => {
@@ -122,16 +136,29 @@ export default function OnboardingScreen({ navigation }) {
         <Text style={styles.center}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
         {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
         <CoralButton
-          title="Continuer"
-          disabled={code.length < 8}
-          onPress={() => {
-            setJoin(false);
-            setCode('');
-            goHome();
+          title={loadingJoin ? "Recherche en cours..." : "Continuer"}
+          disabled={code.length < 8 || loadingJoin}
+          onPress={async () => {
+            setLoadingJoin(true);
+            try {
+              const album = await joinAlbum(code);
+              if (!album) {
+                Alert.alert("Introuvable", "Ce code d'album n'existe pas ou a été supprimé.");
+                return;
+              }
+              setJoin(false);
+              setCode('');
+              goHome();
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de rejoindre l'album.");
+            } finally {
+              setLoadingJoin(false);
+            }
           }}
         />
       </Sheet>
 
+      {/* Sheet Créer */}
       <Sheet
         visible={create}
         onClose={() => setCreate(false)}
@@ -151,12 +178,19 @@ export default function OnboardingScreen({ navigation }) {
         />
         <Text style={styles.center}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton
-          title="Créer un album"
-          disabled={!name.trim() || !first.trim()}
-          onPress={() => {
-            createAlbum({ name: name.trim(), firstName: first.trim() });
-            setCreate(false);
-            goHome();
+          title={loadingCreate ? "Création en cours..." : "Créer un album"}
+          disabled={!name.trim() || !first.trim() || loadingCreate}
+          onPress={async () => {
+            setLoadingCreate(true);
+            try {
+              await createAlbum({ name: name.trim(), firstName: first.trim() });
+              setCreate(false);
+              goHome();
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de créer l'album.");
+            } finally {
+              setLoadingCreate(false);
+            }
           }}
         />
       </Sheet>
@@ -181,15 +215,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   artWrap: {
-    marginTop: 4,
+    marginTop: 100,
     marginBottom: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     lineHeight: 30,
     color: colors.tealDark,
     paddingHorizontal: 8,

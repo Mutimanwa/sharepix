@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "239240239735",
+    "project_id": "sharepix-84567",
+    "storage_bucket": "sharepix-84567.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:239240239735:android:ee3171cbc99419cd508472",
+        "android_client_info": {
+          "package_name": "app.sharepix.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJ4hn9p-XIUqA1B6oPaGWV7b2BVVQ3GS0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
