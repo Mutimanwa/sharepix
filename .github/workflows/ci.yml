@@ -1,0 +1,76 @@
+# ── SharePix · Intégration continue ──────────────────────────────────────
+# Déclenché sur chaque PR et chaque push sur `main`.
+# Valide : types TypeScript, santé du projet Expo (expo-doctor),
+# la Edge Function Deno (check + lint) et la sécurité RLS/Storage en live.
+# ─────────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript + Expo Doctor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Expo Doctor
+        run: npx expo-doctor
+
+  edge-function:
+    name: Edge Function (Deno)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Deno check
+        run: deno check supabase/functions/activity-push/index.ts
+
+      - name: Deno lint
+        run: deno lint supabase/functions/activity-push/index.ts
+
+  security:
+    name: RLS & Storage (live Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: RLS / Storage check
+        run: node supabase/rls-check.cjs

@@ -1,0 +1,75 @@
+# ── SharePix · Livraison continue « preview » ────────────────────────────
+# À chaque push sur `main` : publication d'une mise à jour OTA (EAS Update)
+# sur la branche `preview` → les builds déjà installés (dev client, APK de
+# test) se mettent à jour sans repasser par les stores.
+# En manuel (workflow_dispatch) : possibilité de builder un APK de preview.
+# ─────────────────────────────────────────────────────────────────────────
+name: Preview (EAS Update)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Builder aussi un APK de preview (Android) ?'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: preview-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Publish OTA update
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish update (branch preview)
+        run: eas update --branch preview --auto --non-interactive
+
+  build:
+    name: Build preview APK
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build preview APK
+        run: eas build --platform android --profile preview --non-interactive
