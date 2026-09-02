@@ -51,10 +51,10 @@ jobs:
           deno-version: v2.x
 
       - name: Deno check
-        run: deno check supabase/functions/activity-push/index.ts
+        run: deno check --config supabase/functions/deno.json supabase/functions/activity-push/index.ts
 
       - name: Deno lint
-        run: deno lint supabase/functions/activity-push/index.ts
+        run: deno lint --config supabase/functions/deno.json supabase/functions/activity-push/index.ts
 
   security:
     name: RLS & Storage (live Supabase)

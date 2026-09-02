@@ -25,7 +25,9 @@ supabase/functions/** ──────▶ Déploiement Edge Function Supabase
 1. **TypeScript + Expo Doctor** — `npm ci` puis `npm run typecheck`
    (`tsc --noEmit`, sur le tsconfig Expo) et `npx expo-doctor`.
 2. **Edge Function (Deno)** — `deno check` + `deno lint` sur
-   `supabase/functions/activity-push/index.ts`.
+   `supabase/functions/activity-push/index.ts`, avec l'import map explicite
+   `--config supabase/functions/deno.json` (le job Deno n'installe pas les
+   dépendances npm : la résolution passe par l'import map seule).
 3. **Sécurité RLS / Storage** — exécute `node supabase/rls-check.cjs`
    contre le projet Supabase réel : vérifie qu'aucune donnée ne fuit sans
    session, que les comptes invités frais ne voient rien, et que le bucket
@@ -98,7 +100,8 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 npm ci
 npm run typecheck          # tsc --noEmit
 npx expo-doctor            # santé du projet Expo
-deno check supabase/functions/activity-push/index.ts   # si Deno installé
+deno check --config supabase/functions/deno.json supabase/functions/activity-push/index.ts
+deno lint  --config supabase/functions/deno.json supabase/functions/activity-push/index.ts
 node supabase/rls-check.cjs                            # réseau requis
 ```
 
