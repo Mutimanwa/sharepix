@@ -1,0 +1,40 @@
+# ── SharePix · Déploiement des Edge Functions Supabase ───────────────────
+# Déclenché quand un fichier sous supabase/functions/ change sur `main`,
+# ou manuellement. Déploie la fonction `activity-push` sur le projet
+# référencé par supabase/config.toml (surchargable via la variable
+# SUPABASE_PROJECT_ID).
+# Secrets requis : SUPABASE_ACCESS_TOKEN (token d'accès Supabase).
+# NB : les secrets de la fonction (WEBHOOK_SECRET…) sont gérés côté
+# Supabase (supabase secrets set), pas par ce workflow.
+# ─────────────────────────────────────────────────────────────────────────
+name: Supabase Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy edge functions
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID || 'bpillwvvxqiduxtkftuh' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy activity-push
+        run: supabase functions deploy activity-push --project-ref "$SUPABASE_PROJECT_ID"

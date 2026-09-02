@@ -69,6 +69,16 @@ Prérequis : `google-services.json` à la racine + clé de compte de
 service FCM V1 uploadée via `npx eas-cli credentials`.
 Guide complet : [`supabase/PUSH.md`](supabase/PUSH.md).
 
+## CI/CD
+
+Pipeline GitHub Actions + EAS : la CI (`ci.yml`) vérifie les types
+TypeScript, la santé Expo (`expo-doctor`), l'Edge Function (Deno) et la
+sécurité RLS/Storage (`rls-check.cjs`) à chaque PR. La CD publie une mise à
+jour OTA (`eas update`) à chaque push sur `main`, un build de production sur
+tag `v*`, et redéploie les Edge Functions Supabase automatiquement.
+
+Guide complet (secrets à configurer, déclencheurs) : [`CICD.md`](CICD.md).
+
 ## Backend Supabase
 
 Tout est décrit dans [`supabase/`](supabase/) :
