@@ -83,6 +83,10 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 `activity-push` est redéployée sur le projet `bpillwvvxqiduxtkftuh`
 (surchargable via la variable de dépôt `SUPABASE_PROJECT_ID`).
 
+> La dépendance `@supabase/supabase-js` de la fonction est déclarée dans
+> l'import map `supabase/functions/deno.json` (specifier nu, donc conforme
+> au lint Deno `no-import-prefix`).
+
 > Le **schéma SQL** (`supabase/schema.sql`) n'est **pas** appliqué
 > automatiquement : il est ré-exécutable/idempotent mais modifie la
 > production. On l'applique volontairement après revue, puis on relance
