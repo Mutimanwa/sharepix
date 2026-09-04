@@ -1,0 +1,61 @@
+# ── SharePix · Livraison continue « production » ─────────────────────────
+# Déclenché sur un tag `v*` (ex: v1.0.1) ou manuellement.
+# Build EAS avec le profil `production` (autoIncrement du build number),
+# puis soumission automatique aux stores si demandée.
+# ─────────────────────────────────────────────────────────────────────────
+name: Production (EAS Build + Submit)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Plateforme(s) à builder'
+        type: choice
+        required: true
+        default: 'android'
+        options:
+          - android
+          - all
+      submit:
+        description: 'Soumettre automatiquement aux stores après le build'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: production-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build with EAS
+        run: |
+          PLATFORM="${{ github.event.inputs.platform || 'android' }}"
+          ARGS=(build --platform "$PLATFORM" --profile production --non-interactive)
+          if [ "${{ github.event.inputs.submit }}" = "true" ]; then
+            ARGS+=(--auto-submit)
+          fi
+          eas "${ARGS[@]}"
