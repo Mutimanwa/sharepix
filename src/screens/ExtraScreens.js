@@ -68,7 +68,7 @@ export function QRScreen({ route, navigation }) {
 
   if (!album) {
     return (
-      <Page style={styles.root} edges={['top']}>
+      <Page style={[styles.root , { paddingBottom: insets.bottom + 24 }]} edges={['top']}>
         <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <Text style={styles.hintCenter}>Album introuvable</Text>
@@ -84,10 +84,10 @@ export function QRScreen({ route, navigation }) {
   };
 
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , { paddingBottom: insets.bottom + 24 }]} edges={['top']}>
       <ScreenHead title="Code QR" onBack={() => navigation.goBack()} />
       <ScrollView
-        contentContainerStyle={[styles.qrContainer, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.qrContainer]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.qrCard}>
@@ -158,7 +158,7 @@ export function MembersScreen({ route, navigation }) {
 
   if (!album) {
     return (
-      <Page style={styles.root} edges={['top']}>
+      <Page style={[styles.root , { paddingBottom: insets.bottom + 24 }]} edges={['top']}>
         <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <Text style={styles.hintCenter}>Album introuvable</Text>
@@ -176,7 +176,7 @@ export function MembersScreen({ route, navigation }) {
   const isOwnerRole = (m) => m.role === 'owner' || m.role === 'admin';
 
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root , { paddingBottom: insets.bottom + 24 }]} edges={['top']}>
       <ScreenHead title="Membres" onBack={() => navigation.goBack()} />
       <ScrollView
         contentContainerStyle={[styles.membersScroll, { paddingBottom: insets.bottom + 24 }]}
@@ -296,10 +296,10 @@ const PERKS = [
 export function PremiumScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root, { paddingBottom: insets.bottom + 24 }]} edges={['top']}>
       <ScreenHead title="Album Premium" onBack={() => navigation.goBack()} />
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ padding: 16 }}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
@@ -357,11 +357,11 @@ const STEPS = [
 export function PcUploadScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   return (
-    <Page style={styles.root} edges={['top']}>
+    <Page style={[styles.root, { paddingBottom: insets.bottom + 24 }]} edges={['top']}>
       <ScreenHead title="Téléchargement PC" onBack={() => navigation.goBack()} />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ padding: 16 }}
       >
         <Text style={styles.lead}>
           Ajoutez photos et vidéos à l'album depuis le navigateur de votre ordinateur.
