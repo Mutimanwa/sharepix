@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert ,Modal ,SafeAreaView, } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert ,Modal ,SafeAreaView, Animated } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
   UserCircle02Icon, 
@@ -26,21 +26,40 @@ import Constants from 'expo-constants';
 // ── COMPOSANTS RÉUTILISABLES POUR L'UI ──
 
 function SwitchRow({ title, sub, value, onValueChange, isLast }) {
+  const knobPosition = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(knobPosition, {
+      toValue: value ? 1 : 0,
+      friction: 7,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  }, [knobPosition, value]);
+
+  const knobTransform = {
+    transform: [{
+      translateX: knobPosition.interpolate({
+        inputRange: [0, 1],
+        outputRange: [2, 22],
+      }),
+    }],
+  };
+
   return (
     <Pressable 
       style={[styles.row, !isLast && styles.rowBorder]} 
       onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
     >
       <View style={styles.rowTextContainer}>
         <Text style={styles.rt}>{title}</Text>
         {sub ? <Text style={styles.rs}>{sub}</Text> : null}
       </View>
-      <Switch 
-        value={value} 
-        onValueChange={onValueChange} 
-        trackColor={{ true: colors.coral, false: colors.muted }} 
-        pointerEvents="none" 
-      />
+      <View style={[styles.switchTrack, value && styles.switchTrackOn]} pointerEvents="none">
+        <Animated.View style={[styles.switchKnob, knobTransform]} />
+      </View>
     </Pressable>
   );
 }
@@ -70,6 +89,18 @@ export default function ProfileScreen({ navigation }) {
   const [busyOut, setBusyOut] = useState(false);
   const [busyDelete, setBusyDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const initialProfileRef = useRef(null);
+
+  const profileSignature = JSON.stringify({
+    firstName: p.firstName || '',
+    lastName: p.lastName || '',
+    notifications: !!p.notifications,
+    newPhotos: !!p.newPhotos,
+    likes: !!p.likes,
+    comments: !!p.comments,
+  });
+  if (initialProfileRef.current === null) initialProfileRef.current = profileSignature;
+  const hasProfileChanges = profileSignature !== initialProfileRef.current;
 
   // Récupération dynamique de la version depuis app.json
   const appVersion = Constants.expoConfig?.version || '1.0.1';
@@ -128,12 +159,13 @@ export default function ProfileScreen({ navigation }) {
   };
 
  const handleSave = async () => {
-    if (saving) return;
+   if (saving || !hasProfileChanges) return;
     setSaving(true);
     
     // On simule/attend le temps de la sauvegarde (local + synchro Supabase en arrière-plan)
     await new Promise(resolve => setTimeout(resolve, 1500));
     
+    initialProfileRef.current = profileSignature;
     setSaving(false);
     Alert.alert("Succès", "Votre profil a été mis à jour.");
   };
@@ -145,7 +177,12 @@ export default function ProfileScreen({ navigation }) {
       {/* HEADER */}
       <View style={styles.head}>
         <Text style={styles.title}>Mon profil</Text>
-        <TouchableOpacity onPress={handleSave} activeOpacity={0.7} style={styles.saveBtn}>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={!hasProfileChanges || saving}
+          activeOpacity={0.7}
+          style={[styles.saveBtn, !hasProfileChanges && styles.saveBtnDisabled]}
+        >
           <Text style={styles.saveBtnText}>Terminé</Text>
         </TouchableOpacity>
       </View>
@@ -179,7 +216,7 @@ export default function ProfileScreen({ navigation }) {
         {isSupabaseConfigured && isAnonymous && (
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
-              <View style={[styles.accountIcon, { backgroundColor: '#FFF3E0' }]}>
+              <View style={[styles.accountIcon]}>
                    <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.tealDark} />
               </View>
               <View style={{ flex: 1 }}>
@@ -321,6 +358,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '600', color: colors.tealDark },
   saveBtn: { paddingVertical: 6, paddingHorizontal: 12 },
   saveBtnText: { color: colors.coral, fontWeight: '700', fontSize: 14 },
+  saveBtnDisabled: { opacity: 0.35 },
 
   // Avatar
   avatarSection: { alignItems: 'center', marginVertical: 20 },
@@ -352,7 +390,7 @@ const styles = StyleSheet.create({
   syncBadge: { position: 'absolute', right: 0, top: 5, fontSize: 10, color: colors.teal, fontWeight: '700', textTransform: 'uppercase' },
 
   // Compte & Invité
-  guestCard: { borderColor: '#F57C00', borderWidth: 1, backgroundColor: '#FFFDF9' },
+  guestCard: { borderColor: colors.coral, borderWidth: 1, },
   accountRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   accountIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   accountT: { fontSize: 16, fontWeight: '600', color: colors.tealDark, marginBottom: 2 },
@@ -370,6 +408,31 @@ const styles = StyleSheet.create({
   rowTextContainer: { flex: 1, paddingRight: 16 },
   rt: { fontSize: 16, fontWeight: '500', color: colors.tealDark },
   rs: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
+  switchTrack: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+    backgroundColor: '#D7E1E1',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  switchTrackOn: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  switchKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.white,
+    shadowColor: '#164E52',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    elevation: 2,
+  },
 
   // Aide box
   helpBox: { backgroundColor: colors.light, borderRadius: 16, padding: 20, marginVertical: 16, alignItems: 'flex-start' },
