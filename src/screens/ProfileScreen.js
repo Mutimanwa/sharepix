@@ -6,7 +6,6 @@ import {
   Logout01Icon, 
   Camera01Icon, 
   ArrowRight01Icon, 
-  ShieldCheckIcon,
   CheckmarkBadge01Icon,
   Delete02Icon
 } from '@hugeicons/core-free-icons';
@@ -194,7 +193,9 @@ export default function ProfileScreen({ navigation }) {
           <TouchableOpacity 
             style={styles.avatarContainer} 
             activeOpacity={0.8}
-            onPress={() => user?.avatarUrl ? Alert.alert("Photo de profil", "Modifiez votre photo directement depuis votre compte Google.") : null}
+            onPress={() => Alert.alert("Photo de profil", "Modifiez votre photo directement depuis votre compte Google.")}
+            accessibilityRole="button"
+            accessibilityLabel="Modifier la photo de profil"
           >
             <View style={styles.avatar}>
               {/* AFFICHAGE CONDITIONNEL : Image URL ou Initiales */}
@@ -206,31 +207,44 @@ export default function ProfileScreen({ navigation }) {
                 </Text>
               )}
             </View>
-            <View style={styles.avatarBadge}>
+            <View style={styles.avatarBadge} pointerEvents="none">
               <HugeiconsIcon icon={Camera01Icon} size={14} color="#fff" />
             </View>
           </TouchableOpacity>
+          <Text style={styles.avatarHint}>Photo de profil</Text>
         </View>
 
         {/* ── BANNIÈRE COMPTE ── */}
         {isSupabaseConfigured && isAnonymous && (
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
-              <View style={[styles.accountIcon]}>
+              <View style={[styles.accountIcon, styles.guestIcon]}>
                    <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.tealDark} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountT}>Sécurisez vos données</Text>
+                <View style={styles.accountTitleRow}>
+                  <Text style={styles.accountT}>Compte invité</Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>À sécuriser</Text>
+                  </View>
+                </View>
                 <Text style={styles.accountS}>
-                  Vous utilisez actuellement un compte invité. Liez une adresse e-mail pour sauvegarder vos albums et y accéder partout.
+                  Vos albums sont uniquement liés à cet appareil. Ajoutez un compte pour les retrouver partout.
                 </Text>
               </View>
             </View>
             {/* ── SUPABASE ALBUMS : intégration ── */}
             {/* mode 'convert' : l'AuthScreen convertira le compte invité au lieu d'en créer un nouveau */}
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Auth', { mode: 'convert' })} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() => navigation.navigate('Auth', { mode: 'convert' })}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Sécuriser mon compte invité"
+            >
             {/* ── SUPABASE ALBUMS : fin ── */}
-              <Text style={styles.primaryBtnText}>Créer mon compte sécurisé</Text>
+              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>Sécuriser mon compte</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -249,6 +263,7 @@ export default function ProfileScreen({ navigation }) {
               </View>
               {/* Badge indiquant que c'est lié à Google */}
               <View style={styles.providerBadge}>
+                <HugeiconsIcon icon={CheckmarkBadge01Icon} size={15} color="#4285F4" />
                 <Text style={styles.providerBadgeText}>Google</Text>
               </View>
             </View>
@@ -380,6 +395,7 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   avatarInitials: { color: '#fff', fontSize: 34, fontWeight: '700' },
   avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.tealDark, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  avatarHint: { marginTop: 8, color: colors.muted, fontSize: 12, fontWeight: '500' },
 
   // Sections
   sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: 8, marginBottom: 8, marginTop: 16 },
@@ -392,11 +408,15 @@ const styles = StyleSheet.create({
   // Compte & Invité
   guestCard: { borderColor: colors.coral, borderWidth: 1, },
   accountRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
-  accountIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  accountIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.light },
+  guestIcon: { backgroundColor: '#FDECEA' },
+  accountTitleRow: { flexDirection: 'row', alignItems: 'center',   flexWrap: 'wrap', gap: 8, marginBottom: 3 },
   accountT: { fontSize: 16, fontWeight: '600', color: colors.tealDark, marginBottom: 2 },
   accountS: { color: colors.muted, lineHeight: 18, fontSize: 13 },
+  statusBadge: { backgroundColor: '#FFF1E8', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  statusBadgeText: { color: colors.coralDark, fontSize: 10, fontWeight: '700' },
   
-  primaryBtn: { marginTop: 16, backgroundColor: colors.coral, borderRadius: 12, height: 40, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn: { marginTop: 16, backgroundColor: colors.coral, borderRadius: 12, minHeight: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   primaryBtnText: { color: '#fff', fontWeight: '500', fontSize: 15 },
   
   logoutBtn: { marginTop: 16, backgroundColor: '#FDECEA', borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
@@ -498,11 +518,13 @@ const styles = StyleSheet.create({
   },
   providerBadge: { 
     backgroundColor: '#F1F3F4', // Le gris clair caractéristique de Google
-    paddingHorizontal: 5, 
+    paddingHorizontal: 8, 
     paddingVertical: 5, 
     borderRadius: 20, 
     alignItems: 'center', 
-    justifyContent: 'center' 
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
   providerBadgeText: { 
     color: '#5F6368', // Gris foncé Google
