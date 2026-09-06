@@ -164,7 +164,7 @@ export default function AuthScreen({ navigation, route }) {
       if (result.needsEmailConfirm) {
         setNeedsEmailConfirm(true);
         setError('Compte créé. Vérifiez votre email pour confirmer votre inscription.');
-        console.log('📧 Email confirmation required');
+        console.log('Email confirmation required');
         setLoading(false);
         return;
       }
@@ -446,6 +446,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
   },
   brandContainer: {
+    marginTop: 80,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -520,7 +521,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputWrapperFocused: {
-    borderColor: colors.teal,
+    borderColor: colors.tealDark,
   },
   inputIcon: {
     marginRight: 15,
