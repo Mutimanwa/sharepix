@@ -25,6 +25,7 @@ import {
   FavouriteIcon,
   Camera01Icon,
   QrCodeIcon,
+  ScanIcon,
   Copy01Icon,
   UserMultipleIcon,
   Diamond01Icon,
@@ -705,7 +706,7 @@ export default function AlbumScreen({ route, navigation }) {
             accessibilityRole="button"
             accessibilityLabel="Scanner un code QR"
           >
-            <HugeiconsIcon icon={QrCodeIcon} size={22} color="#fff" />
+            <HugeiconsIcon icon={ScanIcon} size={22} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -1078,8 +1079,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   scanButton: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     marginTop: 12,
     borderRadius: 10,
     backgroundColor: colors.tealDark,

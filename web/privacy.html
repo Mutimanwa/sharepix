@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Politique de confidentialité de SharePix, application d'albums photo et vidéo privés.">
+    <title>Politique de confidentialité - SharePix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Poppins', 'sans-serif'] },
+                    colors: {
+                        teal: { 50: '#f0f8f9', 100: '#d4eaea', 300: '#7dc1c3', 500: '#2ba3a8', 800: '#164e52', 900: '#0e3a3e' },
+                        coral: { 500: '#e07a6a', 600: '#c96556' },
+                        cream: '#f3f8f8', border: '#d5e3e3', muted: '#6b7c7d'
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        body { background: #f3f8f8; font-family: 'Poppins', sans-serif; color: #164e52; }
+        .legal-copy h2 { color: #164e52; font-size: 1.35rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+        .legal-copy p { color: #6b7c7d; font-size: 0.96rem; line-height: 1.85; margin: 0.7rem 0; }
+        .legal-copy ul { color: #6b7c7d; list-style: disc; margin: 0.75rem 0 1rem 1.4rem; }
+        .legal-copy li { line-height: 1.8; padding-left: 0.25rem; margin: 0.25rem 0; }
+        .legal-copy strong { color: #164e52; font-weight: 600; }
+        .legal-copy a { color: #c96556; font-weight: 600; }
+        .legal-copy a:hover { color: #e07a6a; }
+    </style>
+</head>
+<body class="antialiased">
+    <header class="sticky top-0 z-30 border-b border-border/80 bg-white/95 backdrop-blur">
+        <nav class="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8" aria-label="Navigation principale">
+            <a href="index.html" class="flex items-center gap-2" aria-label="SharePix, accueil">
+                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-teal-800 text-white"><i class="fa-solid fa-camera"></i></span>
+                <span class="text-2xl font-bold tracking-tight text-teal-800">SharePix</span>
+            </a>
+            <a href="index.html#download" class="rounded-full border border-coral-800 px-5 py-2 text-sm font-semibold text-coral-500 transition hover:bg-teal-50">Télécharger</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="bg-teal-900 px-5 py-16 sm:px-8 sm:py-20">
+            <div class="mx-auto max-w-4xl">
+                <p class="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Document légal</p>
+                <h1 class="text-4xl font-bold leading-tight text-white sm:text-5xl">Politique de confidentialité</h1>
+                <p class="mt-5 max-w-2xl text-base leading-relaxed text-teal-100/80">Une présentation claire des données utilisées par SharePix pour protéger et synchroniser vos albums privés.</p>
+                <p class="mt-7 text-sm text-teal-200/70">Dernière mise à jour : août 2026</p>
+            </div>
+        </section>
+
+        <div class="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[230px_minmax(0,1fr)] lg:py-14">
+            <aside class="h-fit rounded-2xl border border-border bg-white p-5 lg:sticky lg:top-28">
+                <p class="mb-4 text-xs font-bold uppercase tracking-wider text-muted">Sommaire</p>
+                <nav class="space-y-2 text-sm" aria-label="Sommaire de la politique">
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#responsable">Responsable</a>
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#donnees">Données collectées</a>
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#finalites">Utilisation</a>
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#acces">Accès aux contenus</a>
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#securite">Sécurité</a>
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#droits">Vos droits</a>
+                    <a class="block rounded-lg px-3 py-2 text-teal-800 hover:bg-cream" href="#contact">Contact</a>
+                </nav>
+            </aside>
+
+            <article class="legal-copy rounded-2xl border border-border bg-white px-6 py-8 shadow-sm sm:px-10 sm:py-10">
+                <p class="!mt-0">SharePix ("l'application", "le service") est une application de partage <strong>privé</strong> d'albums photo et vidéo lors d'événements. Chaque album est accessible uniquement aux personnes invitées au moyen d'un code à 8 caractères ou d'un code QR.</p>
+
+                <h2 id="responsable">1. Responsable du traitement</h2>
+                <p>L'application est éditée par <strong>RESTART</strong> ("l'Éditeur", "nous"). Pour toute question concernant vos données, écrivez à <a href="mailto:contact@sharepix.app">contact@sharepix.app</a>.</p>
+
+                <h2 id="donnees">2. Données que nous collectons</h2>
+                <ul>
+                    <li><strong>Compte invité :</strong> un identifiant technique aléatoire est créé automatiquement à la première ouverture. Aucune inscription n'est requise.</li>
+                    <li><strong>Profil :</strong> le prénom et/ou le nom que vous saisissez, utilisés pour vous identifier auprès des autres membres d'un album.</li>
+                    <li><strong>Compte permanent :</strong> votre adresse e-mail, ou les informations de base transmises par Google si vous choisissez cette connexion.</li>
+                    <li><strong>Contenus publiés :</strong> photos, vidéos, commentaires et mentions J'aime ajoutés dans les albums dont vous êtes membre.</li>
+                    <li><strong>Notifications :</strong> un identifiant technique Expo Push Token ou FCM si vous activez les notifications.</li>
+                    <li><strong>Journal d'activité :</strong> les actions réalisées dans vos albums, visibles par les membres concernés.</li>
+                </ul>
+
+                <h2 id="finalites">3. Finalités du traitement</h2>
+                <ul>
+                    <li>Fournir le service de création et de partage d'albums privés.</li>
+                    <li>Synchroniser vos albums entre vos appareils.</li>
+                    <li>Restaurer vos albums sur un nouvel appareil après conversion du compte invité.</li>
+                    <li>Vous envoyer les notifications que vous avez activées.</li>
+                    <li>Assurer la sécurité du service et prévenir les abus.</li>
+                </ul>
+
+                <h2 id="acces">4. Qui peut voir vos contenus</h2>
+                <p>Vos photos, vidéos et commentaires sont visibles <strong>uniquement par les membres des albums</strong> auxquels vous appartenez. SharePix ne propose aucun espace public et ne contient aucune publicité.</p>
+                <p>Les fichiers sont stockés dans un espace privé. Ils sont accessibles uniquement via des liens temporaires signés, délivrés aux membres autorisés.</p>
+
+                <h2>5. Sous-traitants</h2>
+                <ul>
+                    <li><strong>Supabase Inc. :</strong> authentification, base de données et stockage privé.</li>
+                    <li><strong>Expo et Google Firebase Cloud Messaging :</strong> acheminement des notifications push.</li>
+                    <li><strong>Google Ireland / Google LLC :</strong> uniquement si vous choisissez la connexion Google.</li>
+                </ul>
+                <p>Ces prestataires traitent les données pour notre compte et dans la limite nécessaire à la fourniture du service.</p>
+
+                <h2 id="securite">6. Sécurité</h2>
+                <p>Les échanges sont chiffrés via HTTPS/TLS. Le contrôle d'accès est appliqué côté serveur pour chaque requête et les fichiers restent inaccessibles sans autorisation d'appartenance à l'album.</p>
+
+                <h2>7. Conservation et suppression</h2>
+                <p>Les données sont conservées tant que votre compte ou vos albums existent. La suppression d'un album par son propriétaire supprime définitivement ses photos, commentaires et journaux associés.</p>
+                <p>Vous pouvez demander la suppression intégrale de votre compte et de vos données à tout moment en nous écrivant à <a href="mailto:contact@sharepix.app">contact@sharepix.app</a>.</p>
+
+                <h2 id="droits">8. Vos droits</h2>
+                <p>Vous disposez d'un droit d'accès, de rectification, d'effacement, de portabilité et d'opposition concernant vos données. Pour exercer vos droits, contactez-nous à <a href="mailto:contact@sharepix.app">contact@sharepix.app</a>. Nous répondons sous 30 jours. Vous pouvez également introduire une réclamation auprès de l'autorité de protection des données compétente.</p>
+
+                <h2>9. Enfants</h2>
+                <p>Le service n'est pas destiné aux enfants de moins de 13 ans et ne collecte pas sciemment leurs données. Si vous pensez qu'un enfant utilise le service, contactez-nous pour demander la suppression des données concernées.</p>
+
+                <h2>10. Modifications</h2>
+                <p>Cette politique peut être mise à jour. La version en vigueur est celle publiée à cette adresse. Toute modification substantielle vous sera signalée dans l'application ou sur cette page.</p>
+
+                <h2 id="contact">11. Contact</h2>
+                <p><strong>RESTART</strong> — <a href="mailto:contact@sharepix.app">contact@sharepix.app</a></p>
+
+                <div class="mt-10 rounded-xl border border-teal-100 bg-cream px-5 py-4 text-sm leading-relaxed text-muted">
+                    <strong>En bref :</strong> vos contenus restent privés et ne sont partagés qu'avec les membres des albums concernés. Nous ne vendons ni ne louons vos données.
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="bg-teal-800 px-5 py-8 text-center text-sm text-teal-100/70 sm:px-8">
+        <p>© 2026 SharePix, édité par RESTART.</p>
+        <div class="mt-2 flex justify-center gap-4">
+            <a href="terms.html" class="text-teal-100 transition hover:text-white">Conditions d'utilisation</a>
+            <a href="index.html" class="text-teal-100 transition hover:text-white">Accueil</a>
+        </div>
+    </footer>
+</body>
+</html>
