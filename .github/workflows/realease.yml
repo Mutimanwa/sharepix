@@ -1,9 +1,4 @@
 # ── SharePix · Publication APK & Release GitHub ─────────────────────────
-# À chaque push sur `main` :
-# 1. Génère un APK Android via EAS Build
-# 2. Télécharge le fichier .apk généré
-# 3. Crée une Release GitHub officielle avec l'APK attaché
-# ─────────────────────────────────────────────────────────────────────────
 name: Release APK (GitHub Release)
 
 on:
@@ -50,10 +45,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: SharePix v1.0.${{ github.run_number }}
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "SharePix v1.0.${{ github.run_number }}"
           body: |
-             **Nouvelle mise à jour disponible !**
+            H **Nouvelle mise à jour disponible !**
 
             Téléchargez le fichier `sharepix-latest.apk` ci-dessous pour installer la dernière version sur votre appareil Android.
           draft: false
