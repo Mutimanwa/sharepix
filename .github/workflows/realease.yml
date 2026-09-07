@@ -36,11 +36,11 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build APK with EAS
-        run: eas build --platform android --profile preview --non-interactive
-
-      - name: Download APK artifact
-        run: eas build:download --platform android --profile preview --latest --output sharepix-latest.apk
+      - name: Build APK and Download
+        run: |
+          eas build --platform android --profile preview --non-interactive --json > build-result.json
+          BUILD_URL=$(jq -r '.[0].artifacts.buildUrl // .artifacts.buildUrl' build-result.json)
+          curl -L "$BUILD_URL" -o sharepix-latest.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -48,7 +48,7 @@ jobs:
           tag_name: "v1.0.${{ github.run_number }}"
           name: "SharePix v1.0.${{ github.run_number }}"
           body: |
-            H **Nouvelle mise à jour disponible !**
+            🚀 **Nouvelle mise à jour disponible !**
 
             Téléchargez le fichier `sharepix-latest.apk` ci-dessous pour installer la dernière version sur votre appareil Android.
           draft: false
