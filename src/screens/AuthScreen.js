@@ -10,7 +10,8 @@ import {
   View,
   Dimensions,
   Alert,
-  TextInput
+  TextInput,
+  Linking
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -96,6 +97,7 @@ export default function AuthScreen({ navigation, route }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const insets = useSafeAreaInsets();
   const { setAuthUser } = useStore();
@@ -127,6 +129,18 @@ export default function AuthScreen({ navigation, route }) {
     }
     if (!isLogin && !firstName.trim()) {
       setError('Veuillez entrer votre prénom.');
+      return false;
+    }
+    if (!isLogin && !acceptedTerms) {
+      setError('Veuillez accepter les conditions et la politique de confidentialité.');
+      return false;
+    }
+    return true;
+  };
+
+  const validateTermsForGoogle = () => {
+    if (!isLogin && !acceptedTerms) {
+      setError('Veuillez accepter les conditions et la politique de confidentialité.');
       return false;
     }
     return true;
@@ -164,7 +178,7 @@ export default function AuthScreen({ navigation, route }) {
       if (result.needsEmailConfirm) {
         setNeedsEmailConfirm(true);
         setError('Compte créé. Vérifiez votre email pour confirmer votre inscription.');
-        console.log('📧 Email confirmation required');
+        console.log('Email confirmation required');
         setLoading(false);
         return;
       }
@@ -187,6 +201,7 @@ export default function AuthScreen({ navigation, route }) {
   };
 
   const handleGoogle = async () => {
+    if (!validateTermsForGoogle()) return;
     if (!isSupabaseConfigured) {
       setError('Supabase n\'est pas configuré.');
       return;
@@ -286,7 +301,9 @@ export default function AuthScreen({ navigation, route }) {
                 <View style={styles.googleIcon}>
                   <GoogleMark size={20} />
                 </View>
-                <Text style={styles.googleText}>Continuer avec Google</Text>
+                <Text style={styles.googleText}>
+                  {converting ? 'Lier mon compte Google' : 'Continuer avec Google'}
+                </Text>
               </>
             )}
           </Pressable>
@@ -354,6 +371,35 @@ export default function AuthScreen({ navigation, route }) {
               }
             />
 
+            {!isLogin && (
+              <View style={styles.termsRow}>
+                <Pressable
+                  onPress={() => setAcceptedTerms((value) => !value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: acceptedTerms }}
+                  style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}
+                >
+                  {acceptedTerms && <Text style={styles.checkboxMark}>✓</Text>}
+                </Pressable>
+                <Text style={styles.termsText}>
+                  J'accepte les{' '}
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() => Linking.openURL('https://sharepix.app/cgv')}
+                  >
+                    conditions générales
+                  </Text>{' '}
+                  et la{' '}
+                  <Text
+                    style={styles.termsLink}
+                    onPress={() => Linking.openURL('https://sharepix.app/privacy')}
+                  >
+                    politique de confidentialité
+                  </Text>.
+                </Text>
+              </View>
+            )}
+
             {/* Error Box */}
             {!!error && (
               <View style={styles.errorBox}>
@@ -402,6 +448,7 @@ export default function AuthScreen({ navigation, route }) {
             onPress={() => {
               setError('');
               setNeedsEmailConfirm(false);
+              setAcceptedTerms(false);
               setMode(isLogin ? 'register' : 'login');
             }}
           >
@@ -446,6 +493,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
   },
   brandContainer: {
+    marginTop: 80,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -520,7 +568,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputWrapperFocused: {
-    borderColor: colors.teal,
+    borderColor: colors.tealDark,
   },
   inputIcon: {
     marginRight: 15,
@@ -547,6 +595,44 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.6,
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: colors.white,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.tealDark,
+    borderColor: colors.tealDark,
+  },
+  checkboxMark: {
+    color: colors.white,
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  termsText: {
+    flex: 1,
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  termsLink: {
+    color: colors.tealDark,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   errorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',

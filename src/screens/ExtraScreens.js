@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-  Diamond01Icon,
+  HonourStarIcon,
   Video01Icon,
   Image01Icon,
   Copy01Icon,
@@ -290,7 +290,7 @@ export function MembersScreen({ route, navigation }) {
 const PERKS = [
   { icon: Video01Icon, title: 'Vidéos illimitées', hint: 'Chaque membre peut déposer des films' },
   { icon: Image01Icon, title: 'Qualité originale', hint: 'Aucun recadrage, aucun tassement' },
-  { icon: Diamond01Icon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
+  { icon: HonourStarIcon, title: 'Espace étendu', hint: 'Plus de souvenirs, plus longtemps' },
 ];
 
 export function PremiumScreen({ navigation }) {
@@ -304,7 +304,7 @@ export function PremiumScreen({ navigation }) {
       >
         <View style={styles.hero}>
           <View style={styles.cover}>
-            <HugeiconsIcon icon={Diamond01Icon} size={36} color="#fff" />
+            <HugeiconsIcon icon={HonourStarIcon} size={36} />
           </View>
           <Text style={styles.albumName}>Passez à Premium</Text>
           <Text style={styles.hintCenter}>
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E8EEEE',
+
   },
   memberAvatar: {
     width: 40,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 24,
-    backgroundColor: colors.tealDeep,
+    backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
   },

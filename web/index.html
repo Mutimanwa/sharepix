@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="fr" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SharePix - Vos souvenirs, en un seul endroit</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["Poppins", "sans-serif"],
+                    },
+                    colors: {
+                        teal: {
+                            50: "#f0f8f9",
+                            100: "#d4eaea",
+                            200: "#aad6d7",
+                            300: "#7dc1c3",
+                            400: "#4dabae",
+                            500: "#2ba3a8", // Primary
+                            600: "#218388",
+                            700: "#1a6a6e",
+                            800: "#164e52", // TealDark
+                            900: "#0e3a3e", // TealDeep
+                        },
+                        coral: {
+                            50: "#fdf4f2",
+                            100: "#fbe3de",
+                            200: "#f5c7bc",
+                            300: "#eeab9a",
+                            400: "#e78d78",
+                            500: "#e07a6a", // Primary Coral
+                            600: "#c96556", // CoralDark
+                            700: "#b35446",
+                            800: "#9c4538",
+                            900: "#85362b",
+                        },
+                        cream: "#f3f8f8",
+                        peach: "#e8f6f6",
+                        border: "#d5e3e3",
+                        muted: "#6b7c7d",
+                        taupe: "#c4b8b0",
+                        taupeDark: "#a89b93",
+                    },
+                },
+            },
+        };
+    </script>
+
+    <!-- Styles personnalisés pour la charte -->
+    <style>
+        body {
+            background-color: #f3f8f8;
+            font-family: "Poppins", sans-serif;
+        }
+
+        .bg-cream {
+            background-color: #f3f8f8;
+        }
+
+        .bg-peach {
+            background-color: #e8f6f6;
+        }
+
+        .text-teal-dark {
+            color: #164e52;
+        }
+
+        .text-teal-deep {
+            color: #0e3a3e;
+        }
+
+        .border-border {
+            border-color: #d5e3e3;
+        }
+
+        .text-muted {
+            color: #6b7c7d;
+        }
+
+        .btn-coral {
+            background-color: #e07a6a;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .btn-coral:hover {
+            background-color: #c96556;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(224, 122, 106, 0.4);
+        }
+
+        .btn-coral-outline {
+            border: 2px solid #e07a6a;
+            color: #e07a6a;
+            background: transparent;
+            transition: all 0.3s ease;
+        }
+
+        .btn-coral-outline:hover {
+            background-color: #e07a6a;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .btn-teal {
+            background-color: #2ba3a8;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .btn-teal:hover {
+            background-color: #164e52;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(43, 163, 168, 0.4);
+        }
+
+        .link-teal {
+            color: #2ba3a8;
+            transition: color 0.2s;
+        }
+
+        .link-teal:hover {
+            color: #164e52;
+        }
+
+        /* Hero overlay */
+        .hero-overlay {
+            background: linear-gradient(135deg,
+                    rgba(14, 58, 62, 0.85) 0%,
+                    rgba(22, 78, 82, 0.7) 100%);
+        }
+
+        /* Phone mockup */
+        .phone-mockup {
+            border-radius: 2.5rem;
+            border: 6px solid #ffffff;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            position: relative;
+            background: #ffffff;
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 20px;
+            background: #1a1a1a;
+            border-radius: 0 0 16px 16px;
+            z-index: 10;
+        }
+
+        .phone-mockup img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Fade-in animation */
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .delay-100 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-200 {
+            animation-delay: 0.2s;
+        }
+
+        .delay-300 {
+            animation-delay: 0.3s;
+        }
+    </style>
+</head>
+
+<body id="top" class="font-sans antialiased overflow-x-hidden">
+    <!-- Navbar Container (Permet de centrer et gérer l'espacement sur les côtés) -->
+    <div
+        class="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 w-full pointer-events-none transition-all duration-300">
+        <!-- Navbar Principale (Avec max-width et bords inférieurs arrondis) -->
+        <nav class="bg-white w-full max-w-[1200px] border rounded-b-[2rem] shadow-sm pointer-events-auto" id="navbar">
+            <div class="px-6 md:px-8">
+                <div class="flex justify-between items-center h-20">
+                    <!-- Logo Sharepix -->
+                    <a href="#top" class="flex-shrink-0 flex items-center gap-2 cursor-pointer group">
+                        <div
+                            class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-[1rem]">
+                            <img src="./assets/imgs/Logo.png" alt="" />
+                        </div>
+                        <span
+                            class="font-bold text-xl text-emerald-800 tracking-tight group-hover:text-emerald-700 transition-colors">Sharepix</span>
+                    </a>
+
+                    <!-- Desktop Menu -->
+                    <div class="hidden md:flex space-x-8">
+                        <a href="#"
+                            class="text-gray-900 font-medium hover:text-emerald-700 transition-colors">Accueil</a>
+                        <a href="#features"
+                            class="text-gray-600 font-medium hover:text-gray-900 transition-colors">Fonctionnalités</a>
+                        <a href="#about" class="text-gray-600 font-medium hover:text-gray-900 transition-colors">À
+                            propos</a>
+                        <a href="#download"
+                            class="text-gray-600 font-medium hover:text-gray-900 transition-colors">Télécharger</a>
+                    </div>
+
+                    <!-- CTA Button (Style "Outline" comme sur la maquette) -->
+                    <div class="hidden md:flex items-center">
+                        <a href="#download"
+                            class="px-6 py-2 rounded-full border border-emerald-700 text-emerald-700 font-medium hover:bg-emerald-50 transition-colors">
+                            Télécharger
+                        </a>
+                    </div>
+
+                    <!-- Mobile menu button -->
+                    <div class="md:hidden flex items-center">
+                        <button id="mobile-menu-btn"
+                            class="text-gray-600 hover:text-emerald-800 focus:outline-none p-2">
+                            <i class="fa-solid fa-bars text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Menu -->
+            <div id="mobile-menu"
+                class="hidden md:hidden bg-white border-t border-gray-100 rounded-b-[2rem] absolute w-full shadow-lg left-0 top-full overflow-hidden">
+                <div class="px-4 pt-2 pb-6 space-y-2">
+                    <a href="#"
+                        class="block px-3 py-2 text-base font-medium text-emerald-800 bg-emerald-50 rounded-xl">Accueil</a>
+                    <a href="#features"
+                        class="block px-3 py-2 text-base font-medium text-gray-600 hover:text-emerald-800 hover:bg-gray-50 rounded-xl">Fonctionnalités</a>
+                    <a href="#about"
+                        class="block px-3 py-2 text-base font-medium text-gray-600 hover:text-emerald-800 hover:bg-gray-50 rounded-xl">À
+                        propos</a>
+                    <a href="#download"
+                        class="block px-3 py-2 text-base font-medium text-gray-600 hover:text-emerald-800 hover:bg-gray-50 rounded-xl">Télécharger</a>
+                    <a href="#download"
+                        class="block px-3 py-2 mt-4 text-center text-base font-medium text-emerald-700 border border-emerald-700 rounded-full hover:bg-emerald-50">Télécharger</a>
+                </div>
+            </div>
+        </nav>
+    </div>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="relative pt-20 pb-0 overflow-hidden bg-white flex flex-col justify-between">
+            <!-- Background Image with Dark Overlay (Matches the rocky landscape) -->
+            <div class="absolute top-0 left-0 w-full h-[85%] z-0">
+                <!-- Image de fond rocheux similaire à la maquette -->
+                <img src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?ixlib=rb-4.0.3&auto=format&fit=crop&w=2021&q=80"
+                    alt="Rocky Landscape" class="w-full h-full object-cover" />
+                <!-- Overlay sombre -->
+                <div class="absolute inset-0 bg-black/60"></div>
+            </div>
+
+            <!-- Hero Content -->
+            <div class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-8 md:pt-12">
+                <h1 class="text-4xl md:text-5xl font-bold text-white leading-tight mb-4 tracking-tight">
+                    Vos souvenirs, <br class="hidden sm:block" />en un seul endroit.
+                </h1>
+                <p class="mt-4 text-base md:text-lg text-gray-200 mb-8 max-w-2xl mx-auto font-light">
+                    Mariage, vacances, anniversaire : créez un album, partagez un simple
+                    code, et chacun y ajoute ses photos. Rien de public.
+                </p>
+                <a href="#download"
+                    class="inline-block px-8 py-3 bg-white text-emerald-800 rounded-full font-semibold shadow-lg hover:bg-gray-50 transition-colors">
+                    Commencer l'expérience
+                </a>
+            </div>
+
+            <!-- Overlapping Phones Mockups -->
+            <div class="relative z-20 max-w-5xl mx-auto px-4 mt-16 flex justify-center items-end">
+                <!-- Left Phone (Derrière et décalé à gauche) -->
+                <div
+                    class="hidden md:block w-[260px] lg:w-[280px] h-[560px] lg:h-[550px] bg-white rounded-[2.5rem] border-4 border-[#1a1a1a] shadow-2xl relative translate-x-16 lg:translate-x-20 mb-8 shrink-0 overflow-hidden z-10">
+                    <!-- Dynamic Island -->
+                    <div class="absolute top-3 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full z-50"></div>
+                    <img src="./assets/imgs/ScreenSplash.png" alt="App Screen" class="w-full h-full object-cover" />
+                </div>
+
+                <!-- Center Phone (Au premier plan) -->
+                <div
+                    class="w-[280px] lg:w-[300px] h-[580px] lg:h-[500px] bg-white rounded-[2.5rem] border-4 border-[#1a1a1a] shadow-2xl relative z-30 shrink-0 overflow-hidden">
+                    <!-- Dynamic Island -->
+                    <div class="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full z-50"></div>
+                    <img src="./assets/imgs/01-accueil.png" alt="App Screen" class="w-full h-full mt-8 " />
+                </div>
+
+                <!-- Right Phone (Derrière et décalé à droite) -->
+                <div
+                    class="hidden md:block w-[260px] py-[20px] bg-white lg:w-[280px] h-[560px] rounded-[2.5rem] border-4 border-[#1a1a1a] shadow-2xl relative -translate-x-16 lg:-translate-x-20 mb-8 shrink-0 overflow-hidden z-10">
+                    <div class="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full z-50"></div>
+                    <img src="./assets/imgs/02-album.png" alt="App Screen" class="w-full h-full mt-5" />
+                </div>
+            </div>
+
+            <!-- Gradient Fade Bottom (Le fondu blanc sur les téléphones) -->
+            <div
+                class="absolute bottom-0 left-0 right-0 h-40 md:h-64 bg-gradient-to-t from-white via-white to-transparent z-40 pointer-events-none">
+            </div>
+        </section>
+
+        <!-- Partners Section -->
+        <section class="py-12 bg-white">
+            <div class="max-w-7xl mx-auto px-4 text-center">
+                <p class="text-sm font-semibold text-muted tracking-wider uppercase mb-8">
+                    Conçu pour vos moments importants
+                </p>
+                <div
+                    class="flex flex-wrap justify-center items-center gap-10 md:gap-20 opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+                    <div class="flex items-center gap-2 text-xl font-bold font-serif text-teal-dark">
+                        <i class="fa-solid fa-camera text-2xl text-teal-500"></i>
+                        LogoIpsum
+                    </div>
+                    <div class="flex items-center gap-2 text-xl font-bold text-teal-dark">
+                        <i class="fa-brands fa-slack text-2xl text-teal-500"></i>
+                        SpaceIpsum
+                    </div>
+                    <div class="flex items-center gap-2 text-xl font-bold font-mono text-teal-dark">
+                        <i class="fa-solid fa-layer-group text-2xl text-teal-500"></i>
+                        NextIpsum
+                    </div>
+                    <div class="flex items-center gap-2 text-xl font-bold italic text-teal-dark">
+                        <i class="fa-solid fa-shield-halved text-2xl text-teal-500"></i>
+                        LogoIpsum
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats & About Grid Section -->
+        <section class="py-20 bg-white" id="about">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Left Column -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <!-- Stats Card -->
+                        <div class="bg-[#EAEFEF] rounded-xl p-8 grid grid-cols-3 gap-4 border-none">
+                            <div>
+                                <h3 class="text-4xl font-semibold text-gray-800 tracking-tight">
+                                    1
+                                </h3>
+                                <p class="text-sm text-gray-500 font-medium mt-2">
+                                    Album pour chaque événement
+                                </p>
+                            </div>
+                            <div>
+                                <h3 class="text-4xl font-semibold text-gray-800 tracking-tight">
+                                    0
+                                </h3>
+                                <p class="text-sm text-gray-500 font-medium mt-2">
+                                    Espace public
+                                </p>
+                            </div>
+                            <div>
+                                <h3 class="text-4xl font-semibold text-gray-800 tracking-tight">
+                                    8
+                                </h3>
+                                <p class="text-sm text-gray-500 font-medium mt-2">
+                                    Caractères par invitation
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- About Card -->
+                        <div
+                            class="bg-[#164e52] rounded-xl p-8 md:p-10 text-white flex-1 flex flex-col justify-between shadow-lg">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-4">À propos de SharePix</h2>
+                                <p class="text-emerald-50/90 text-[15px] leading-relaxed mb-8 font-light">
+                                    SharePix rassemble les photos et vidéos de vos événements
+                                    dans des albums privés. Créez un album, invitez vos proches
+                                    avec un code ou un QR code, puis laissez chacun ajouter ses
+                                    souvenirs. Vos contenus restent accessibles uniquement aux
+                                    membres invités.
+                                </p>
+                            </div>
+                            <div class="mt-auto">
+                                <a href="#features"
+                                    class="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-full font-semibold text-sm hover:bg-gray-100 transition-colors w-fit">
+                                    En savoir plus
+                                    <!-- Icône Flèche Diagonale -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column (Floating App Screens) -->
+                    <div
+                        class="lg:col-span-7 bg-[#EEF0F5] rounded-[2rem] p-8 relative overflow-hidden min-h-[500px] flex items-center justify-center">
+                        <!-- Floating Screens Composition (Scaled for responsiveness) -->
+                        <div
+                            class="relative w-[480px] h-[420px] transform scale-75 sm:scale-90 lg:scale-100 origin-center">
+                            <!-- Left Screen (Droit, à l'arrière-plan, le plus bas) -->
+                            <div
+                                class="absolute z-20 w-[200px] h-[400px] rounded-[2rem] bg-white shadow-xl overflow-hidden left-[-2rem] top-0 transition-transform duration-500 hover:-translate-y-2">
+                                <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=400&q=80"
+                                    alt="Interface de l'application 1" class="w-full h-full object-cover" />
+                            </div>
+
+                            <!-- Center Screen (Légèrement incliné, au milieu, le plus haut) -->
+                            <div
+                                class="absolute z-10 w-[200px] h-[400px] rounded-[2rem] bg-white shadow-2xl overflow-hidden transform rotate-[10deg] left-[150px] transition-transform duration-500 hover:-translate-y-2 hover:rotate-[10deg]">
+                                <img src="https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=400&q=80"
+                                    alt="Interface de l'application 2" class="w-full h-full object-cover" />
+                            </div>
+
+                            <!-- Right Screen (Plus incliné, au premier plan, plus bas que le centre) -->
+                            <div
+                                class="absolute z-5 w-[200px] h-[400px] rounded-[2rem] bg-white shadow-[0_25px_50px_rgba(0,0,0,0.15)] overflow-hidden transform rotate-[20deg] left-[20rem] bottom-[-2rem] transition-transform duration-500 hover:-translate-y-2 hover:rotate-[15deg]">
+                                <img src="https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=400&q=80"
+                                    alt="Interface de l'application 3" class="w-full h-full object-cover" />
+                            </div>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="py-24 bg-white" id="features">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-2xl mx-auto mb-16">
+                    <p class="text-teal-500 font-semibold mb-2">Nos Fonctionnalités</p>
+                    <h2 class="text-3xl md:text-4xl font-bold text-teal-dark">
+                        Des outils clés pour sublimer votre expérience photo
+                    </h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Feature 1 -->
+                    <div
+                        class="bg-cream p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-border">
+                        <div
+                            class="w-12 h-12 bg-teal-100 text-teal-500 rounded-xl flex items-center justify-center text-xl mb-6">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-teal-dark mb-3">
+                            Sauvegarde Sécurisée
+                        </h3>
+                        <p class="text-muted text-sm leading-relaxed">
+                            Gardez vos albums dans un espace privé accessible uniquement aux
+                            membres invités.
+                        </p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div
+                        class="bg-cream p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-border">
+                        <div
+                            class="w-12 h-12 bg-teal-100 text-teal-500 rounded-xl flex items-center justify-center text-xl mb-6">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-teal-dark mb-3">
+                            Souvenirs réunis
+                        </h3>
+                        <p class="text-muted text-sm leading-relaxed">
+                            Photos, vidéos, commentaires et favoris réunis au même endroit.
+                        </p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div
+                        class="bg-cream p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-border">
+                        <div
+                            class="w-12 h-12 bg-teal-100 text-teal-500 rounded-xl flex items-center justify-center text-xl mb-6">
+                            <i class="fa-regular fa-bell"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-teal-dark mb-3">
+                            Notifications Actives
+                        </h3>
+                        <p class="text-muted text-sm leading-relaxed">
+                            Recevez les nouvelles photos, mentions J'aime et commentaires de
+                            vos albums.
+                        </p>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div
+                        class="bg-cream p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-border">
+                        <div
+                            class="w-12 h-12 bg-teal-100 text-teal-500 rounded-xl flex items-center justify-center text-xl mb-6">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-teal-dark mb-3">
+                            Albums Collaboratifs
+                        </h3>
+                        <p class="text-muted text-sm leading-relaxed">
+                            Créez des albums partagés pour regrouper les souvenirs de vos
+                            événements entre amis.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Split Section 1 -->
+        <section class="py-24 bg-cream overflow-hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col lg:flex-row items-center gap-16">
+                    <div class="w-full lg:w-1/2 flex justify-center lg:justify-start relative">
+                        <div
+                            class="bg-peach rounded-[3rem] p-10 w-full max-w-md relative flex items-center justify-center h-[500px] border border-border">
+                            <div
+                                class="w-[280px] lg:w-[300px] h-[580px] bg-white rounded-[2.5rem] border-4 border-[#1a1a1a] shadow-2xl relative z-10 pt-12 shrink-0 overflow-hidden">
+                                <!-- Dynamic Island -->
+                                <div
+                                    class="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full z-50">
+                                </div>
+                                <img src="./assets/imgs/01-accueil.png" alt="App Screen" class="w-full h-full" />
+                            </div>
+                            <div
+                                class="absolute z-20 -right-4 top-1/3 bg-white p-3 rounded-xl shadow-lg border border-border flex items-center gap-3">
+                                <div
+                                    class="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-500">
+                                    <i class="fa-solid fa-check"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-teal-dark">Synchronisé</p>
+                                    <p class="text-[10px] text-muted">À l'instant</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-full lg:w-1/2">
+                        <h2 class="text-3xl md:text-4xl font-bold text-teal-dark mb-6 leading-tight">
+                            Votre guide ultime pour une galerie photo sans tracas.
+                        </h2>
+                        <p class="text-muted mb-8 text-lg leading-relaxed">
+                            Un mariage, une fête ou un voyage rassemble souvent des
+                            centaines de photos. SharePix donne à chacun un espace simple
+                            pour contribuer, retrouver les bons souvenirs et garder le
+                            contrôle des personnes qui y ont accès.
+                        </p>
+                        <ul class="space-y-4 mb-8">
+                            <li class="flex items-start gap-3">
+                                <i class="fa-solid fa-circle-check text-teal-500 mt-1"></i>
+                                <span class="text-teal-dark font-medium">Albums privés pour vos événements</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fa-solid fa-circle-check text-teal-500 mt-1"></i>
+                                <span class="text-teal-dark font-medium">Invitation par code, QR code ou lien</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fa-solid fa-circle-check text-teal-500 mt-1"></i>
+                                <span class="text-teal-dark font-medium">Synchronisation entre vos appareils</span>
+                            </li>
+                        </ul>
+                        <a href="#features"
+                            class="inline-flex items-center gap-2 border-2 border-emerald-700 text-emerald-700 font-medium hover:bg-emerald-50 px-8 py-3 rounded-full transition-colors">
+                            Découvrir plus
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Split Section 2 -->
+        <section class="py-24 bg-white overflow-hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col-reverse lg:flex-row items-center gap-16">
+                    <div class="w-full lg:w-1/2">
+                        <h2 class="text-3xl md:text-4xl font-bold text-teal-dark mb-6 leading-tight">
+                            Un album commun, sans groupe interminable.
+                        </h2>
+                        <p class="text-muted mb-8 text-lg leading-relaxed">
+                            Commencez sans inscription grâce au compte invité, invitez vos
+                            proches en quelques secondes et convertissez ensuite votre
+                            compte pour retrouver vos albums sur tous vos appareils.
+                        </p>
+                        <a href="#download"
+                            class="inline-flex items-center gap-2 border border-emerald-700 text-emerald-700 font-medium hover:bg-emerald-50 transition-colors px-8 py-3 rounded-full">
+                            Voir comment
+                        </a>
+                    </div>
+
+                    <div class="w-full lg:w-1/2 flex justify-center lg:justify-end">
+                        <!-- Conteneur principal -->
+                        <div
+                            class="relative bg-[#EAF1F8] rounded-[3rem] p-6 sm:p-10 w-full max-w-lg h-[500px] sm:h-[600px] flex items-center justify-center overflow-hidden">
+                            <!-- Scène 3D -->
+                            <div
+                                class="relative w-full h-full flex items-center justify-center [perspective:1500px] group">
+                                <!-- PHONE 1 : gauche / avant -->
+                                <div
+                                    class="absolute w-[160px] sm:w-[190px] h-[340px] sm:h-[400px] bg-white rounded-[2rem] overflow-hidden border-[6px] border-white shadow-[20px_20px_40px_rgba(0,0,0,0.15)] z-30 transition-transform duration-700 ease-out [transform:rotateX(60deg)_rotateY(-10deg)_rotateZ(40deg)_translateX(-60px)_translateY(-80px)] group-hover:[transform:rotateX(0deg)_rotateY(5deg)_rotateZ(0deg)_translateX(-75px)_translateY(-50px)]">
+                                    <img src="./assets/imgs/00b-onboarding.png" alt="Application screen 1"
+                                        class="w-full h-full object-cover" />
+                                </div>
+
+                                <!-- PHONE 2 : centre -->
+                                <div
+                                    class="absolute w-[160px] sm:w-[190px] h-[340px] sm:h-[400px] bg-white rounded-[2rem] overflow-hidden border-[6px] border-white shadow-[20px_20px_40px_rgba(0,0,0,0.10)] z-20 transition-transform duration-700 ease-out [transform:rotateX(55deg)_rotateY(10deg)_rotateZ(40deg)_translateX(15px)_translateY(20px)] group-hover:[transform:rotateX(0deg)_rotateY(5deg)_rotateZ(0deg)_translateX(15px)_translateY(10px)]">
+                                    <img src="./assets/imgs/01-accueil.png" alt="Application screen 2"
+                                        class="w-full h-full object-cover" />
+                                </div>
+
+                                <!-- PHONE 3 : droite / arrière -->
+                                <div
+                                    class="absolute w-[160px] sm:w-[190px] h-[340px] sm:h-[400px] bg-white rounded-[2rem] overflow-hidden border-[6px] border-white shadow-[20px_20px_40px_rgba(0,0,0,0.05)] z-10 transition-transform duration-700 ease-out [transform:rotateX(55deg)_rotateY(10deg)_rotateZ(40deg)_translateX(90px)_translateY(120px)] group-hover:[transform:rotateX(0deg)_rotateY(5deg)_rotateZ(0deg)_translateX(105px)_translateY(50px)]">
+                                    <img src="./assets/imgs/02-album.png" alt="Application screen 3"
+                                        class="w-full h-full object-cover" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials Section -->
+        <section class="py-24 bg-cream" id="testimonials">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <p class="text-teal-500 font-semibold mb-2">Avis de nos clients</p>
+                <h2 class="text-3xl md:text-4xl font-bold text-teal-dark mb-16">
+                    Des souvenirs qui restent ensemble
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                    <!-- Testimonial 1 -->
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-border">
+                        <div class="text-teal-500 text-3xl mb-6">
+                            <i class="fa-solid fa-quote-left"></i>
+                        </div>
+                        <h4 class="font-bold text-teal-dark text-lg mb-3">
+                            Partager avec Sharepix a été un tournant pour moi.
+                        </h4>
+                        <p class="text-muted text-sm mb-6 line-clamp-4">
+                            Pour notre mariage, chacun a pu ajouter ses photos dans le même
+                            album. Nous avons retrouvé des moments que les mariés n'avaient
+                            jamais vus.
+                        </p>
+                        <div class="flex text-coral-500 text-sm mb-6">
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <img src="https://randomuser.me/api/portraits/women/68.jpg" alt="User"
+                                class="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <p class="font-bold text-teal-dark text-sm">Sophie Martin</p>
+                                <p class="text-xs text-muted">Photographe Amateur</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Testimonial 2 -->
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-border">
+                        <div class="text-teal-500 text-3xl mb-6">
+                            <i class="fa-solid fa-quote-left"></i>
+                        </div>
+                        <h4 class="font-bold text-teal-dark text-lg mb-3">
+                            L'interface la plus propre que j'ai utilisée.
+                        </h4>
+                        <p class="text-muted text-sm mb-6 line-clamp-4">
+                            Le code d'invitation a suffi pour réunir toute notre famille
+                            dans un album privé, sans créer de groupe supplémentaire.
+                        </p>
+                        <div class="flex text-coral-500 text-sm mb-6">
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star-half-stroke"></i>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="User"
+                                class="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <p class="font-bold text-teal-dark text-sm">Thomas Dubois</p>
+                                <p class="text-xs text-muted">Créateur de contenu</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Testimonial 3 -->
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-border">
+                        <div class="text-teal-500 text-3xl mb-6">
+                            <i class="fa-solid fa-quote-left"></i>
+                        </div>
+                        <h4 class="font-bold text-teal-dark text-lg mb-3">
+                            Une organisation automatique bluffante.
+                        </h4>
+                        <p class="text-muted text-sm mb-6 line-clamp-4">
+                            J'aime pouvoir garder mes souvenirs dans un espace réservé aux
+                            membres de l'album et recevoir les nouvelles photos au bon
+                            moment.
+                        </p>
+                        <div class="flex text-coral-500 text-sm mb-6">
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                            <i class="fa-solid fa-star"></i>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <img src="https://randomuser.me/api/portraits/women/12.jpg" alt="User"
+                                class="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <p class="font-bold text-teal-dark text-sm">Camille Leroi</p>
+                                <p class="text-xs text-muted">Voyageuse</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-center items-center gap-4 mt-12">
+                    <button
+                        class="w-12 h-12 rounded-full border border-border flex items-center justify-center text-muted hover:bg-teal-500 hover:text-white hover:border-teal-500 transition-colors">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <button
+                        class="w-12 h-12 rounded-full bg-teal-500 text-white flex items-center justify-center shadow-md hover:bg-teal-dark transition-colors">
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Blog & News Section -->
+        <section class="py-24 bg-white" id="blog">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-end mb-12">
+                    <div>
+                        <h2 class="text-3xl md:text-4xl font-bold text-teal-dark">
+                            Blog & Actualités
+                        </h2>
+                    </div>
+                    <a href="#features"
+                        class="hidden md:inline-flex items-center gap-2 border border-border text-muted px-6 py-2 rounded-full text-sm font-medium hover:border-teal-dark hover:text-teal-dark transition-colors">
+                        Voir tout
+                    </a>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Blog Post 1 -->
+                    <div class="group cursor-pointer">
+                        <div class="w-full h-56 rounded-3xl overflow-hidden mb-6 relative">
+                            <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                                alt="Blog Image"
+                                class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <h3 class="font-bold text-xl text-teal-dark mb-3 group-hover:text-teal-500 transition-colors">
+                            Créer un album pour son événement
+                        </h3>
+                        <p class="text-muted text-sm mb-4 line-clamp-2">
+                            Les étapes essentielles pour rassembler les photos d'un mariage,
+                            d'un anniversaire ou d'un voyage.
+                        </p>
+                    </div>
+
+                    <!-- Blog Post 2 -->
+                    <div class="group cursor-pointer">
+                        <div class="w-full h-56 rounded-3xl overflow-hidden mb-6 relative">
+                            <img src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                                alt="Blog Image"
+                                class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <h3 class="font-bold text-xl text-teal-dark mb-3 group-hover:text-teal-500 transition-colors">
+                            Inviter ses proches en quelques secondes
+                        </h3>
+                        <p class="text-muted text-sm mb-4 line-clamp-2">
+                            Code à 8 caractères, QR code ou lien direct : choisissez la
+                            façon la plus simple de partager votre album.
+                        </p>
+                    </div>
+
+                    <!-- Blog Post 3 -->
+                    <div class="group cursor-pointer">
+                        <div class="w-full h-56 rounded-3xl overflow-hidden mb-6 relative">
+                            <img src="https://images.unsplash.com/photo-1516483638261-f40af5ba408d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                                alt="Blog Image"
+                                class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <h3 class="font-bold text-xl text-teal-dark mb-3 group-hover:text-teal-500 transition-colors">
+                            Mise à jour: Nouveau système de tags IA
+                        </h3>
+                        <p class="text-muted text-sm mb-4 line-clamp-2">
+                            Nos conseils pour organiser les photos d'un événement et
+                            préserver les souvenirs qui comptent.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center md:hidden">
+                    <a href="#features"
+                        class="inline-flex items-center gap-2 border border-border text-muted px-6 py-2 rounded-full text-sm font-medium hover:border-teal-dark hover:text-teal-dark transition-colors">
+                        Voir tout
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Download Section -->
+        <section class="py-24 bg-cream" id="download">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="rounded-[2rem] bg-teal-deep px-6 py-14 md:px-14 text-center relative overflow-hidden">
+                    <div class="relative z-10 max-w-2xl mx-auto">
+                        <p class="text-teal-500 font-semibold mb-3">
+                            Commencez simplement
+                        </p>
+                        <h2 class="text-3xl md:text-4xl font-bold text-teal-dark mb-5">
+                            Vos souvenirs méritent un espace à eux.
+                        </h2>
+                        <p class="text-muted mb-8 leading-relaxed">
+                            Créez votre premier album privé, invitez vos proches et
+                            rassemblez les photos de votre événement au même endroit.
+                        </p>
+                        <a href="mailto:contact@sharepix.app?subject=Télécharger SharePix"
+                            class="inline-flex items-center gap-3 btn-coral px-8 py-3.5 rounded-full font-semibold shadow-lg">
+                            <i class="fa-solid fa-download"></i>
+                            Télécharger SharePix
+                        </a>
+                        <p class="text-muted text-xs mt-4">
+                            L'application arrive bientôt sur Google Play.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Newsletter Section -->
+        <section class="py-20 bg-white">
+            <div class="max-w-3xl mx-auto px-4 text-center">
+                <h2 class="text-3xl font-bold text-teal-dark mb-4">
+                    Restez au courant
+                </h2>
+                <p class="text-muted mb-8 text-sm">
+                    Recevez les nouveautés SharePix et quelques idées pour mieux
+                    conserver vos souvenirs.
+                </p>
+                <form class="max-w-md mx-auto relative flex items-center" onsubmit="
+              event.preventDefault();
+              this.querySelector('button').textContent = 'Merci !';
+            ">
+                    <input type="email" placeholder="Votre adresse email" aria-label="Votre adresse email"
+                        class="w-full bg-cream border border-border text-teal-dark placeholder:text-muted px-6 py-4 rounded-full outline-none focus:border-teal-400 transition-colors"
+                        required />
+                    <button type="submit"
+                        class="absolute right-2 btn-coral px-6 py-2.5 rounded-full font-medium shadow-sm">
+                        S'abonner
+                    </button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#164e52] text-teal-50 pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+                <!-- Brand Col -->
+                <div class="lg:col-span-1">
+                    <div class="flex items-center gap-2 mb-6">
+                        <div
+                            class="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                            <img src="./assets/imgs/Logo.png" alt="" />
+                        </div>
+                        <span class="font-bold text-2xl text-white tracking-tight">Sharepix</span>
+                    </div>
+                    <p class="text-teal-200/70 text-sm leading-relaxed mb-6">
+                        Des albums privés pour rassembler les souvenirs de vos événements
+                        avec les bonnes personnes.
+                    </p>
+                </div>
+
+                <!-- Service Col -->
+                <div>
+                    <h4 class="text-white font-bold mb-6">Service</h4>
+                    <ul class="space-y-4 text-sm text-teal-200/70">
+                        <li>
+                            <a href="#features" class="hover:text-white transition-colors">Fonctionnalités</a>
+                        </li>
+                        <li>
+                            <a href="#download" class="hover:text-white transition-colors">Télécharger</a>
+                        </li>
+                        <li>
+                            <a href="mailto:contact@sharepix.app" class="hover:text-white transition-colors">Centre
+                                d'aide</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Menu Col -->
+                <div>
+                    <h4 class="text-white font-bold mb-6">Menu</h4>
+                    <ul class="space-y-4 text-sm text-teal-200/70">
+                        <li>
+                            <a href="#about" class="hover:text-white transition-colors">À propos</a>
+                        </li>
+                        <li>
+                            <a href="privacy.html" class="hover:text-white transition-colors">Politique de
+                                confidentialité</a>
+                        </li>
+                        <li>
+                            <a href="terms.html" class="hover:text-white transition-colors">Conditions d'utilisation</a>
+                        </li>
+                        <li>
+                            <a href="mailto:contact@sharepix.app" class="hover:text-white transition-colors">Nous
+                                contacter</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Contact Col -->
+                <div>
+                    <h4 class="text-white font-bold mb-6">Contactez-nous</h4>
+                    <ul class="space-y-4 text-sm text-teal-200/70">
+                        <li class="flex items-center gap-3">
+                            <i class="fa-solid fa-envelope"></i> contact@sharepix.app
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Bottom Bar -->
+            <div class="border-t border-teal-600/50 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-sm text-teal-200/50">
+                    &copy; 2026 Sharepix. Tous droits réservés.
+                </p>
+                <div class="flex gap-4">
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-teal-600/50 flex items-center justify-center text-white hover:bg-teal-500 hover:text-white transition-colors">
+                        <i class="fa-brands fa-facebook-f"></i>
+                    </a>
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-teal-600/50 flex items-center justify-center text-white hover:bg-teal-500 hover:text-white transition-colors">
+                        <i class="fa-brands fa-twitter"></i>
+                    </a>
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-teal-600/50 flex items-center justify-center text-white hover:bg-teal-500 hover:text-white transition-colors">
+                        <i class="fa-brands fa-instagram"></i>
+                    </a>
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-teal-600/50 flex items-center justify-center text-white hover:bg-teal-500 hover:text-white transition-colors">
+                        <i class="fa-brands fa-linkedin-in"></i>
+                    </a>
+                </div>
+            </div>
+            <!-- Lien vers les mentions légales -->
+            <div class="text-center mt-6">
+                <a href="privacy.html" class="text-teal-200/60 hover:text-white text-sm transition-colors">
+                    <i class="fa-solid fa-shield-halved mr-1"></i> Confidentialité
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu toggle logic
+        const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+        const mobileMenu = document.getElementById("mobile-menu");
+        const navbar = document.getElementById("navbar");
+
+        mobileMenuBtn.addEventListener("click", () => {
+            mobileMenu.classList.toggle("hidden");
+            const icon = mobileMenuBtn.querySelector("i");
+            if (mobileMenu.classList.contains("hidden")) {
+                icon.classList.remove("fa-xmark");
+                icon.classList.add("fa-bars");
+            } else {
+                icon.classList.remove("fa-bars");
+                icon.classList.add("fa-xmark");
+            }
+        });
+
+        // Add shadow to navbar on scroll
+        window.addEventListener("scroll", () => {
+            if (window.scrollY > 10) {
+                navbar.classList.add("shadow-md");
+            } else {
+                navbar.classList.remove("shadow-md");
+            }
+        });
+
+        // Close mobile menu when clicking a link
+        const mobileLinks = mobileMenu.querySelectorAll("a");
+        mobileLinks.forEach((link) => {
+            link.addEventListener("click", () => {
+                mobileMenu.classList.add("hidden");
+                const icon = mobileMenuBtn.querySelector("i");
+                icon.classList.remove("fa-xmark");
+                icon.classList.add("fa-bars");
+            });
+        });
+    </script>
+</body>
+
+</html>

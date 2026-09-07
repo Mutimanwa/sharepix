@@ -33,6 +33,15 @@
       "favicon": "./assets/sharepix-icon.png"
     },
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Autoriser SharePix à utiliser la caméra pour scanner un album",
+          "microphonePermission": "Autoriser SharePix à utiliser le microphone",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
       "expo-image-picker",
       [
         "expo-splash-screen",

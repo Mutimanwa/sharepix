@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert ,Modal ,SafeAreaView, } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert ,Modal ,SafeAreaView, Animated } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
   UserCircle02Icon, 
   Logout01Icon, 
   Camera01Icon, 
   ArrowRight01Icon, 
-  ShieldCheckIcon,
   CheckmarkBadge01Icon,
   Delete02Icon
 } from '@hugeicons/core-free-icons';
@@ -26,21 +25,40 @@ import Constants from 'expo-constants';
 // ── COMPOSANTS RÉUTILISABLES POUR L'UI ──
 
 function SwitchRow({ title, sub, value, onValueChange, isLast }) {
+  const knobPosition = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(knobPosition, {
+      toValue: value ? 1 : 0,
+      friction: 7,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  }, [knobPosition, value]);
+
+  const knobTransform = {
+    transform: [{
+      translateX: knobPosition.interpolate({
+        inputRange: [0, 1],
+        outputRange: [2, 22],
+      }),
+    }],
+  };
+
   return (
     <Pressable 
       style={[styles.row, !isLast && styles.rowBorder]} 
       onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
     >
       <View style={styles.rowTextContainer}>
         <Text style={styles.rt}>{title}</Text>
         {sub ? <Text style={styles.rs}>{sub}</Text> : null}
       </View>
-      <Switch 
-        value={value} 
-        onValueChange={onValueChange} 
-        trackColor={{ true: colors.coral, false: colors.muted }} 
-        pointerEvents="none" 
-      />
+      <View style={[styles.switchTrack, value && styles.switchTrackOn]} pointerEvents="none">
+        <Animated.View style={[styles.switchKnob, knobTransform]} />
+      </View>
     </Pressable>
   );
 }
@@ -70,6 +88,18 @@ export default function ProfileScreen({ navigation }) {
   const [busyOut, setBusyOut] = useState(false);
   const [busyDelete, setBusyDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const initialProfileRef = useRef(null);
+
+  const profileSignature = JSON.stringify({
+    firstName: p.firstName || '',
+    lastName: p.lastName || '',
+    notifications: !!p.notifications,
+    newPhotos: !!p.newPhotos,
+    likes: !!p.likes,
+    comments: !!p.comments,
+  });
+  if (initialProfileRef.current === null) initialProfileRef.current = profileSignature;
+  const hasProfileChanges = profileSignature !== initialProfileRef.current;
 
   // Récupération dynamique de la version depuis app.json
   const appVersion = Constants.expoConfig?.version || '1.0.1';
@@ -128,12 +158,13 @@ export default function ProfileScreen({ navigation }) {
   };
 
  const handleSave = async () => {
-    if (saving) return;
+   if (saving || !hasProfileChanges) return;
     setSaving(true);
     
     // On simule/attend le temps de la sauvegarde (local + synchro Supabase en arrière-plan)
     await new Promise(resolve => setTimeout(resolve, 1500));
     
+    initialProfileRef.current = profileSignature;
     setSaving(false);
     Alert.alert("Succès", "Votre profil a été mis à jour.");
   };
@@ -145,7 +176,12 @@ export default function ProfileScreen({ navigation }) {
       {/* HEADER */}
       <View style={styles.head}>
         <Text style={styles.title}>Mon profil</Text>
-        <TouchableOpacity onPress={handleSave} activeOpacity={0.7} style={styles.saveBtn}>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={!hasProfileChanges || saving}
+          activeOpacity={0.7}
+          style={[styles.saveBtn, !hasProfileChanges && styles.saveBtnDisabled]}
+        >
           <Text style={styles.saveBtnText}>Terminé</Text>
         </TouchableOpacity>
       </View>
@@ -157,7 +193,9 @@ export default function ProfileScreen({ navigation }) {
           <TouchableOpacity 
             style={styles.avatarContainer} 
             activeOpacity={0.8}
-            onPress={() => user?.avatarUrl ? Alert.alert("Photo de profil", "Modifiez votre photo directement depuis votre compte Google.") : null}
+            onPress={() => Alert.alert("Photo de profil", "Modifiez votre photo directement depuis votre compte Google.")}
+            accessibilityRole="button"
+            accessibilityLabel="Modifier la photo de profil"
           >
             <View style={styles.avatar}>
               {/* AFFICHAGE CONDITIONNEL : Image URL ou Initiales */}
@@ -169,31 +207,44 @@ export default function ProfileScreen({ navigation }) {
                 </Text>
               )}
             </View>
-            <View style={styles.avatarBadge}>
+            <View style={styles.avatarBadge} pointerEvents="none">
               <HugeiconsIcon icon={Camera01Icon} size={14} color="#fff" />
             </View>
           </TouchableOpacity>
+          <Text style={styles.avatarHint}>Photo de profil</Text>
         </View>
 
         {/* ── BANNIÈRE COMPTE ── */}
         {isSupabaseConfigured && isAnonymous && (
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
-              <View style={[styles.accountIcon, { backgroundColor: '#FFF3E0' }]}>
+              <View style={[styles.accountIcon, styles.guestIcon]}>
                    <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.tealDark} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountT}>Sécurisez vos données</Text>
+                <View style={styles.accountTitleRow}>
+                  <Text style={styles.accountT}>Compte invité</Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>À sécuriser</Text>
+                  </View>
+                </View>
                 <Text style={styles.accountS}>
-                  Vous utilisez actuellement un compte invité. Liez une adresse e-mail pour sauvegarder vos albums et y accéder partout.
+                  Vos albums sont uniquement liés à cet appareil. Ajoutez un compte pour les retrouver partout.
                 </Text>
               </View>
             </View>
             {/* ── SUPABASE ALBUMS : intégration ── */}
             {/* mode 'convert' : l'AuthScreen convertira le compte invité au lieu d'en créer un nouveau */}
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Auth', { mode: 'convert' })} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() => navigation.navigate('Auth', { mode: 'convert' })}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Sécuriser mon compte invité"
+            >
             {/* ── SUPABASE ALBUMS : fin ── */}
-              <Text style={styles.primaryBtnText}>Créer mon compte sécurisé</Text>
+              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>Sécuriser mon compte</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -212,6 +263,7 @@ export default function ProfileScreen({ navigation }) {
               </View>
               {/* Badge indiquant que c'est lié à Google */}
               <View style={styles.providerBadge}>
+                <HugeiconsIcon icon={CheckmarkBadge01Icon} size={15} color="#4285F4" />
                 <Text style={styles.providerBadgeText}>Google</Text>
               </View>
             </View>
@@ -321,6 +373,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '600', color: colors.tealDark },
   saveBtn: { paddingVertical: 6, paddingHorizontal: 12 },
   saveBtnText: { color: colors.coral, fontWeight: '700', fontSize: 14 },
+  saveBtnDisabled: { opacity: 0.35 },
 
   // Avatar
   avatarSection: { alignItems: 'center', marginVertical: 20 },
@@ -342,6 +395,7 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   avatarInitials: { color: '#fff', fontSize: 34, fontWeight: '700' },
   avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.tealDark, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  avatarHint: { marginTop: 8, color: colors.muted, fontSize: 12, fontWeight: '500' },
 
   // Sections
   sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: 8, marginBottom: 8, marginTop: 16 },
@@ -352,13 +406,17 @@ const styles = StyleSheet.create({
   syncBadge: { position: 'absolute', right: 0, top: 5, fontSize: 10, color: colors.teal, fontWeight: '700', textTransform: 'uppercase' },
 
   // Compte & Invité
-  guestCard: { borderColor: '#F57C00', borderWidth: 1, backgroundColor: '#FFFDF9' },
+  guestCard: { borderColor: colors.coral, borderWidth: 1, },
   accountRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
-  accountIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  accountIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.light },
+  guestIcon: { backgroundColor: '#FDECEA' },
+  accountTitleRow: { flexDirection: 'row', alignItems: 'center',   flexWrap: 'wrap', gap: 8, marginBottom: 3 },
   accountT: { fontSize: 16, fontWeight: '600', color: colors.tealDark, marginBottom: 2 },
   accountS: { color: colors.muted, lineHeight: 18, fontSize: 13 },
+  statusBadge: { backgroundColor: '#FFF1E8', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  statusBadgeText: { color: colors.coralDark, fontSize: 10, fontWeight: '700' },
   
-  primaryBtn: { marginTop: 16, backgroundColor: colors.coral, borderRadius: 12, height: 40, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn: { marginTop: 16, backgroundColor: colors.coral, borderRadius: 12, minHeight: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   primaryBtnText: { color: '#fff', fontWeight: '500', fontSize: 15 },
   
   logoutBtn: { marginTop: 16, backgroundColor: '#FDECEA', borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
@@ -370,6 +428,31 @@ const styles = StyleSheet.create({
   rowTextContainer: { flex: 1, paddingRight: 16 },
   rt: { fontSize: 16, fontWeight: '500', color: colors.tealDark },
   rs: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
+  switchTrack: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+    backgroundColor: '#D7E1E1',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  switchTrackOn: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  switchKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.white,
+    shadowColor: '#164E52',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    elevation: 2,
+  },
 
   // Aide box
   helpBox: { backgroundColor: colors.light, borderRadius: 16, padding: 20, marginVertical: 16, alignItems: 'flex-start' },
@@ -435,11 +518,13 @@ const styles = StyleSheet.create({
   },
   providerBadge: { 
     backgroundColor: '#F1F3F4', // Le gris clair caractéristique de Google
-    paddingHorizontal: 5, 
+    paddingHorizontal: 8, 
     paddingVertical: 5, 
     borderRadius: 20, 
     alignItems: 'center', 
-    justifyContent: 'center' 
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
   providerBadgeText: { 
     color: '#5F6368', // Gris foncé Google
