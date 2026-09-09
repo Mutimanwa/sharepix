@@ -123,7 +123,13 @@ export async function signInWithEmail(email, password) {
 export async function linkGoogleIdentity() {
   if (!supabase) throw new Error('Supabase non configuré');
 
-  const isWeb = Platform.OS === 'web' || typeof window !== 'undefined';
+  // ── SUPABASE ALBUMS : intégration ──
+  // FIX MOBILE : « typeof window !== undefined » est VRAI aussi sur
+  // Android/iOS (RN définit window = global), mais sans window.location !
+  // Le vieux test envoyait le natif dans la branche web → crash
+  // « Cannot read property 'origin' of undefined ».
+  const isWeb = Platform.OS === 'web' && typeof window !== 'undefined' && !!window.location;
+  // ── SUPABASE ALBUMS : fin ──
 
   if (isWeb) {
     const webRedirectUrl = `${window.location.origin}/auth/callback`;
@@ -318,7 +324,11 @@ export async function signInWithGoogle() {
   if (!supabase) throw new Error('Supabase non configuré');
 
   // Détecter si on est sur Web ou Mobile
-  const isWeb = Platform.OS === 'web' || typeof window !== 'undefined';
+  // ── SUPABASE ALBUMS : intégration ──
+  // FIX MOBILE : même piège que linkGoogleIdentity — window existe en natif
+  // mais pas window.location. Platform.OS seul décide.
+  const isWeb = Platform.OS === 'web' && typeof window !== 'undefined' && !!window.location;
+  // ── SUPABASE ALBUMS : fin ──
 
   if (isWeb) {
     return signInWithGoogleWeb();
