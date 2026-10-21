@@ -325,7 +325,11 @@ export default function AlbumScreen({ route, navigation }) {
         delayLongPress={220}
       >
         {/* ── SQUELETTES : tuile fantôme jusqu'à onLoad, puis fondu ── */}
-        <ProgressiveImage uri={item.uri} style={styles.thumb} />
+        <ProgressiveImage
+          uri={item.uri}
+          storagePath={item.storagePath}
+          style={styles.thumb}
+        />
         {selecting && (
           <View style={[styles.selLayer, isSel && styles.selLayerOn]}>
             <View style={[styles.selDot, isSel && styles.selDotOn]}>
@@ -618,7 +622,11 @@ export default function AlbumScreen({ route, navigation }) {
             <View style={styles.coverWrap}>
               {album.photos.length > 0 ? (
                 // ── SQUELETTES : couverture progressive ──
-                <ProgressiveImage uri={album.photos[0].uri} style={styles.coverImg} />
+                <ProgressiveImage
+                  uri={album.photos[0].uri}
+                  storagePath={album.photos[0].storagePath}
+                  style={styles.coverImg}
+                />
               ) : (
                 <View style={styles.cover}>
                   <Logo size={12} color="#fff" />
