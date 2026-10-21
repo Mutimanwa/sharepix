@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert ,Modal ,SafeAreaView, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Pressable, Image, Alert, Modal, Animated } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
   UserCircle02Icon, 
@@ -18,7 +18,8 @@ import { signOut, deleteAccount } from '../services/auth';
 // (Dé)enregistrement du token Expo Push selon l'interrupteur ci-dessous
 import { registerPushToken, unregisterPushToken } from '../services/push';
 // ── SUPABASE PUSH : fin ──
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// ── BUG-03 : SafeAreaView depuis react-native-safe-area-context ──
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants'; 
 
@@ -250,7 +251,9 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* ── COMPTE CONNECTÉ (DONNÉES GOOGLE) ── */}
-        {isSupabaseConfigured && !isAnonymous && (
+        {/* P0-03 : `user` peut être null juste après la déconnexion →
+            cette branche déréférençait user.firstName / user.email. */}
+        {isSupabaseConfigured && !!user && !isAnonymous && (
           <View style={styles.card}>
             <View style={styles.accountRow}>
               <View style={{ flex: 1, gap: 4 }}>
@@ -343,8 +346,9 @@ export default function ProfileScreen({ navigation }) {
 
        {/* MODAL DE SAUVEGARDE DU PROFIL */}
       <Modal visible={saving} transparent animationType="fade">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={[styles.savingBanner, { marginTop: insets.top + 10 }]}>
+        {/* BUG-03 : SafeAreaView gère l'encoche, plus de marginTop manuel. */}
+        <SafeAreaView style={styles.modalContainer} edges={['top']}>
+          <View style={[styles.savingBanner, { marginTop: 10 }]}>
             <ActivityIndicator size="small" color={colors.tealDark} />
             <Text style={styles.savingText}>
               Enregistrement de votre profil...

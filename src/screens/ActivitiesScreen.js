@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   Image,
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// ── BUG-03 : SafeAreaView depuis react-native-safe-area-context ──
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -149,7 +149,7 @@ export default function ActivitiesScreen({ navigation }) {
   // Porte notifications (inchangée)
   if (!asked) {
     return (
-      <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
+      <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.title}>Activités</Text>
         </View>
@@ -226,7 +226,7 @@ export default function ActivitiesScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { paddingTop: insets.top }]} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         {selecting ? (

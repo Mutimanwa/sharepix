@@ -13,6 +13,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { StoreProvider } from './src/store';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import { colors } from './src/theme';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
@@ -194,29 +195,31 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StoreProvider>
-        <NavigationContainer linking={linking}>
-          <StatusBar style="light" />
-          <Stack.Navigator 
-            screenOptions={{ 
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.cream },
-            }}
-          >
-            <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            <Stack.Screen name="Auth" component={AuthScreen} />
-            <Stack.Screen name="Main" component={Tabs} />
-            <Stack.Screen name="Album" component={AlbumScreen} />
-            <Stack.Screen name="Photo" component={PhotoScreen} />
-            <Stack.Screen name="Menu" component={MenuScreen} />
-            <Stack.Screen name="QR" component={QRScreen} />
-            <Stack.Screen name="Members" component={MembersScreen} />
-            <Stack.Screen name="Premium" component={PremiumScreen} />
-            <Stack.Screen name="PcUpload" component={PcUploadScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </StoreProvider>
+      <ErrorBoundary>
+        <StoreProvider>
+          <NavigationContainer linking={linking}>
+            <StatusBar style="light" />
+            <Stack.Navigator
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.cream },
+              }}
+            >
+              <Stack.Screen name="Splash" component={SplashScreen} />
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+              <Stack.Screen name="Auth" component={AuthScreen} />
+              <Stack.Screen name="Main" component={Tabs} />
+              <Stack.Screen name="Album" component={AlbumScreen} />
+              <Stack.Screen name="Photo" component={PhotoScreen} />
+              <Stack.Screen name="Menu" component={MenuScreen} />
+              <Stack.Screen name="QR" component={QRScreen} />
+              <Stack.Screen name="Members" component={MembersScreen} />
+              <Stack.Screen name="Premium" component={PremiumScreen} />
+              <Stack.Screen name="PcUpload" component={PcUploadScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </StoreProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

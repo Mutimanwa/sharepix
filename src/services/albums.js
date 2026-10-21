@@ -171,28 +171,95 @@ export async function cloudDeleteAlbum(albumId) {
     .select('storage_path')
     .eq('album_id', albumId);
   const paths = (rows || []).map((r) => r.storage_path).filter(Boolean);
-  if (paths.length) {
-    await supabase.storage.from('album-photos').remove(paths);
-  }
+
+  // ── ORDRE CORRIGÉ (audit P0-01) ──
+  // 1. La ligne albums d'abord : la cascade nettoie photos, membres,
+  //    commentaires, likes et activité.
+  // 2. Les fichiers Storage ensuite : on ne détruit des octets que si la
+  //    base a réellement accepté la suppression.
   const { error } = await supabase.from('albums').delete().eq('id', albumId);
-  return { error };
+  if (error) return { error };
+
+  if (paths.length) {
+    paths.forEach((p) => signedUrlCache.delete(p));
+    const { error: storageError } = await supabase.storage
+      .from('album-photos')
+      .remove(paths);
+    if (storageError) {
+      console.log('⚠️ storage delete album error:', storageError.message);
+      return { error: null, warning: storageError.message };
+    }
+  }
+  return { error: null };
 }
 
 /** Quitter un album rejoint (supprime sa ligne album_members). */
 export async function cloudLeaveAlbum(albumId) {
   if (!supabase || !isCloudId(albumId)) return { error: null };
+  const uid = await currentUserId();
+  if (!uid) return { error: new Error('Session expirée') };
   const { error } = await supabase
     .from('album_members')
     .delete()
-    .eq('album_id', albumId);
+    .eq('album_id', albumId)
+    .eq('user_id', uid); // ne supprime QUE ma propre adhésion
   return { error };
+}
+
+/**
+ * Identifiant de l'utilisateur courant, lu depuis la session locale
+ * (aucun aller-retour réseau).
+ * ── SÉCURITÉ (audit P3/P1-06) ──
+ * Les suppressions doivent TOUJOURS être bornées à l'utilisateur courant.
+ * La RLS le garantit déjà côté serveur, mais s'appuyer uniquement sur elle
+ * est fragile : une policy oubliée sur une table et la requête effacerait
+ * les données de tous les membres.
+ */
+async function currentUserId() {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.user?.id || null;
 }
 
 // ── Photos cloud ─────────────────────────────────────────────────────
 
 // ── Bucket PRIVÉ (V2 sécurité) : les photos ne sont lisibles que via des
 // URLs signées, créées ici APRÈS contrôle RLS (membre de l'album requis).
-export const SIGNED_URL_TTL = 60 * 60; // 1 h — régénérées à chaque refresh
+export const SIGNED_URL_TTL = 60 * 60; // 1 h
+
+// ── CACHE DES URLs SIGNÉES : correctif BUG-01 ─────────────────────────
+// Avant : chaque refresh re-signait TOUTES les photos, donc chaque `uri`
+// changeait, donc <ProgressiveImage> se réinitialisait et retéléchargeait
+// tout (squelette permanent sur réseau lent).
+// Maintenant : une URL signée est réutilisée tant qu'elle n'expire pas, donc
+// l'identité de l'image reste stable d'un refresh à l'autre.
+const SIGNED_URL_SAFETY_MARGIN = 60 * 1000; // on renouvelle 60 s avant l'expiration
+const signedUrlCache = new Map(); // storage_path -> { url, expiresAt }
+
+function cachedSignedUrl(storagePath) {
+  const entry = signedUrlCache.get(storagePath);
+  if (!entry) return '';
+  if (entry.expiresAt - SIGNED_URL_SAFETY_MARGIN <= Date.now()) {
+    signedUrlCache.delete(storagePath);
+    return '';
+  }
+  return entry.url;
+}
+
+function rememberSignedUrl(storagePath, url) {
+  if (!storagePath || !url) return;
+  signedUrlCache.set(storagePath, {
+    url,
+    expiresAt: Date.now() + SIGNED_URL_TTL * 1000,
+  });
+}
+
+/**
+ * Vide le cache (déconnexion, changement de compte).
+ * Sécurité : on ne garde jamais les URLs signées d'un autre utilisateur.
+ */
+export function clearSignedUrlCache() {
+  signedUrlCache.clear();
+}
 
 /** Normalise une ligne `photos` en objet photo de l'app. */
 export function mapCloudPhoto(row, signedUrl = '') {
@@ -212,27 +279,38 @@ export function mapCloudPhoto(row, signedUrl = '') {
 /** Signe l'URL d'UNE photo (appelé juste après un upload, store.addPhoto). */
 export async function cloudPhotoUrl(storagePath) {
   if (!supabase || !storagePath) return '';
+
+  const cached = cachedSignedUrl(storagePath);
+  if (cached) return cached;
+
   const { data, error } = await supabase.storage
     .from('album-photos')
     .createSignedUrl(storagePath, SIGNED_URL_TTL);
-  if (error) console.log('📛 signed url error:', error.message);
-  return data?.signedUrl || '';
+  if (error || !data?.signedUrl) {
+    console.log('📛 signed url error:', error?.message || 'réponse vide');
+    return '';
+  }
+  rememberSignedUrl(storagePath, data.signedUrl);
+  return data.signedUrl;
 }
 
 /** Signe EN LOT les URLs des lignes photos (une seule requête Storage). */
 async function withSignedUrls(rows) {
-  const paths = (rows || []).map((r) => r.storage_path).filter(Boolean);
-  const signed = new Map();
-  if (paths.length) {
+  const list = rows || [];
+  const paths = [...new Set(list.map((r) => r.storage_path).filter(Boolean))];
+
+  // Ne signer que ce qui manque ou expire bientôt.
+  const toSign = paths.filter((p) => !cachedSignedUrl(p));
+
+  if (toSign.length) {
     const { data, error } = await supabase.storage
       .from('album-photos')
-      .createSignedUrls(paths, SIGNED_URL_TTL);
+      .createSignedUrls(toSign, SIGNED_URL_TTL);
     if (error) console.log('📛 signed urls error:', error.message);
-    (data || []).forEach((s) => {
-      if (s?.path && s?.signedUrl) signed.set(s.path, s.signedUrl);
-    });
+    (data || []).forEach((s) => rememberSignedUrl(s?.path, s?.signedUrl));
   }
-  return (rows || []).map((r) => mapCloudPhoto(r, signed.get(r.storage_path) || ''));
+
+  return list.map((r) => mapCloudPhoto(r, cachedSignedUrl(r.storage_path)));
 }
 
 /** Photos d'un album cloud, de la plus récente à la plus ancienne. */
@@ -251,11 +329,26 @@ export async function cloudFetchAlbumPhotos(albumId) {
 /** Supprime une photo : fichier Storage + ligne (policy : auteur ou owner). */
 export async function cloudDeletePhoto(photo) {
   if (!supabase || !photo?.cloud) return { error: null };
-  if (photo.storagePath) {
-    await supabase.storage.from('album-photos').remove([photo.storagePath]);
-  }
+
+  // ── ORDRE CORRIGÉ (audit P0-01) ──
+  // Avant : le fichier Storage était supprimé AVANT la ligne SQL. Si la
+  // seconde étape échouait (RLS, réseau), les octets étaient perdus et
+  // la ligne restait → photo cassée pour tout le monde.
   const { error } = await supabase.from('photos').delete().eq('id', photo.id);
-  return { error };
+  if (error) return { error };
+
+  if (photo.storagePath) {
+    signedUrlCache.delete(photo.storagePath);
+    const { error: storageError } = await supabase.storage
+      .from('album-photos')
+      .remove([photo.storagePath]);
+    if (storageError) {
+      console.log('⚠️ storage delete error:', storageError.message);
+      // La ligne est partie : on remonte l'avertissement sans annuler.
+      return { error: null, warning: storageError.message };
+    }
+  }
+  return { error: null };
 }
 
 // ── Interactions (likes + commentaires) ──────────────────────────────
@@ -353,10 +446,13 @@ export async function cloudSetLike(photoId, liked, userName = '') {
       .upsert({ photo_id: photoId, user_name: userName || '' });
     return { error };
   }
+  const uid = await currentUserId();
+  if (!uid) return { error: new Error('Session expirée') };
   const { error } = await supabase
     .from('photo_likes')
     .delete()
-    .eq('photo_id', photoId);
+    .eq('photo_id', photoId)
+    .eq('user_id', uid); // ne retire QUE mon like
   return { error };
 }
 

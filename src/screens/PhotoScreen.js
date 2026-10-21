@@ -74,7 +74,12 @@ export default function PhotoScreen({ route, navigation }) {
 
   const album = state.albums.find((a) => a.id === albumId);
   const photos = album?.photos || [];
-  const initialIndex = Math.max(0, photos.findIndex((p) => p.id === photoId));
+  // ── BUG-02 : index initial FIGÉ au montage ──
+  // Avant : recalculé à chaque rendu. Dès qu'une photo était ajoutée en tête,
+  // l'index changeait, VirtualizedList re-scrollait explicitement et le
+  // carrousel sautait sur une autre photo.
+  const initialIndexRef = useRef(Math.max(0, photos.findIndex((p) => p.id === photoId)));
+  const initialIndex = initialIndexRef.current;
 
   // Retour robuste : /photo/:albumId/:photoId peut être le seul écran
   // de la pile sur le web (recharge, lien direct).
@@ -299,10 +304,14 @@ export default function PhotoScreen({ route, navigation }) {
   };
 
   // ── En-tête de la liste (photo + actions + titre commentaires) ────────
-
+  // ── BUG-02 ──
+  // Appelée et passée comme ÉLÉMENT (`renderHeader()`), jamais comme fonction.
+  // FlatList traite une fonction comme un TYPE de composant : `renderHeader`
+  // étant recréée à chaque rendu, React démontait puis remontait tout
+  // l'en-tête (donc le carrousel) à chaque swipe → retour à la photo 1.
   const renderHeader = () => (
     <>
-      {/* Carrousel : FlatList paginée, position initiale garantie */}
+      {/* Carrousel : FlatList paginée, position initiale FIGÉE au montage */}
       <FlatList
         ref={carouselRef}
         horizontal
@@ -313,7 +322,7 @@ export default function PhotoScreen({ route, navigation }) {
         directionalLockEnabled // pas de conflit avec le scroll vertical
         showsHorizontalScrollIndicator={false}
         initialScrollIndex={initialIndex}
-        initialNumToRender={Math.min(initialIndex + 2, photos.length)}
+        initialNumToRender={2}
         windowSize={3}
         maxToRenderPerBatch={2}
         getItemLayout={(_, index) => ({
@@ -333,9 +342,11 @@ export default function PhotoScreen({ route, navigation }) {
             {/* ── SQUELETTES : voile sombre pulsant jusqu'à onLoad (fond noir) ── */}
             <ProgressiveImage
               uri={photo.uri}
+              storagePath={photo.storagePath}
               style={styles.img}
               resizeMode="contain"
               color="#2A2A2A"
+              showErrorText
             />
           </View>
         )}
@@ -507,13 +518,13 @@ export default function PhotoScreen({ route, navigation }) {
           data={comments}
           keyExtractor={(item) => item.id}
           renderItem={renderComment}
-          ListHeaderComponent={renderHeader}
+          ListHeaderComponent={renderHeader()} // BUG-02 : élément, pas fonction
           ListEmptyComponent={renderEmptyComments}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           style={{ flex: 1 }}
-          extraData={{ likedComments, safeIndex, photos }}
+          extraData={`${safeIndex}|${Object.keys(likedComments).length}|${photos.length}`} // BUG-02 : primitive stable
         />
 
         {renderCommentInput()}

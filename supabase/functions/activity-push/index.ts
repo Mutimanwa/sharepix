@@ -46,8 +46,18 @@ const BODIES: Record<string, (r: ActivityRecord) => string> = {
 
 Deno.serve(async (req) => {
   // 0. Secret partagé avec le Database Webhook (anti-rejeu / anti-spam)
+  //
+  // ── SÉCURITÉ (audit P1-03) : FAIL-CLOSED ──
+  // Avant : `if (secret && ...)` — si WEBHOOK_SECRET était absent (oubli de
+  // configuration, nouvel environnement), la fonction acceptait TOUT LE MONDE
+  // et servait de relais à notifications avec le service_role de la
+  // plateforme (verify_jwt = false dans config.toml).
   const secret = Deno.env.get('WEBHOOK_SECRET');
-  if (secret && req.headers.get('x-webhook-secret') !== secret) {
+  if (!secret) {
+    console.error('WEBHOOK_SECRET manquant : refus de traiter la requête');
+    return new Response('server misconfigured', { status: 500 });
+  }
+  if (req.headers.get('x-webhook-secret') !== secret) {
     return new Response('unauthorized', { status: 401 });
   }
 

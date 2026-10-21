@@ -22,7 +22,6 @@ import { IconVacances, IconFamille, IconBebe, IconSpecial } from '../components/
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Add01Icon, UserAdd01Icon } from '@hugeicons/core-free-icons';
 import { useStore } from '../store';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 const suggestions = [
@@ -36,7 +35,6 @@ export default function HomeScreen() {
   const nav = useNavigation();
   const route = useRoute(); // ── DEEP LINK QR : param ?code= du scan ──
   const { state, createAlbum, joinAlbum } = useStore(); 
-  const insets = useSafeAreaInsets();
   
   const [create, setCreate] = useState(false);
   const [join, setJoin] = useState(false);
@@ -94,12 +92,14 @@ export default function HomeScreen() {
       pendingJoin.current = null;
       submitJoin(toSubmit);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params?.code, state.authChecked]);
   // ── DEEP LINK QR : fin ──
 
   return (
-    <Page style={[styles.root ,{ paddingTop: insets.top }]} edges={['top', 'left', 'right']}>
+    // ── BUG-03 : plus de compensation manuelle — Page applique l'inset top
+    // via SafeAreaView (react-native-safe-area-context). La garder ici
+    // produirait un double padding.
+    <Page style={styles.root} edges={['top', 'left', 'right']}>
       <StatusBar style='dark' />
 
         <View style={styles.header}>
@@ -180,7 +180,12 @@ export default function HomeScreen() {
                       sinon couverture cloud pré-signée au boot (coverUrl) ── */}
                   {(a.photos[0]?.uri || a.coverUrl) ? (
                     // ── SQUELETTES : intégration ──
-                    <ProgressiveImage uri={a.photos[0]?.uri || a.coverUrl} style={styles.coverImg} radius={5} />
+                    <ProgressiveImage
+                      uri={a.photos[0]?.uri || a.coverUrl}
+                      storagePath={a.photos[0]?.storagePath}
+                      style={styles.coverImg}
+                      radius={5}
+                    />
                     // ── SQUELETTES : fin ──
                   ) : (
                     <Image source={require('../../assets/empty/photo.png')} style={{ width: 150, height: 150 }} />

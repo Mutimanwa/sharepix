@@ -48,7 +48,9 @@ export default function MenuScreen({ route, navigation }) {
   // Fonction pour copier le code dans le presse-papiers
   const copyToClipboard = async () => {
     await Clipboard.setStringAsync(album.code);
-    Alert.instance ? Alert.alert("Copié", "Code d'invitation copié !") : alert("Code d'invitation copié !");
+    // `alert()` n'existe pas sur React Native natif (seulement sur le web) :
+    // l'ancien ternaire provoquait un ReferenceError sur Android/iOS.
+    Alert.alert("Copié", "Code d'invitation copié !");
   };
 
   return (

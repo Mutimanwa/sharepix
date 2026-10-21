@@ -33,6 +33,7 @@ import {
   cloudDeleteComment,
   cloudFetchAlbumsSummary,
   subscribePhotosSummary,
+  clearSignedUrlCache, // ── BUG-01 / P1-12 : purge le cache d'URLs signées ──
 } from './services/albums';
 // ── SUPABASE ALBUMS : fin ──
 import { Alert, Platform } from 'react-native';
@@ -84,6 +85,15 @@ function base64ToUint8Array(base64) {
   }
   return p === bytes.length ? bytes : bytes.slice(0, p);
 }
+
+// ── SÉCURITÉ (audit P1-04) : plafond d'upload côté client ──
+// Aligné sur storage.buckets.file_size_limit (migration bucket_upload_limits).
+// On refuse AVANT de lire le fichier : sinon un fichier de 200 Mo était chargé
+// en base64 (~270 Mo de chaîne) puis décodé de façon synchrone → crash / gel.
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+const TOO_LARGE_MESSAGE =
+  'Fichier trop volumineux (25 Mo maximum). Choisissez une photo plus légère.';
 
 // Extension + MIME réels du fichier choisi (jpg, png, heic, mp4…).
 function fileMetaFromUri(uri) {
@@ -266,9 +276,20 @@ export function StoreProvider({ children }) {
         }));
       },
       
+      // ── SÉCURITÉ (audit P1-12) ──
+      // Avant : seul `user` était vidé. Les albums, photos et commentaires du
+      // compte précédent restaient affichés (et persistés dans AsyncStorage)
+      // sur un appareil partagé, jusqu'au redémarrage suivant.
       clearAuthUser: () => {
         console.log('👋 Clearing auth user');
-        setState((s) => ({ ...s, user: null }));
+        clearSignedUrlCache();
+        setState((s) => ({
+          ...s,
+          user: null,
+          albums: [],
+          profile: defaultState.profile,
+        }));
+        AsyncStorage.removeItem(KEY).catch(() => {});
       },
       
       updateProfile: (p) => {
@@ -416,6 +437,7 @@ export function StoreProvider({ children }) {
             // SUR LE WEB : On convertit le Data URI en objet Blob que Supabase comprend parfaitement
             const response = await fetch(uri);
             fileToUpload = await response.blob();
+            if (fileToUpload.size > MAX_UPLOAD_BYTES) throw new Error(TOO_LARGE_MESSAGE);
             if (fileToUpload.type) fileMime = fileToUpload.type;
           } else {
             // ── SUPABASE ALBUMS : intégration ──
@@ -428,6 +450,9 @@ export function StoreProvider({ children }) {
             const meta = fileMetaFromUri(uri);
             fileMime = meta.mime;
             fileExt = meta.ext;
+            // Plafond AVANT lecture : getInfoAsync ne charge pas le fichier.
+            const info = await FileSystem.getInfoAsync(uri, { size: true });
+            if (info?.size && info.size > MAX_UPLOAD_BYTES) throw new Error(TOO_LARGE_MESSAGE);
             const base64 = await FileSystem.readAsStringAsync(uri, {
               encoding: 'base64',
             });
@@ -455,8 +480,16 @@ export function StoreProvider({ children }) {
 
           // ── SUPABASE ALBUMS : intégration ──
           // Étape B : URL SIGNÉE de l'image (bucket privé — V2 sécurité).
-          // Valable SIGNED_URL_TTL (1 h) ; régénérée au prochain refresh.
-          const publicUrl = await cloudPhotoUrl(uploadData.path);
+          // Valable SIGNED_URL_TTL (1 h), mise en cache par albums.js.
+          // ── BUG-01 : une URL vide rendait la photo invisible sans erreur.
+          // On retente une fois, puis on retombe sur l'URI locale.
+          let publicUrl = await cloudPhotoUrl(uploadData.path);
+          if (!publicUrl) {
+            publicUrl = await cloudPhotoUrl(uploadData.path);
+          }
+          if (!publicUrl) {
+            console.log('⚠️ signed url indisponible, repli sur l URI locale');
+          }
           // ── SUPABASE ALBUMS : fin ──
 
           // Étape C : Créer l'entrée dans la table SQL 'photos'
@@ -481,7 +514,9 @@ export function StoreProvider({ children }) {
           // Étape D : Mettre à jour le state local avec l'URL du cloud
           const newPhoto = {
             id: photoData.id,
-            uri: publicUrl, // On remplace l'URI locale par l'URL Cloud !
+            // BUG-01 : jamais d'uri vide — on garde l'URI locale en attendant
+            // qu'une URL signée soit disponible (le refresh la remplacera).
+            uri: publicUrl || uri,
             // ── SUPABASE ALBUMS : intégration ──
             cloud: true,
             storagePath: uploadData.path, // nécessaire pour la suppression
