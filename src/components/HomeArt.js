@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image } from 'react-native';
-import Svg, { Circle, Rect, Path, Ellipse } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 export function IconVacances({ size = 80 }) {
   return (

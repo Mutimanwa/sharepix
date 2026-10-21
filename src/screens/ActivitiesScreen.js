@@ -56,12 +56,12 @@ const KINDS = {
   member_joined: {
     icon: UserAdd01Icon,
     color: colors.teal,
-    text: (a) => `a rejoint l'album`,
+    text: () => `a rejoint l'album`,
   },
   photo_added: {
     icon: Camera01Icon,
     color: colors.coral,
-    text: (a) => 'a ajouté une photo',
+    text: () => 'a ajouté une photo',
   },
   comment_added: {
     icon: SentIcon,

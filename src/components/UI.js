@@ -13,7 +13,6 @@ import {
   Dimensions,
   Animated,
   Image,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { colors } from '../theme';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
