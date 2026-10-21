@@ -115,9 +115,22 @@ jobs:
             echo "::warning title=RLS non vérifié::STAGING_SUPABASE_URL absent. Le test RLS/Storage n'est PAS exécuté. Il écrit des données : il ne doit pas viser la production. Provisionne un projet de test, applique supabase/migrations/, puis renseigne STAGING_SUPABASE_URL et STAGING_SUPABASE_ANON_KEY."
           fi
 
+      # Codes de sortie du script : 0 = protégé, 1 = fuite réelle,
+      # 2 = vérification impossible (projet injoignable, ou compte de
+      # contrôle non créable). On distingue les deux dans l'onglet Actions :
+      # sans cela, les deux cas affichent le même « exit code 2 » opaque.
       - name: RLS / Storage check
         if: steps.staging.outputs.ready == 'true'
         env:
           SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-        run: node supabase/rls-check.cjs
+        run: |
+          set +e
+          node supabase/rls-check.cjs
+          CODE=$?
+          if [ $CODE -eq 1 ]; then
+            echo "::error title=Fuite RLS::Au moins une table ou un fichier est accessible sans en avoir le droit. Vérifie les policies de supabase/migrations/."
+          elif [ $CODE -eq 2 ]; then
+            echo "::error title=Vérification RLS impossible::Le script n'a pas pu s'exécuter : projet de test injoignable, ou comptes anonymes désactivés sur ce projet (Authentication → Sign In / Providers → Anonymous sign-ins). Rien n'a été vérifié."
+          fi
+          exit $CODE
