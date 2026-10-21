@@ -29,9 +29,20 @@ supabase/functions/** ──────▶ Déploiement Edge Function Supabase
    `--config supabase/functions/deno.json` (le job Deno n'installe pas les
    dépendances npm : la résolution passe par l'import map seule).
 3. **Sécurité RLS / Storage** — exécute `node supabase/rls-check.cjs`
-   contre le projet Supabase réel : vérifie qu'aucune donnée ne fuit sans
-   session, que les comptes invités frais ne voient rien, et que le bucket
-   `album-photos` reste privé (URLs signées uniquement).
+   contre le **projet de test** (jamais la production : ce script écrit).
+   Il vérifie qu'aucune donnée ne fuit sans session, qu'un compte invité
+   frais ne voit rien, et que le bucket `album-photos` reste privé (URLs
+   signées uniquement).
+
+   Codes de sortie : `0` = protégé, `1` = fuite réelle, `2` = vérification
+   **impossible** (projet injoignable, ou compte jetable non créable). Le
+   code `2` est un échec volontaire : une panne réseau ne doit jamais être
+   comptée comme une protection.
+
+   > **Prérequis du projet de test :** *Anonymous sign-ins* doit être
+   > **activé** (Authentication → Sign In / Providers). La production les
+   > utilise ; si le projet de test les refuse, la configuration testée
+   > n'est pas celle de la production et le job sort en code `2`.
 
 ## Prérequis : secrets GitHub
 
@@ -43,6 +54,8 @@ Actions**. Les workflows s'arrêtent proprement si un secret manque
 | --- | --- | --- |
 | `EXPO_TOKEN` | Preview + Production (EAS) | `npx eas-cli whoami` / expo.dev → Settings → Access Tokens |
 | `SUPABASE_ACCESS_TOKEN` | Déploiement Edge Functions | dashboard Supabase → Account → Access Tokens |
+| `STAGING_SUPABASE_URL` | Test RLS / Storage | projet de test → Settings → API |
+| `STAGING_SUPABASE_ANON_KEY` | Test RLS / Storage | même écran, clé **anon** (jamais `service_role`) |
 
 > ℹ️ Les clés **anon** (`src/config.js`, `supabase/rls-check.cjs`) sont déjà
 > dans le dépôt : elles sont publiques par nature (la sécurité repose sur la
@@ -108,8 +121,12 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 > secret Vault : la fonction webhook y est donc inerte et ne peut pas
 > notifier la production.
 >
-> Reste à faire : renseigner les deux secrets dans
-> *Settings → Secrets and variables → Actions*.
+> Secrets posés le 22/10/2026 : le job s'exécute désormais pour de vrai.
+>
+> Reste à faire sur le projet de test : **activer les comptes anonymes**
+> (Authentication → Sign In / Providers → *Anonymous sign-ins*). Sans cela,
+> le script ne peut pas créer son compte de contrôle et sort en code `2` —
+> volontairement, plutôt que d'afficher un vert qui ne prouve rien.
 
 ## Lancer les vérifications en local
 

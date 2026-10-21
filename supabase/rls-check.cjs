@@ -39,6 +39,12 @@ if (!SB_URL || !SB_KEY) {
 const TABLES_PRIVEES = ['albums', 'photos', 'photo_comments', 'photo_likes', 'album_members'];
 
 let fuites = 0;
+// Une erreur n'est pas toujours une preuve de protection : « fetch failed »
+// veut dire que le serveur n'a pas répondu. Compter cela comme un succès
+// reviendrait à déclarer la base protégée parce que le réseau est coupé.
+let pannes = 0;
+const PANNE_RESEAU =
+  /fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket hang up|network|aborted|terminated/i;
 
 async function compter(client, table) {
   const { count, error } = await client
@@ -48,8 +54,15 @@ async function compter(client, table) {
 }
 
 function verdict(label, { count, error }, attendu = 0) {
-  // Une erreur (table absente, accès refusé) = protégé en pratique
   if (error) {
+    if (PANNE_RESEAU.test(error.message || '')) {
+      pannes += 1;
+      console.log(
+        `  ⛔ ${label.padEnd(18)} : injoignable (${error.message.slice(0, 50)}) — RIEN N'EST PROUVÉ`
+      );
+      return;
+    }
+    // Vraie erreur d'accès (RLS, table absente) = protégé en pratique
     console.log(`  ✅ ${label.padEnd(18)} : refusé (${error.message.slice(0, 60)})`);
     return;
   }
@@ -76,8 +89,18 @@ function verdict(label, { count, error }, attendu = 0) {
   });
   const s = await frais.auth.signInAnonymously();
   if (s.error) {
-    console.log('  ⚠️ signInAnonymously impossible :', s.error.message);
-    process.exit(1);
+    console.log('  ⛔ signInAnonymously impossible :', s.error.message);
+    console.log(
+      '\n  Le test a besoin d\'un compte jetable pour vérifier ce qu\'un nouvel\n' +
+        '  utilisateur peut voir. Deux causes possibles :\n' +
+        '   • les comptes anonymes sont DÉSACTIVÉS sur le projet de test\n' +
+        '     (Authentication → Sign In / Providers → Anonymous sign-ins).\n' +
+        '     La production les utilise : le projet de test doit faire pareil,\n' +
+        '     sinon la configuration testée n\'est pas celle de la production ;\n' +
+        '   • le projet est injoignable (en pause, URL erronée, réseau coupé).\n' +
+        '\n  Rien n\'a été vérifié.\n'
+    );
+    process.exit(2);
   }
   console.log('  compte de test :', s.data.user.id);
   for (const t of TABLES_PRIVEES) {
@@ -147,17 +170,23 @@ function verdict(label, { count, error }, attendu = 0) {
       const etranger = createClient(SB_URL, SB_KEY, {
         auth: { persistSession: false, storageKey: `rls-out-${Date.now()}` },
       });
-      await etranger.auth.signInAnonymously();
-      const sig2 = await etranger.storage.from('album-photos').createSignedUrl(path, 60);
-      if (sig2.error || !sig2.data?.signedUrl) {
-        console.log('  ✅ URL signée refusée au non-membre');
+      const anon = await etranger.auth.signInAnonymously();
+      if (anon.error) {
+        // Sans session, le refus vient de l'absence de jeton, pas de la RLS.
+        pannes += 1;
+        console.log('  ⛔ non-membre : compte de contrôle impossible — non vérifié');
       } else {
-        const r2 = await fetch(sig2.data.signedUrl).catch(() => null);
-        if (r2 && r2.ok) {
-          fuites += 1;
-          console.log('  ❌ un non-membre peut télécharger la photo via URL signée !');
+        const sig2 = await etranger.storage.from('album-photos').createSignedUrl(path, 60);
+        if (sig2.error || !sig2.data?.signedUrl) {
+          console.log('  ✅ URL signée refusée au non-membre');
         } else {
-          console.log('  ✅ non-membre : URL signée inutilisable');
+          const r2 = await fetch(sig2.data.signedUrl).catch(() => null);
+          if (r2 && r2.ok) {
+            fuites += 1;
+            console.log('  ❌ un non-membre peut télécharger la photo via URL signée !');
+          } else {
+            console.log('  ✅ non-membre : URL signée inutilisable');
+          }
         }
       }
 
@@ -167,12 +196,20 @@ function verdict(label, { count, error }, attendu = 0) {
     }
   }
 
+  if (pannes > 0) {
+    console.log(
+      `\n⛔ ${pannes} VÉRIFICATION(S) NON EXÉCUTÉE(S) : le serveur n'a pas répondu.\n` +
+        '   Ce n\'est pas un succès : on ne sait pas si les données sont protégées.\n'
+    );
+  }
   console.log(
-    fuites === 0
-      ? '\n✅ RLS + Storage OK — aucune fuite détectée.\n'
-      : `\n❌ ${fuites} FUITE(S) DÉTECTÉE(S) — vérifie les policies RLS et le caractère privé du bucket (supabase/migrations/).\n`
+    fuites > 0
+      ? `\n❌ ${fuites} FUITE(S) DÉTECTÉE(S) — vérifie les policies RLS et le caractère privé du bucket (supabase/migrations/).\n`
+      : pannes === 0
+        ? '\n✅ RLS + Storage OK — aucune fuite détectée.\n'
+        : ''
   );
-  process.exit(fuites === 0 ? 0 : 1);
+  process.exit(fuites > 0 ? 1 : pannes > 0 ? 2 : 0);
 })().catch((e) => {
   console.log('ERREUR FATALE :', e.message);
   process.exit(1);

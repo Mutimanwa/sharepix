@@ -108,7 +108,7 @@ absentes — plutôt que de retomber silencieusement sur la production.
 | 2 | **Sentry annoncé dans la politique de confidentialité, absent du code** | ❌ | Écart entre un document public et la réalité. Soit on l'installe, soit on corrige le document. |
 | 3 | `password_min_length` = 6, protection HIBP désactivée | ⚠️ | Mots de passe faibles acceptés (`123456` passe). |
 | 4 | 81 comptes anonymes sur 84, 11 albums | ⚠️ | Le correctif P1-08 devrait tarir la source ; à remesurer après déploiement. |
-| 5 | Secrets `STAGING_*` absents | ⚠️ | Le job RLS est vert mais ne teste rien. |
+| 5 | Secrets `STAGING_*` posés, mais **comptes anonymes désactivés** sur le projet de test | ⚠️ | Le script ne peut pas créer son compte de contrôle : il sort en code `2` (non vérifié) au lieu d'un faux vert. Une case à cocher dans la console du projet de test. |
 | 6 | `version` d'`app.json` = 1.0.0, dernière release = v1.0.4 | ⚠️ | EAS gère les numéros de build à distance (`appVersionSource: remote`), donc ce n'est pas bloquant, mais la version affichée n'est pas la version réelle. |
 | 7 | `REDIRECT_URI_WEB` en dur sur `http://localhost:8081` | ℹ️ | OAuth impossible sur le web en production. Le mobile n'est pas concerné. |
 
