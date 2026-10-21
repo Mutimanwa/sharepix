@@ -38,7 +38,9 @@ Détail complet : `SPRINT1_RAPPORT.md` (§14 pour le carrousel).
 | *(bonus)* Index dupliqué `albums_code_unique` | ✅ supprimé | `albums_code_key` conserve l'unicité |
 | **P1-02** · Migration initiale versionnée | ✅ **fait** | `20261021000000_initial_schema.sql`, relevée du catalogue |
 | **P1-03** · Suppression des 4 SQL destructeurs | ✅ **fait** | `schema.sql` et consorts retirés, références corrigées |
-| **P1-16** · CI qui n'écrit plus en production | ✅ **fait** | `rls-check.cjs` lit l'environnement ; job inactif sans staging, avec avertissement |
+| **P1-16** · CI qui n'écrit plus en production | ✅ **fait** | `rls-check.cjs` lit l'environnement ; projet `sharepix-staging` provisionné et aligné sur la prod |
+| P1-16 · secrets `STAGING_SUPABASE_*` | ⬜ **à coller dans GitHub** | jeton de session en lecture seule sur les secrets (403) |
+| *(bonus)* URL du webhook sortie du schéma | ✅ **fait** | lue dans Vault ; un projet sans secrets est inerte |
 
 Détail : section « Sprint 2 » ci-dessous.
 

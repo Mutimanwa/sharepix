@@ -357,8 +357,11 @@ end;
 $$;
 
 -- ── 8. Webhook de notification (P1-04) ─────────────────────────────────
--- Le secret n'est PLUS dans la définition du trigger : il est lu dans
--- vault.decrypted_secrets à l'émission. Sans secret, on n'émet rien.
+-- Ni le secret ni l'URL ne sont figés dans le schéma : tous deux sont lus
+-- dans vault.decrypted_secrets à l'émission. Un environnement sans ces
+-- secrets (staging, poste local) reste donc inerte et ne peut pas, par
+-- accident, notifier la production. C'est ce qui rend cette migration
+-- réellement transposable d'un projet à l'autre.
 create or replace function public.push_activity_webhook()
 returns trigger
 language plpgsql
@@ -367,18 +370,24 @@ set search_path = 'public'
 as $$
 declare
   v_secret text;
+  v_url    text;
 begin
   select s.decrypted_secret into v_secret
   from vault.decrypted_secrets s
   where s.name = 'activity_webhook_secret'
   limit 1;
 
-  if v_secret is null or v_secret = '' then
+  select s.decrypted_secret into v_url
+  from vault.decrypted_secrets s
+  where s.name = 'activity_webhook_url'
+  limit 1;
+
+  if v_secret is null or v_secret = '' or v_url is null or v_url = '' then
     return new;
   end if;
 
   perform net.http_post(
-    url := 'https://bpillwvvxqiduxtkftuh.supabase.co/functions/v1/activity-push',
+    url := v_url,
     body := jsonb_build_object(
       'old_record', null,
       'record', to_jsonb(new),

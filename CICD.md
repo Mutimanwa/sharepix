@@ -100,6 +100,16 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 > `STAGING_SUPABASE_ANON_KEY`. Sans ces secrets, il est **ignoré** avec un
 > avertissement visible dans l'onglet Actions — il ne retombe jamais sur la
 > production.
+>
+> Projet de test provisionné le 21/10/2026 : `sharepix-staging`
+> (`slxljxllyjitnjnqaapk`, eu-west-1). Son schéma est identique à la
+> production (9 tables, 9 RLS, 21 policies `public` + 3 `storage`,
+> 10 fonctions, 6 triggers, bucket privé 25 Mo). Il ne contient **aucun**
+> secret Vault : la fonction webhook y est donc inerte et ne peut pas
+> notifier la production.
+>
+> Reste à faire : renseigner les deux secrets dans
+> *Settings → Secrets and variables → Actions*.
 
 ## Lancer les vérifications en local
 
