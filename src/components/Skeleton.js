@@ -38,7 +38,16 @@ export function Skeleton({ width = '100%', height = 16, radius = 8, color = '#E2
  *  - une rotation d'URL sur une image déjà affichée ne provoque AUCUN clignotement ;
  *  - une rotation d'URL sur une image en échec déclenche une nouvelle tentative ;
  *  - un échec définitif affiche un état visible au lieu d'un squelette infini.
+ *
+ * ── COMPLÉMENT (rechargement au swipe) ────────────────────────────────
+ * Une liste virtualisée démonte les cellules éloignées puis les remonte au
+ * retour. Comme l'état React repart de zéro, l'image repassait par le
+ * squelette et par le fondu à CHAQUE remontage, même si les octets étaient
+ * déjà en cache. On mémorise donc les identités déjà affichées pour la
+ * session : une image connue s'affiche directement, sans squelette ni fondu.
  */
+const ALREADY_LOADED = new Set();
+
 export function ProgressiveImage({
   uri,
   storagePath,
@@ -49,15 +58,25 @@ export function ProgressiveImage({
   showErrorText = false,
   ...imgProps
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const fade = useRef(new Animated.Value(0)).current;
-
   // Identité stable : le chemin Storage ne change jamais, l'URL signée si.
   const identity = storagePath || uri || '';
+  // Image déjà affichée une fois dans la session → état final dès le premier
+  // rendu (pas une seule image de squelette au remontage de la cellule).
+  const alreadyLoaded = !!identity && ALREADY_LOADED.has(identity);
 
-  // Nouvelle photo → on repart de zéro.
+  const [loaded, setLoaded] = useState(alreadyLoaded);
+  const [failed, setFailed] = useState(false);
+  const fade = useRef(new Animated.Value(alreadyLoaded ? 1 : 0)).current;
+
+  // Nouvelle photo → on repart de zéro. Photo déjà affichée → on reprend
+  // directement à l'état final (ni squelette, ni fondu au remontage).
   useEffect(() => {
+    if (identity && ALREADY_LOADED.has(identity)) {
+      setLoaded(true);
+      setFailed(false);
+      fade.setValue(1);
+      return;
+    }
     setLoaded(false);
     setFailed(false);
     fade.setValue(0);
@@ -90,9 +109,16 @@ export function ProgressiveImage({
           resizeMode={resizeMode}
           style={{ width: '100%', height: '100%', opacity: fade }}
           onLoad={() => {
+            const wasKnown = !!identity && ALREADY_LOADED.has(identity);
+            if (identity) ALREADY_LOADED.add(identity);
             setLoaded(true);
             setFailed(false);
-            Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: false }).start();
+            if (wasKnown) {
+              // Déjà connue : aucun fondu, l'image est là tout de suite.
+              fade.setValue(1);
+            } else {
+              Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: false }).start();
+            }
           }}
           onError={() => {
             setFailed(true);

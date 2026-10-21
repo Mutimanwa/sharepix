@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -31,12 +30,9 @@ import { subscribeAlbumChanges } from '../services/albums';
 import { StatusBar } from 'expo-status-bar';
 // ── SQUELETTES : intégration ──
 import { BackButton, Sheet,  } from '../components/UI';
-import {ProgressiveImage} from '../components/Skeleton'
 // ── SQUELETTES : fin ──
-
-// ── Dimensions ───────────────────────────────────────────────────────────
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.7;
+// ── CARROUSEL PHOTO : composant isolé et mémoïsé ──
+import PhotoCarousel from '../components/PhotoCarousel';
 
 // Astuce favoris (module-level : une seule fois par session)
 let globalHasSeenTip = false;
@@ -69,7 +65,6 @@ export default function PhotoScreen({ route, navigation }) {
   } = useStore();
   const insets = useSafeAreaInsets();
 
-  const carouselRef = useRef(null);
   const commentInputRef = useRef(null);
 
   const album = state.albums.find((a) => a.id === albumId);
@@ -167,10 +162,20 @@ export default function PhotoScreen({ route, navigation }) {
     Keyboard.dismiss();
   };
 
-  const dismissTip = () => {
+  // Stable : le carrousel est mémoïsé, ses callbacks ne doivent pas changer
+  // d'identité à chaque rendu (sinon le `memo` garderait une closure morte).
+  const dismissTip = useCallback(() => {
     setTip(false);
     globalHasSeenTip = true;
-  };
+  }, []);
+
+  const handleIndexChange = useCallback(
+    (index) => {
+      setCurrentIndex(index);
+      dismissTip();
+    },
+    [dismissTip]
+  );
 
   const toggleCommentLike = (commentId) =>
     setLikedComments((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
@@ -311,45 +316,14 @@ export default function PhotoScreen({ route, navigation }) {
   // l'en-tête (donc le carrousel) à chaque swipe → retour à la photo 1.
   const renderHeader = () => (
     <>
-      {/* Carrousel : FlatList paginée, position initiale FIGÉE au montage */}
-      <FlatList
-        ref={carouselRef}
-        horizontal
-        data={photos}
-        keyExtractor={(p) => p.id}
-        pagingEnabled
-        disableIntervalMomentum // une photo à la fois, pas de dérives
-        directionalLockEnabled // pas de conflit avec le scroll vertical
-        showsHorizontalScrollIndicator={false}
-        initialScrollIndex={initialIndex}
-        initialNumToRender={2}
-        windowSize={3}
-        maxToRenderPerBatch={2}
-        getItemLayout={(_, index) => ({
-          length: SCREEN_WIDTH,
-          offset: SCREEN_WIDTH * index,
-          index,
-        })}
-        onMomentumScrollEnd={(event) => {
-          const newIndex = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-          if (newIndex !== safeIndex && newIndex >= 0 && newIndex < photos.length) {
-            setCurrentIndex(newIndex);
-            dismissTip();
-          }
-        }}
-        renderItem={({ item: photo }) => (
-          <View style={styles.imageContainer}>
-            {/* ── SQUELETTES : voile sombre pulsant jusqu'à onLoad (fond noir) ── */}
-            <ProgressiveImage
-              uri={photo.uri}
-              storagePath={photo.storagePath}
-              style={styles.img}
-              resizeMode="contain"
-              color="#2A2A2A"
-              showErrorText
-            />
-          </View>
-        )}
+      {/* Carrousel isolé : voir src/components/PhotoCarousel.js.
+          Il ne se re-rend plus quand un commentaire, un like ou une frappe
+          clavier change l'état de l'écran — donc les images ne bougent plus. */}
+      <PhotoCarousel
+        photos={photos}
+        initialIndex={initialIndex}
+        onIndexChange={handleIndexChange}
+        onInteract={dismissTip}
       />
 
       {/* Pagination */}
@@ -566,15 +540,6 @@ const styles = StyleSheet.create({
   author: { fontWeight: '800', fontSize: 16, color: colors.tealDark },
   when: { color: colors.muted, fontSize: 12, marginTop: 1 },
   iconHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-
-  imageContainer: {
-    width: SCREEN_WIDTH,
-    height: IMAGE_HEIGHT,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  img: { width: '100%', height: '100%' },
 
   pagination: { alignItems: 'center', paddingVertical: 2 },
   paginationText: { color: colors.tealDark, fontSize: 12, fontWeight: '600' },
