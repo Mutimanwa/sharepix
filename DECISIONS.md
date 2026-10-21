@@ -215,6 +215,20 @@ Date : 22/10/2026. Contexte : 9 captures d'écran, 5 défauts signalés.
 
 `tsc --noEmit` 0 erreur · `eslint .` **0 erreur, 0 avertissement** ·
 `jest` 21/21 · `expo export --platform web` OK.
+
+### Deux écarts de version corrigés au passage
+
+`expo-doctor` (en CI) refusait le projet pour deux raisons qui ne venaient pas
+des captures mais bloquaient la porte de qualité :
+
+- `@sentry/react-native` **8.31.0** alors que le SDK 57 attend **~7.11.0**
+  (majeure différente) → rétrogradé en `~7.11.0`. L'API utilisée
+  (`init`, `wrap`, `captureException`, `addBreadcrumb`, `beforeSend`) est
+  identique dans les deux majeures, aucun code modifié.
+- `expo-crypto` déclaré `~57.0.0` au lieu de `~57.0.4`, `react-native-web`
+  en `^0.21.2` au lieu de `~0.21.0` → réalignés.
+
+`npm ls` + comparaison à `bundledNativeModules.json` : **plus aucun écart**.
 Reste à valider **sur appareil** (les 4 défauts sont visuels/physiques) :
 le clavier et la caméra ne se testent pas en CI.
 
