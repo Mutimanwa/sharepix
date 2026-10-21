@@ -614,7 +614,8 @@ export async function cloudDismissActivities(activityIds) {
 
 /**
  * Realtime du centre d'activités : prévient dès qu'un événement est
- * journalisé dans activity_log (publication activée dans schema.sql §12).
+ * journalisé dans activity_log (trigger trg_activity_photo, voir
+ * supabase/migrations/20261021000000_initial_schema.sql §9).
  * Pas de filtre serveur possible (l'écran agrège plusieurs albums) :
  * la RLS Realtime limite déjà aux albums dont on est membre.
  * `onChange` doit debouncer puis re-fetcher (cloudFetchActivity).

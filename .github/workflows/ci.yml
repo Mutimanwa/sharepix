@@ -57,7 +57,7 @@ jobs:
         run: deno lint --config supabase/functions/deno.json supabase/functions/activity-push/index.ts
 
   security:
-    name: RLS & Storage (live Supabase)
+    name: RLS & Storage (projet de test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -72,5 +72,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ── P1-16 : ne JAMAIS écrire dans la production ──
+      # Ce test crée deux comptes anonymes, un album et un fichier, puis
+      # tente de les supprimer. Exécuté contre la prod à chaque pull
+      # request, il y laissait des comptes et des lignes dès que le
+      # nettoyage échouait (il est en try/catch best-effort).
+      # Il vise désormais un projet Supabase de test dédié.
+      - name: Configuration de test disponible ?
+        id: staging
+        env:
+          STAGING_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+        run: |
+          if [ -n "$STAGING_URL" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=RLS non vérifié::STAGING_SUPABASE_URL absent. Le test RLS/Storage n'est PAS exécuté. Il écrit des données : il ne doit pas viser la production. Provisionne un projet de test, applique supabase/migrations/, puis renseigne STAGING_SUPABASE_URL et STAGING_SUPABASE_ANON_KEY."
+          fi
+
       - name: RLS / Storage check
+        if: steps.staging.outputs.ready == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
         run: node supabase/rls-check.cjs

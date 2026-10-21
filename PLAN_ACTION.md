@@ -13,9 +13,9 @@
 
 | Élément | Statut | Vérification |
 |---|---|---|
-| BUG-01 · Cache des URLs signées + `onError` + garde URL vide | 🟡 **insuffisant au re-test** → voir Sprint 1 bis | typecheck + build web |
-| BUG-02 · `initialScrollIndex` figé + `ListHeaderComponent` en élément | 🟡 **insuffisant au re-test** → voir Sprint 1 bis | idem |
-| **Sprint 1 bis** · Carrousel isolé et mémoïsé (`PhotoCarousel`) + `expo-image` + fenêtre élargie + registre d'images chargées | ✅ **codé et vérifié** | typecheck + build web (bundle 10 MB) · **re-test appareil à faire** |
+| BUG-01 · Cache des URLs signées + `onError` + garde URL vide | ✅ **résolu** (après Sprint 1 bis) | validé par l'utilisateur sur appareil |
+| BUG-02 · `initialScrollIndex` figé + `ListHeaderComponent` en élément | ✅ **résolu** (après Sprint 1 bis) | idem |
+| **Sprint 1 bis** · Carrousel isolé et mémoïsé (`PhotoCarousel`) + `expo-image` + fenêtre élargie + registre d'images chargées | ✅ **fait, mergé (PR #26)** | typecheck + build web (10 MB) + **re-test terrain concluant** |
 | BUG-03 · `SafeAreaView` depuis `react-native-safe-area-context` | ✅ **fait** | idem |
 | P0-03 · Crash du Profil (`user === null`) | ✅ **fait** | idem |
 | P0-01 · Policy Storage DELETE | ✅ **fait et testé en base** | `is_album_owner` → true/false conformes |
@@ -26,7 +26,21 @@
 | *(bonus)* `ErrorBoundary` global | ✅ **fait** | — |
 | *(bonus)* Lint : 3 erreurs réelles corrigées | ✅ **fait** | 0 erreur |
 
-Détail complet : `SPRINT1_RAPPORT.md`.
+Détail complet : `SPRINT1_RAPPORT.md` (§14 pour le carrousel).
+
+## État d'avancement — Sprint 2 (21/10/2026)
+
+| Élément | Statut | Vérification |
+|---|---|---|
+| **P1-04** · Secret webhook sorti du catalogue → Vault | ✅ **fait et testé** | 401 sans secret, 200 avec ; trigger sans secret |
+| **P1-01** · `site_url` + `uri_allow_list` sur le domaine réel | ✅ **fait** | `https://sharepix.app` + `sharepix://auth/callback` |
+| **P1-06** · Purge Storage à la suppression de compte | ✅ **fait** | `my_storage_paths()` + `auth.js` ; reste à valider sur appareil |
+| *(bonus)* Index dupliqué `albums_code_unique` | ✅ supprimé | `albums_code_key` conserve l'unicité |
+| **P1-02** · Migration initiale versionnée | ✅ **fait** | `20261021000000_initial_schema.sql`, relevée du catalogue |
+| **P1-03** · Suppression des 4 SQL destructeurs | ✅ **fait** | `schema.sql` et consorts retirés, références corrigées |
+| **P1-16** · CI qui n'écrit plus en production | ✅ **fait** | `rls-check.cjs` lit l'environnement ; job inactif sans staging, avec avertissement |
+
+Détail : section « Sprint 2 » ci-dessous.
 
 ---
 

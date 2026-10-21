@@ -89,10 +89,17 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 > l'import map `supabase/functions/deno.json` (specifier nu, donc conforme
 > au lint Deno `no-import-prefix`).
 
-> Le **schéma SQL** (`supabase/schema.sql`) n'est **pas** appliqué
-> automatiquement : il est ré-exécutable/idempotent mais modifie la
-> production. On l'applique volontairement après revue, puis on relance
-> la CI (le job *RLS & Storage* sert de filet de sécurité).
+> Le **schéma** vit dans `supabase/migrations/` et n'est **pas** appliqué
+> automatiquement sur la production : toute évolution passe par une
+> migration horodatée, revue puis appliquée volontairement.
+> `20261021000000_initial_schema.sql` reconstruit l'état complet et sert à
+> provisionner un projet de test.
+>
+> Le job *RLS & Storage* **écrit** (comptes anonymes, album, fichier) : il
+> vise donc un projet de test via `STAGING_SUPABASE_URL` /
+> `STAGING_SUPABASE_ANON_KEY`. Sans ces secrets, il est **ignoré** avec un
+> avertissement visible dans l'onglet Actions — il ne retombe jamais sur la
+> production.
 
 ## Lancer les vérifications en local
 

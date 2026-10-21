@@ -395,12 +395,42 @@ export async function signOut() {
 }
 
 // ── Suppression du compte ─────────────────────────────────────────────
-// Appelle la fonction SQL `delete_own_account` (voir supabase/schema.sql,
-// section 4) : supprime le profil + le user auth du compte connecté,
-// sans jamais exposer la clé service_role côté client.
+// Appelle la fonction SQL `delete_own_account` : supprime le profil + le
+// user auth du compte connecté, sans jamais exposer la clé service_role
+// côté client.
+//
+// ── P1-06 : les fichiers Storage ne partent pas en cascade ────────────
+// `delete from auth.users` supprime les LIGNES public.photos, mais pas les
+// octets du bucket. Sans cette purge, chaque suppression de compte laissait
+// des fichiers payés et invisibles — la politique de confidentialité publiée
+// promet pourtant l'effacement des données.
+//
+// Ordre volontaire : fichiers d'abord, compte ensuite. Après la suppression
+// du compte la session n'existe plus, donc plus aucun droit sur le bucket.
+// Si la RPC échoue malgré tout, le compte existe encore et l'utilisateur
+// peut réessayer.
 export async function deleteAccount() {
   if (!supabase) throw new Error('Supabase non configuré');
 
+  // 1. Inventaire des fichiers que l'appelant a le droit d'effacer
+  //    (les siens + ceux des albums dont il est propriétaire).
+  const { data: paths, error: pathsError } = await supabase.rpc('my_storage_paths');
+
+  // Ne JAMAIS supprimer le compte si l'inventaire échoue : on recréerait
+  // des orphelins, exactement le problème P0-02.
+  if (pathsError) throw pathsError;
+
+  // 2. Purge des octets. Un échec ici doit aussi interrompre : mieux vaut
+  //    un compte encore présent qu'un compte détruit et des fichiers perdus
+  //    dans le bucket.
+  if (paths?.length) {
+    const { error: removeError } = await supabase.storage
+      .from('album-photos')
+      .remove(paths);
+    if (removeError) throw removeError;
+  }
+
+  // 3. Suppression du profil + du compte auth (cascades sur les lignes).
   const { error } = await supabase.rpc('delete_own_account');
   if (error) throw error;
 

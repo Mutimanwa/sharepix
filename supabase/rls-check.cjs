@@ -9,7 +9,12 @@
 //      URL signée OK pour un membre, refusée pour un non-membre.
 //
 // Code de sortie : 0 = tout est protégé, 1 = AU MOINS UNE FUITE.
-// À relancer après chaque exécution de supabase/schema.sql.
+//
+// ── P1-16 : ce test ÉCRIT (comptes anonymes, album, photo) ─────────────
+// Il ne doit donc PLUS viser la production. La configuration vient de
+// l'environnement :
+//   SUPABASE_URL=... SUPABASE_ANON_KEY=... node supabase/rls-check.cjs
+// En CI, ce sont les secrets du projet de staging qui sont injectés.
 // ────────────────────────────────────────────────────────────────────────
 
 /* eslint-disable no-console */
@@ -19,9 +24,17 @@
 global.WebSocket = require('../node_modules/ws');
 const { createClient } = require('../node_modules/@supabase/supabase-js');
 
-const SB_URL = 'https://bpillwvvxqiduxtkftuh.supabase.co';
-const SB_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwaWxsd3Z2eHFpZHV4dGtmdHVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyMTg3ODAsImV4cCI6MjEwMjc5NDc4MH0.Z0FgpDdI3ltOv80X7YCgC71Qzo50fWFCyJ7kNkjzdPo';
+const SB_URL = process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_ANON_KEY;
+
+if (!SB_URL || !SB_KEY) {
+  console.log(
+    'Configuration manquante : renseigne SUPABASE_URL et SUPABASE_ANON_KEY.\n' +
+      'Ce test crée des comptes et des fichiers — ne le pointe pas vers la production.\n' +
+      'Local : SUPABASE_URL=… SUPABASE_ANON_KEY=… node supabase/rls-check.cjs'
+  );
+  process.exit(1);
+}
 
 const TABLES_PRIVEES = ['albums', 'photos', 'photo_comments', 'photo_likes', 'album_members'];
 
@@ -112,8 +125,11 @@ function verdict(label, { count, error }, attendu = 0) {
       const pubRes = await fetch(pub.publicUrl).catch(() => null);
       if (pubRes && pubRes.ok) {
         fuites += 1;
-        console.log('  ❌ bucket PUBLIC : l\'URL publique renvoie HTTP', pubRes.status,
-                    '→ relance schema.sql (bucket privé)');
+        console.log(
+          '  ❌ bucket PUBLIC : l\'URL publique renvoie HTTP',
+          pubRes.status,
+          '→ bucket à repasser en privé (migration bucket idempotente)'
+        );
       } else {
         console.log('  ✅ URL publique refusée (HTTP', pubRes ? pubRes.status : '?', ')');
       }
@@ -154,7 +170,7 @@ function verdict(label, { count, error }, attendu = 0) {
   console.log(
     fuites === 0
       ? '\n✅ RLS + Storage OK — aucune fuite détectée.\n'
-      : `\n❌ ${fuites} FUITE(S) DÉTECTÉE(S) — relance supabase/schema.sql (section 0 purge + bucket privé puis URLs signées).\n`
+      : `\n❌ ${fuites} FUITE(S) DÉTECTÉE(S) — vérifie les policies RLS et le caractère privé du bucket (supabase/migrations/).\n`
   );
   process.exit(fuites === 0 ? 0 : 1);
 })().catch((e) => {
