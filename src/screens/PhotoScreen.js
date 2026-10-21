@@ -7,9 +7,9 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -23,6 +23,7 @@ import {
 import * as FileSystem from 'expo-file-system/legacy'; // API classique (downloadAsync) conservée par Expo
 import * as Sharing from 'expo-sharing';
 import { colors } from '../theme';
+import { useKeyboardSpace } from '../lib/keyboard';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
 import { subscribeAlbumChanges } from '../services/albums';
@@ -64,6 +65,14 @@ export default function PhotoScreen({ route, navigation }) {
     deleteComment, // ── SUPABASE ALBUMS : intégration ──
   } = useStore();
   const insets = useSafeAreaInsets();
+
+  // ── Barre de commentaire façon WhatsApp ──────────────────────────────
+  // La barre suit la hauteur réelle du clavier : collée au clavier quand il
+  // est ouvert, collée au bord bas de l'écran (au-dessus de la barre de
+  // geste) quand il est fermé. Voir src/lib/keyboard.js — en edge-to-edge
+  // Android, `adjustResize` et KeyboardAvoidingView ne suffisent plus.
+  const { space: keyboardSpace, isOpen: keyboardOpen } = useKeyboardSpace();
+  // ── fin ──
 
   const commentInputRef = useRef(null);
 
@@ -427,7 +436,14 @@ export default function PhotoScreen({ route, navigation }) {
   // ── Barre de saisie ────────────────────────────────────────────────────
 
   const renderCommentInput = () => (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View
+      style={[
+        styles.bar,
+        // Clavier ouvert : la barre est déjà posée dessus → marge minimale.
+        // Clavier fermé : on réserve la barre de geste Android / l'encoche iOS.
+        { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 10) },
+      ]}
+    >
       {replyTo && (
         <View style={styles.replyIndicator}>
           <View style={{ flex: 1 }}>
@@ -487,10 +503,7 @@ export default function PhotoScreen({ route, navigation }) {
       </View>
 
       {/* Contenu */}
-      <KeyboardAvoidingView
-        style={styles.mainContent}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <Animated.View style={[styles.mainContent, { marginBottom: keyboardSpace }]}>
         <FlatList
           data={comments}
           keyExtractor={(item) => item.id}
@@ -505,7 +518,7 @@ export default function PhotoScreen({ route, navigation }) {
         />
 
         {renderCommentInput()}
-      </KeyboardAvoidingView>
+      </Animated.View>
 
       {/* Confirmation suppression */}
       <Sheet visible={del} onClose={() => setDel(false)} title="Supprimer">
@@ -666,7 +679,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E4EEEE',
     paddingHorizontal: 10,
-    paddingTop: 8,
+    paddingTop: 10,
   },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inp: {

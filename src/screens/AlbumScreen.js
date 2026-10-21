@@ -8,19 +8,15 @@ import {
   Modal,
   Share,
   TextInput,
-  // ── DEEP LINK QR : intégration ──
-  // Alert : QR non reconnu (était appelé sans import → crash).
-  // BackHandler : le bouton retour Android ferme le scanner.
+  // QR : « QR non reconnu » (était appelé sans import → crash).
   Alert,
-  BackHandler,
-  // ── DEEP LINK QR : fin ──
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { HugeiconsIcon } from '@hugeicons/react-native';
+import { useQrScanner } from '../components/QrScanner';
 import {
   PreferenceHorizontalIcon,
   Notification03Icon,
@@ -104,23 +100,9 @@ export default function AlbumScreen({ route, navigation }) {
 
   // Feedback copie du code
   const [copied, setCopied] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const scanHandled = useRef(false);
-
-  // ── DEEP LINK QR : intégration ──
-  // Bouton retour Android : ferme le scanner au lieu de quitter l'album.
-  // (Le scanner n'est plus une <Modal> native, il faut donc gérer le
-  // retour nous-mêmes.)
-  useEffect(() => {
-    if (!scannerOpen) return undefined;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setScannerOpen(false);
-      return true; // événement consommé : on ne quitte pas l'écran Album
-    });
-    return () => sub.remove();
-  }, [scannerOpen]);
-  // ── DEEP LINK QR : fin ──
+  // Scanner QR : rendu par <QrScannerProvider> à la racine de l'app.
+  // Le bouton retour Android est géré par l'overlay lui-même.
+  const scanner = useQrScanner();
 
   // ── SUPABASE ALBUMS : intégration ──
   // À l'entrée sur l'album : refresh immédiat, puis abonnement Realtime.
@@ -133,12 +115,19 @@ export default function AlbumScreen({ route, navigation }) {
   // Fetch en cours ET rien à montrer → grille squelette au lieu du
   // faux état vide « Personne n'a encore téléchargé de photos ».
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  // Longueur de la liste lue par `useFocusEffect` sans la mettre en
+  // dépendance : sinon chaque photo ajoutée relancerait l'abonnement
+  // Realtime (et donc un refresh, en boucle).
+  const photosLenRef = useRef(0);
+  useEffect(() => {
+    photosLenRef.current = album?.photos?.length ?? 0;
+  }, [album?.photos?.length]);
   // ── SQUELETTES : fin ──
 
   useFocusEffect(
     useCallback(() => {
       if (!album?.cloud) return undefined;
-      setLoadingPhotos(album.photos.length === 0);
+      setLoadingPhotos(photosLenRef.current === 0);
       Promise.resolve(refreshRef.current(id)).finally(() => setLoadingPhotos(false));
 
       let timer = null;
@@ -193,46 +182,37 @@ export default function AlbumScreen({ route, navigation }) {
     setTimeout(() => setCopied(false), 1600);
   };
 
-  const openScanner = async () => {
-    scanHandled.current = false;
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) return;
-    }
-    setMenuModal(false);
-    setScannerOpen(true);
-  };
-
-  const handleBarcodeScanned = ({ data }) => {
-    if (scanHandled.current || !data) return;
-    scanHandled.current = true;
-
+  // Renvoie true quand le code est accepté (l'overlay se ferme tout seul).
+  const handleBarcodeScanned = (data) => {
     try {
       const scannedUrl = new URL(data);
       const code = scannedUrl.searchParams.get('code');
       if (code) {
-        setScannerOpen(false);
         navigation.navigate('Main', {
           screen: 'Accueil',
           params: { code: code.toUpperCase() },
         });
-        return;
+        return true;
       }
     } catch {
       // A raw 8-character album code is also accepted for convenience.
       const rawCode = String(data).trim().toUpperCase();
       if (/^[A-Z0-9]{8}$/.test(rawCode)) {
-        setScannerOpen(false);
         navigation.navigate('Main', {
           screen: 'Accueil',
           params: { code: rawCode },
         });
-        return;
+        return true;
       }
     }
 
-    scanHandled.current = false;
     Alert.alert('QR non reconnu', "Ce code n'est pas un lien d'invitation SharePix.");
+    return false;
+  };
+
+  const openScanner = async () => {
+    setMenuModal(false);
+    await scanner.openScanner({ onScan: handleBarcodeScanned });
   };
 
   const pick = async () => {
@@ -743,74 +723,6 @@ export default function AlbumScreen({ route, navigation }) {
         </View>
       </RightModal>
 
-      {/* ── DEEP LINK QR : intégration ──
-          FIX CAMÉRA NOIRE : CameraView dans une <Modal> native Android ne
-          démarre JAMAIS (la SurfaceView de la caméra ne s'attache pas à la
-          fenêtre modale — bug connu d'expo-camera). Le scanner est donc
-          une VUE plein écran classique (absoluteFill + zIndex/elevation),
-          dessinée au-dessus de l'écran dans la MÊME fenêtre que l'app :
-          la caméra démarre immédiatement. Fermeture : bouton × ou bouton
-          retour Android (BackHandler plus haut). */}
-      {scannerOpen && (
-        <View style={styles.scannerModal}>
-          {permission?.granted ? (
-            <CameraView
-              style={StyleSheet.absoluteFill}
-              facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              onBarcodeScanned={scanHandled.current ? undefined : handleBarcodeScanned}
-            />
-          ) : (
-            <View style={styles.scannerPermission}>
-              <HugeiconsIcon icon={QrCodeIcon} size={42} color="#fff" />
-              <Text style={styles.scannerPermissionTitle}>Accès à la caméra requis</Text>
-              <Text style={styles.scannerPermissionText}>
-                Autorisez la caméra pour scanner le QR d’une invitation SharePix.
-              </Text>
-              <TouchableOpacity style={styles.scannerPermissionButton} onPress={openScanner}>
-                <Text style={styles.scannerPermissionButtonText}>Autoriser la caméra</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View
-            style={[
-              styles.scannerOverlay,
-              // Respect de l'encoche / barre de geste
-              { paddingTop: insets.top + 14, paddingBottom: Math.max(insets.bottom, 20) + 22 },
-            ]}
-            pointerEvents="box-none"
-          >
-            <View style={styles.scannerHeader}>
-              <View style={styles.scannerTitleWrap}>
-                <HugeiconsIcon icon={QrCodeIcon} size={20} color="#fff" />
-                <Text style={styles.scannerTitle}>Scanner un QR</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.scannerClose}
-                onPress={() => setScannerOpen(false)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Fermer le scanner"
-              >
-                <Text style={styles.scannerCloseText}>×</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.scannerCenter}>
-              <Text style={styles.scannerHint}>Placez le QR code dans le cadre</Text>
-              <View style={styles.scanFrame}>
-                <View style={[styles.scanCorner, styles.scanCornerTL]} />
-                <View style={[styles.scanCorner, styles.scanCornerTR]} />
-                <View style={[styles.scanCorner, styles.scanCornerBL]} />
-                <View style={[styles.scanCorner, styles.scanCornerBR]} />
-              </View>
-              <Text style={styles.scannerSubHint}>Le scan se fait automatiquement</Text>
-            </View>
-          </View>
-        </View>
-      )}
-      {/* ── DEEP LINK QR : fin ── */}
     </SafeAreaView>
   );
 }
@@ -1141,151 +1053,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   qrTxt: { fontWeight: '600', color: colors.tealDark, fontSize: 15 },
-  scannerModal: {
-    // ── DEEP LINK QR : intégration ──
-    // Plein écran SANS <Modal> native : absoluteFill + zIndex/elevation
-    // élevés pour passer au-dessus du header, des tabs et du FAB
-    // (sur Android, c'est elevation qui décide de l'ordre de dessin).
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 999,
-    elevation: 999,
-    // ── DEEP LINK QR : fin ──
-    backgroundColor: '#101317',
-  },
-  scannerOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    paddingTop: 54,
-    paddingHorizontal: 24,
-    paddingBottom: 44,
-    justifyContent: 'space-between',
-  },
-  scannerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  scannerTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  scannerTitle: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  scannerClose: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(0,0,0,0.32)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scannerCloseText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '300',
-    lineHeight: 34,
-  },
-  scannerCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  scannerHint: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  scanFrame: {
-    width: 264,
-    height: 264,
-    position: 'relative',
-  },
-  scanCorner: {
-    position: 'absolute',
-    width: 34,
-    height: 34,
-    borderColor: '#fff',
-  },
-  scanCornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 18,
-  },
-  scanCornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 18,
-  },
-  scanCornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 18,
-  },
-  scanCornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 18,
-  },
-  scannerSubHint: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 13,
-    marginTop: 24,
-  },
-  scannerPermission: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    backgroundColor: colors.tealDeep,
-  },
-  scannerPermissionTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 18,
-  },
-  scannerPermissionText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 10,
-    maxWidth: 310,
-  },
-  scannerPermissionButton: {
-    minHeight: 48,
-    paddingHorizontal: 22,
-    borderRadius: 12,
-    backgroundColor: colors.coral,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  scannerPermissionButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
 });

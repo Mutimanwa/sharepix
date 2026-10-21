@@ -187,6 +187,39 @@ techniquement jusqu'à expiration, mais ne correspond plus à aucun compte.
 
 ---
 
+## D-09 — Les défauts d'affichage se corrigent à la cause, pas au symptôme
+
+Date : 22/10/2026. Contexte : 9 captures d'écran, 5 défauts signalés.
+
+### Ce qui a été corrigé
+
+| # | Défaut signalé | Cause réelle | Correction |
+|---|----------------|--------------|------------|
+| a | L'onde de clic « se propage » hors des onglets de la tab bar | `@react-navigation/bottom-tabs` code en dur `android_ripple: { borderless: true }` (`BottomTabItem.tsx:354`) et n'expose pas `pressColor` | `tabBarButton` personnalisé : `PlatformPressable` **avec l'onde bornée** (`borderless: false`) + `overflow: hidden`. Aucun patch de `node_modules`. |
+| a' | Ombre visible sous la tab bar | La lib applique `elevation: 8` par défaut sur Android | `elevation: 0` + ombre iOS neutralisée ; il ne reste qu'un filet de séparation de 1 px. |
+| b | Le scanner QR ne s'affiche pas (seule une bande noire en bas) | L'overlay était une `View` `position: absolute` **dans l'arbre de l'écran Album**, sous `SafeAreaView` + `RightModal` : selon le conteneur, il se réduit à une bande | Scanner extrait dans `src/components/QrScanner.js`, monté **une seule fois à la racine de l'app** (`QrScannerProvider` dans `App.js`), au-dessus de tout. Fond noir opaque garanti, `onMountError` remonté à l'écran. Toujours **pas de `<Modal>` native** (la SurfaceView d'expo-camera reste noire dans une fenêtre modale sur Android). |
+| c | Barre de commentaire collée à la barre de navigation, puis trop haute à l'ouverture du clavier | `KeyboardAvoidingView` `behavior="height"` + `paddingBottom` d'encoche cumulés. En edge-to-edge (Expo 57 / RN 0.86), `adjustResize` est ignoré sur Android | `src/lib/keyboard.js` suit la hauteur réelle du clavier. La barre est ancrée au clavier ouvert, au bord bas fermé, sans marge en double. Comportement de référence : WhatsApp. |
+| d | Toucher un champ « Ajouter un album » / « Rejoindre » n'ouvre pas le clavier | `autoFocus`/`focus()` demandés **pendant l'animation d'ouverture de la `<Modal>`** (le focus est perdu sur Android) + `adjustResize` ignoré + `keyboardShouldPersistTaps="handled"` qui avalait le premier tap | Focus différé (450 ms), `keyboardShouldPersistTaps="always"`, `showSoftInputOnFocus`, `Modal` avec `statusBarTranslucent` / `navigationBarTranslucent`, `CodeBoxes` re-focalisable en tapant n'importe où. |
+| e | Vérifier tous les champs | `Field` ne transmettait ni `keyboardType`, ni `autoCapitalize`, ni `maxLength`, ni `returnKeyType` | `Field` expose ces props (valeurs par défaut sûres : pas d'autocorrection, pas de majuscule auto), `inputRef` pour le focus programmé. |
+
+### Ce qui n'a **pas** été fait, volontairement
+
+- **Aucun changement de couleur ni de contraste.** Mesures disponibles
+  (`coral`/blanc 2,93 ; `success`/blanc 2,28) mais l'utilisateur a écarté une
+  correction d'office : elle attend une capture ou une validation.
+- **Aucun patch de `node_modules`** : tout passe par les props publiques.
+- Le bug « caméra noire dans une `<Modal>` » n'est pas contourné par une
+  réécriture : on garde le rendu dans la fenêtre principale.
+
+### Vérifications
+
+`tsc --noEmit` 0 erreur · `eslint .` **0 erreur, 0 avertissement** ·
+`jest` 21/21 · `expo export --platform web` OK.
+Reste à valider **sur appareil** (les 4 défauts sont visuels/physiques) :
+le clavier et la caméra ne se testent pas en CI.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
