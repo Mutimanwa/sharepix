@@ -197,8 +197,17 @@ Edge Function (Deno check & lint), RLS/Storage. Détail :
 
 ## Limites connues
 
-- **Photos uniquement** : l'import vidéo n'est pas encore proposé.
-  Le schéma prévoit `media_type` ; l'interface suivra.
+- **Photos uniquement.** Contrairement à ce qu'annonçait ce fichier, le
+  schéma **ne prévoit pas** `media_type` : la table `photos` n'a que
+  `id, album_id, storage_path, created_at, uploader_id, author_name`, et le
+  bucket `album-photos` n'accepte que six types MIME d'images (plafond
+  25 Mo). L'import vidéo demande donc une migration, un envoi en flux (la
+  lecture base64 actuelle ne tient pas 50 Mo en mémoire) et un lecteur.
+  Ordre retenu : images → production → vidéo → premium. Voir
+  [`DECISIONS.md`](DECISIONS.md) (D-05).
+- **Pas de premium fonctionnel** : l'écran « Album Premium » est une
+  vitrine, aucun paiement n'est branché et aucune notion d'abonnement
+  n'existe en base.
 - **Pas de file hors-ligne** : sans réseau, l'application fonctionne en
   mode local mais ne rejoue pas les envois à la reconnexion.
 - Pas encore de pagination sur les albums volumineux.
@@ -207,6 +216,7 @@ Edge Function (Deno check & lint), RLS/Storage. Détail :
   configuré (`STAGING_SUPABASE_URL`).
 
 Feuille de route détaillée : [`PLAN_ACTION.md`](PLAN_ACTION.md).
+Décisions produit et techniques : [`DECISIONS.md`](DECISIONS.md).
 
 ## Documents
 

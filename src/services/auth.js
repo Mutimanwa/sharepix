@@ -140,7 +140,7 @@ export async function linkGoogleIdentity() {
 
     if (error) throw error;
 
-    console.log('Redirecting to Google (link identity, Web):', data.url);
+    if (__DEV__) console.log('Redirecting to Google (link identity, Web)');
     window.location.replace(data.url);
     // La page va être remplacée par Google puis rechargée au retour
     return new Promise(() => {});
@@ -154,7 +154,7 @@ export async function linkGoogleIdentity() {
 
   if (error) throw error;
 
-  console.log('Opening Google link URL (Mobile):', data.url);
+  if (__DEV__) console.log('Opening Google link URL (Mobile)');
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, REDIRECT_URI, {
     showInRecents: false,
@@ -252,7 +252,7 @@ export async function signInWithGoogleWeb() {
 
     if (error) throw error;
 
-    console.log('Redirecting to Google OAuth (Web):', data.url);
+    if (__DEV__) console.log('Redirecting to Google OAuth (Web)');
 
     // Au lieu de window.open (bloqué), on redirige l'onglet actuel
     window.location.replace(data.url);
@@ -287,7 +287,7 @@ export async function signInWithGoogleMobile() {
 
     if (error) throw error;
 
-    console.log('Opening Google OAuth URL (Mobile):', data.url);
+    if (__DEV__) console.log('Opening Google OAuth URL (Mobile)');
 
     // 2. Ouvrir le navigateur pour l'authentification
     const result = await WebBrowser.openAuthSessionAsync(

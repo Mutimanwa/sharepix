@@ -186,7 +186,7 @@ export default function AuthScreen({ navigation, route }) {
       }
 
       if (result.user) {
-        console.log('✅ Auth SUCCESS:', result.user.email);
+        console.log('✅ Auth SUCCESS');
         setAuthUser(result.user);
         navigation.replace('Main');
       } else {

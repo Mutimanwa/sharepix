@@ -160,7 +160,7 @@ export function StoreProvider({ children }) {
           const user = await initializeAuth();
           
           if (!cancelled && user) {
-            console.log(`✅ Auth ready (${user.isAnonymous ? 'Anonymous' : 'Logged In'}):`, user.email || user.id);
+            console.log(`✅ Auth ready (${user.isAnonymous ? 'Anonymous' : 'Logged In'})`);
             setState((s) => ({
               ...s,
               user,
@@ -269,7 +269,7 @@ export function StoreProvider({ children }) {
       dismissFavTip: () => setState((s) => ({ ...s, favTipSeen: true })),
       
       setAuthUser: (user) => {
-        console.log('👤 Setting auth user:', user?.email);
+        console.log(`👤 Setting auth user (${user?.isAnonymous ? 'anonyme' : 'identifié'})`);
         setState((s) => ({
           ...s,
           user,
