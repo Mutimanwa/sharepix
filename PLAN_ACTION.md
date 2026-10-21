@@ -13,8 +13,9 @@
 
 | Élément | Statut | Vérification |
 |---|---|---|
-| BUG-01 · Cache des URLs signées + `onError` + garde URL vide | ✅ **fait** | lint + typecheck + build web |
-| BUG-02 · `initialScrollIndex` figé + `ListHeaderComponent` en élément | ✅ **fait** | idem |
+| BUG-01 · Cache des URLs signées + `onError` + garde URL vide | 🟡 **insuffisant au re-test** → voir Sprint 1 bis | typecheck + build web |
+| BUG-02 · `initialScrollIndex` figé + `ListHeaderComponent` en élément | 🟡 **insuffisant au re-test** → voir Sprint 1 bis | idem |
+| **Sprint 1 bis** · Carrousel isolé et mémoïsé (`PhotoCarousel`) + `expo-image` + fenêtre élargie + registre d'images chargées | ✅ **codé et vérifié** | typecheck + build web (bundle 10 MB) · **re-test appareil à faire** |
 | BUG-03 · `SafeAreaView` depuis `react-native-safe-area-context` | ✅ **fait** | idem |
 | P0-03 · Crash du Profil (`user === null`) | ✅ **fait** | idem |
 | P0-01 · Policy Storage DELETE | ✅ **fait et testé en base** | `is_album_owner` → true/false conformes |

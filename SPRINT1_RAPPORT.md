@@ -338,3 +338,73 @@ npx expo-doctor               ✅ contrôle des versions passé
 > Le contrôle `Check that packages match versions required by installed Expo SDK` n'apparaît
 > plus dans la liste des échecs. En CI, où l'API est joignable, les versions installées sont
 > exactement celles qu'il attend.
+
+---
+
+## 14. Re-test terrain : l'image du détail photo rechargeait encore
+
+### Ce que le test a révélé
+
+Malgré le cache d'URLs signées du Sprint 1, l'écran détail photo continuait de
+« recharger l'image à chaque fois, même en plein visionnage », avec un
+clignotement au swipe. Le BUG-01 n'était donc **pas** clos.
+
+### Cause réelle (vérifiée dans le code, pas supposée)
+
+1. **Le carrousel était imbriqué dans l'en-tête** de la `FlatList` verticale des
+   commentaires. `renderHeader()` étant appelée à chaque rendu, chaque frappe au
+   clavier, chaque like et chaque événement Realtime reconstruisaient l'arbre du
+   carrousel.
+2. **`windowSize={3}` + `maxToRenderPerBatch={2}`**, avec
+   `removeClippedSubviews` actif par défaut sur Android : la page voisine était
+   **démontée** dès qu'on s'en éloignait. En revenant dessus, elle était
+   **remontée** : l'état `loaded` de `ProgressiveImage` repartait de zéro →
+   squelette → fondu de 220 ms → nouvel accès réseau.
+   *C'est exactement le symptôme décrit.*
+3. `Animated.Image` (React Native) n'offre pas de cache disque explicite : une
+   URL signée renouvelée est une nouvelle clé de cache.
+
+> Vérification faite dans `@react-native/virtualized-lists` : une liste
+> horizontale imbriquée dans une liste verticale **n'hérite pas** des métriques de
+> scroll du parent (`_isNestedWithSameOrientation`). L'imbrication en elle-même
+> n'était donc pas la cause — c'est bien le cycle démontage/remontage.
+
+### Correctif appliqué
+
+| Fichier | Changement |
+|---|---|
+| `src/components/PhotoCarousel.js` | **Nouveau.** Carrousel isolé, `React.memo` avec comparaison structurelle `id + uri`. `expo-image` (`cachePolicy="memory-disk"`, `recyclingKey`, `transition={0}`), repli automatique sur `Image` de RN si le module natif est absent. `windowSize={7}`, `initialNumToRender={3}`, `removeClippedSubviews={false}`. Largeur mesurée par `onLayout`. |
+| `src/components/Skeleton.js` | Registre de session `ALREADY_LOADED` : une image déjà affichée ne repasse **plus jamais** par le squelette ni par le fondu, même remontée. Bénéficie aussi aux grilles (Accueil, Album). |
+| `src/screens/PhotoScreen.js` | Le carrousel devient `<PhotoCarousel />` mémoïsé ; suppressions du `FlatList` imbriqué, de `carouselRef`, de `SCREEN_WIDTH`/`IMAGE_HEIGHT` et des styles morts. Callbacks stabilisés (`useCallback`). |
+| `package.json` | `expo-image@~57.0.5` (version alignée sur le SDK 57). |
+
+**Ce qui ne se produit plus :** un like, un commentaire, une frappe clavier ou un
+refresh Realtime ne re-rend plus le carrousel (donc plus aucune requête d'image) ;
+un swipe ne démonte plus les pages voisines ; une photo déjà vue ne réaffiche
+jamais de squelette.
+
+### Vérifications
+
+```
+npm run typecheck                  ✅ exit 0
+npx expo export --platform web     ✅ exit 0 — bundle 10 MB
+   memory-disk / recyclingKey /
+   contentFit / « Photo de l'album » ✅ présents dans le bundle
+```
+
+### ⚠️ Contrainte de déploiement
+
+`expo-image` contient du **code natif**. L'APK actuellement installé a été
+construit **sans** ce module : une mise à jour JS seule ne suffira pas.
+**Il faut reconstruire l'APK** avant de tester. Le repli sur `Image` de RN évite
+un plantage sur un ancien binaire, mais sans cache disque explicite.
+
+### Test à refaire sur l'appareil
+
+1. Ouvrir une photo, la laisser affichée **2 minutes** sans toucher l'écran →
+   aucune réapparition de squelette.
+2. Swiper 5 photos, revenir en arrière → les images précédentes sont déjà là,
+   sans clignotement.
+3. Depuis un **second téléphone**, liker/commenter cette photo → l'image du
+   premier téléphone ne doit **pas** bouger.
+4. Écrire un commentaire (clavier ouvert) → l'image ne doit pas bouger.
