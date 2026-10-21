@@ -267,3 +267,74 @@ tests/lint en CI (#19), upload base64 (#22), suppression de compte (#23), access
 Le lint et le typecheck ont été exécutés avec une configuration **temporaire** (`/tmp`) :
 le dépôt n'a toujours pas de configuration ESLint versionnée ni de tests. C'est l'objet de
 l'issue #19.
+
+---
+
+## 13. Alignement des dépendances Expo (échec `expo-doctor` en CI)
+
+### Symptôme
+`npx expo-doctor` échouait en CI : **15 paquets en décalage de version patch**.
+
+### Cause
+`expo-doctor` compare les paquets à la liste publiée sur l'**API distante** d'Expo, pas
+seulement au `bundledNativeModules.json` local. Le projet était figé sur Expo `57.0.20`,
+dont la liste locale ne connaît pas les patchs publiés depuis (`expo-camera 57.0.6`,
+`expo-notifications 57.0.23`…). D'où un contrôle vert en local et rouge en CI.
+
+### Correctif
+Mise à jour des 14 paquets vers les versions attendues, et suppression d'un paquet mort :
+
+| Paquet | Avant | Après |
+|---|---|---|
+| `expo` | ~57.0.19 | **~57.0.30** |
+| `@expo/metro-runtime` | ~57.0.15 | ~57.0.17 |
+| `expo-camera` | ~57.0.4 | ~57.0.6 |
+| `expo-clipboard` | ~57.0.1 | ~57.0.2 |
+| `expo-constants` | ~57.0.17 | ~57.0.22 |
+| `expo-dev-client` | ~57.0.18 | ~57.0.20 |
+| `expo-device` | ~57.0.1 | ~57.0.2 |
+| `expo-file-system` | ~57.0.2 | ~57.0.7 |
+| `expo-image-picker` | ~57.0.15 | ~57.0.20 |
+| `expo-linking` | ~57.0.9 | ~57.0.13 |
+| `expo-notifications` | ~57.0.16 | ~57.0.23 |
+| `expo-sharing` | ~57.0.17 | ~57.0.23 |
+| `expo-splash-screen` | ~57.0.8 | ~57.0.10 |
+| `expo-web-browser` | ~57.0.2 | ~57.0.3 |
+| `expo-auth-session` | ~57.0.11 | **supprimé** (aucun import dans le projet) |
+
+Après installation, **toutes** les versions correspondent aussi au nouveau
+`bundledNativeModules.json` d'Expo 57.0.30 — le contrôle passera donc aussi en local.
+
+### Vulnérabilité critique traitée au passage
+`npm audit` signalait une faille **critique** : `shell-quote` (GHSA-pqg4-j6r4-53mv, injection
+de commande), tirée par `react-native → react-devtools-core`.
+
+`npm audit fix` proposait de corriger, mais en touchant aussi `@react-navigation/core`
+(dépendance runtime de l'application). Un `override` ciblé a été préféré :
+
+```json
+"overrides": { "shell-quote": "^1.12.0" }
+```
+
+| | Avant | Après |
+|---|---|---|
+| Critique | 1 | **0** |
+| Élevées | 19 | 15 |
+| Total | 32 | 27 |
+
+Les vulnérabilités restantes sont toutes dans la chaîne de **build** (`@expo/cli`, `metro`,
+`@expo/config-plugins`) et ne sont pas embarquées dans l'APK.
+
+### Vérifications
+```
+npm ci                        ✅ 595 paquets, lockfile cohérent
+npm run typecheck             ✅ exit 0
+npx eslint App.js index.js src ✅ 0 erreur réelle
+npx expo export --platform web ✅ 6818 modules
+npx expo-doctor               ✅ contrôle des versions passé
+                                 (les 2 échecs restants exigent api.expo.dev, bloqué ici)
+```
+
+> Le contrôle `Check that packages match versions required by installed Expo SDK` n'apparaît
+> plus dans la liste des échecs. En CI, où l'API est joignable, les versions installées sont
+> exactement celles qu'il attend.
