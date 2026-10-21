@@ -141,6 +141,52 @@ envoyer les e-mails d'authentification ?
 
 ---
 
+# Remise à zéro de la production — 22/10/2026
+
+Décidée explicitement (« base vierge »), exécutée et vérifiée.
+
+| Élément | Avant | Après |
+|---|---|---|
+| Comptes | 84 (81 anonymes) | **0** |
+| Profils | 29 | **0** |
+| Albums | 11 | **0** |
+| Photos | 21 | **0** |
+| Commentaires / likes / membres | 1 / 0 / — | **0** |
+| Jetons push | 2 | **0** |
+
+**Le schéma n'a pas bougé** : 9 tables toutes en RLS, 21 policies `public`
++ 3 `storage`, 10 fonctions, 6 triggers (dont `on_auth_user_created` sur
+`auth.users`), bucket privé présent, 2 secrets Vault intacts.
+
+- Sauvegarde : `/home/user/backup-sharepix-2026-10-22.json` (hors dépôt —
+  contient des adresses e-mail, à supprimer une fois la remise à zéro
+  admise).
+- Suppression par `delete from auth.users` : toutes les tables applicatives
+  cascadent depuis `auth.users` (vérifié sur `pg_constraint` — la seule
+  exception est `auth.scim_users`, table système vide).
+
+## Ce qui reste : les octets du bucket
+
+La cascade SQL supprime les **lignes**, pas les fichiers : les 47 objets du
+bucket (10,09 Mo) sont désormais tous orphelins.
+
+⚠️ **Ne pas** faire `delete from storage.objects` : cela supprime la
+métadonnée mais **pas les octets**, qui resteraient facturés et deviendraient
+introuvables. Seule l'API Storage libère réellement l'espace :
+
+```bash
+SUPABASE_URL=https://bpillwvvxqiduxtkftuh.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<clé service_role> \
+node supabase/purge-orphans.cjs          # simulation
+# puis --apply pour supprimer
+```
+
+**Après la remise à zéro**, les appareils qui ont encore une session en
+cache doivent se déconnecter puis se reconnecter : leur JWT reste valide
+techniquement jusqu'à expiration, mais ne correspond plus à aucun compte.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
@@ -150,7 +196,7 @@ envoyer les e-mails d'authentification ?
 | 1 | **Aucun SMTP configuré** (`smtp_host` = `null`, `rate_limit_email_sent` = 2/h) | ❌ | Le mot de passe oublié et les confirmations d'adresse ne partent pas de façon fiable. Un utilisateur qui perd son mot de passe perd son compte. |
 | 2 | **Sentry annoncé dans la politique de confidentialité, absent du code** | ✅ codé le 22/10 | SDK intégré (`src/lib/sentry.js`), inactif sans DSN. **Reste à créer le projet et fournir `EXPO_PUBLIC_SENTRY_DSN`.** Sans DSN, la mention de la politique reste inexacte. |
 | 3 | `password_min_length` = 6, protection HIBP désactivée | ⚠️ | Mots de passe faibles acceptés (`123456` passe). |
-| 4 | 81 comptes anonymes sur 84, 11 albums | ⚠️ | Le correctif P1-08 devrait tarir la source ; à remesurer après déploiement. |
+| 4 | 81 comptes anonymes sur 84, 11 albums | ✅ réglé le 22/10 | Base remise à zéro (voir ci-dessous). Les comptes fantômes ne reviendront pas : le correctif P1-08 tari la source. |
 | 5 | Secrets `STAGING_*` posés, mais **comptes anonymes désactivés** sur le projet de test | ⚠️ | Le script ne peut pas créer son compte de contrôle : il sort en code `2` (non vérifié) au lieu d'un faux vert. Une case à cocher dans la console du projet de test. |
 | 6 | `version` d'`app.json` = 1.0.0, dernière release = v1.0.4 | ⚠️ | EAS gère les numéros de build à distance (`appVersionSource: remote`), donc ce n'est pas bloquant, mais la version affichée n'est pas la version réelle. |
 | 7 | `REDIRECT_URI_WEB` en dur sur `http://localhost:8081` | ℹ️ | OAuth impossible sur le web en production. Le mobile n'est pas concerné. |
