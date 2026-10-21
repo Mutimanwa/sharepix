@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,12 @@ import {
   Modal,
   Share,
   TextInput,
+  // ── DEEP LINK QR : intégration ──
+  // Alert : QR non reconnu (était appelé sans import → crash).
+  // BackHandler : le bouton retour Android ferme le scanner.
+  Alert,
+  BackHandler,
+  // ── DEEP LINK QR : fin ──
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,7 +34,7 @@ import {
   ScanIcon,
   Copy01Icon,
   UserMultipleIcon,
-  Diamond01Icon,
+  HonourStarIcon,
   ComputerIcon,
   PencilEdit02Icon,
   ArrowRight01Icon,
@@ -103,6 +109,20 @@ export default function AlbumScreen({ route, navigation }) {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scanHandled = useRef(false);
+
+  // ── DEEP LINK QR : intégration ──
+  // Bouton retour Android : ferme le scanner au lieu de quitter l'album.
+  // (Le scanner n'est plus une <Modal> native, il faut donc gérer le
+  // retour nous-mêmes.)
+  useEffect(() => {
+    if (!scannerOpen) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setScannerOpen(false);
+      return true; // événement consommé : on ne quitte pas l'écran Album
+    });
+    return () => sub.remove();
+  }, [scannerOpen]);
+  // ── DEEP LINK QR : fin ──
 
   // ── SUPABASE ALBUMS : intégration ──
   // À l'entrée sur l'album : refresh immédiat, puis abonnement Realtime.
@@ -634,7 +654,7 @@ export default function AlbumScreen({ route, navigation }) {
 
         <View style={styles.card}>
           <Row
-            icon={Diamond01Icon}
+            icon={HonourStarIcon}
             title="Album Premium"
             hint="Vidéos et qualité originale"
             onPress={() => {
@@ -733,7 +753,15 @@ export default function AlbumScreen({ route, navigation }) {
         </View>
       </RightModal>
 
-      <Modal visible={scannerOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setScannerOpen(false)}>
+      {/* ── DEEP LINK QR : intégration ──
+          FIX CAMÉRA NOIRE : CameraView dans une <Modal> native Android ne
+          démarre JAMAIS (la SurfaceView de la caméra ne s'attache pas à la
+          fenêtre modale — bug connu d'expo-camera). Le scanner est donc
+          une VUE plein écran classique (absoluteFill + zIndex/elevation),
+          dessinée au-dessus de l'écran dans la MÊME fenêtre que l'app :
+          la caméra démarre immédiatement. Fermeture : bouton × ou bouton
+          retour Android (BackHandler plus haut). */}
+      {scannerOpen && (
         <View style={styles.scannerModal}>
           {permission?.granted ? (
             <CameraView
@@ -755,7 +783,14 @@ export default function AlbumScreen({ route, navigation }) {
             </View>
           )}
 
-          <View style={styles.scannerOverlay} pointerEvents="box-none">
+          <View
+            style={[
+              styles.scannerOverlay,
+              // Respect de l'encoche / barre de geste
+              { paddingTop: insets.top + 14, paddingBottom: Math.max(insets.bottom, 20) + 22 },
+            ]}
+            pointerEvents="box-none"
+          >
             <View style={styles.scannerHeader}>
               <View style={styles.scannerTitleWrap}>
                 <HugeiconsIcon icon={QrCodeIcon} size={20} color="#fff" />
@@ -784,7 +819,8 @@ export default function AlbumScreen({ route, navigation }) {
             </View>
           </View>
         </View>
-      </Modal>
+      )}
+      {/* ── DEEP LINK QR : fin ── */}
     </SafeAreaView>
   );
 }
@@ -1089,7 +1125,14 @@ const styles = StyleSheet.create({
   },
   qrTxt: { fontWeight: '600', color: colors.tealDark, fontSize: 15 },
   scannerModal: {
-    flex: 1,
+    // ── DEEP LINK QR : intégration ──
+    // Plein écran SANS <Modal> native : absoluteFill + zIndex/elevation
+    // élevés pour passer au-dessus du header, des tabs et du FAB
+    // (sur Android, c'est elevation qui décide de l'ordre de dessin).
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
+    // ── DEEP LINK QR : fin ──
     backgroundColor: '#101317',
   },
   scannerOverlay: {

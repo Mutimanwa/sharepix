@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// ── SUPABASE ALBUMS : intégration ──
+// Lecture base64 des fichiers locaux pour l'upload Storage sur mobile.
+import * as FileSystem from 'expo-file-system/legacy';
+// ── SUPABASE ALBUMS : fin ──
 import { isSupabaseConfigured } from './config';
 import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
 // ── SUPABASE ALBUMS : intégration ──
@@ -60,6 +64,40 @@ function code8() {
   for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
 }
+
+// ── SUPABASE ALBUMS : intégration ──
+// base64 → octets (Uint8Array). Sans dépendance : RN n'a ni atob ni Buffer.
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function base64ToUint8Array(base64) {
+  const clean = base64.replace(/[^A-Za-z0-9+/]/g, '');
+  const bytes = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let p = 0;
+  for (let i = 0; i < clean.length; i += 4) {
+    const c1 = B64_CHARS.indexOf(clean[i]);
+    const c2 = B64_CHARS.indexOf(clean[i + 1]);
+    const c3 = i + 2 < clean.length ? B64_CHARS.indexOf(clean[i + 2]) : -1;
+    const c4 = i + 3 < clean.length ? B64_CHARS.indexOf(clean[i + 3]) : -1;
+    const n = (c1 << 18) | (c2 << 12) | ((c3 < 0 ? 0 : c3) << 6) | (c4 < 0 ? 0 : c4);
+    bytes[p++] = (n >> 16) & 0xff;
+    if (c3 >= 0) bytes[p++] = (n >> 8) & 0xff;
+    if (c4 >= 0) bytes[p++] = n & 0xff;
+  }
+  return p === bytes.length ? bytes : bytes.slice(0, p);
+}
+
+// Extension + MIME réels du fichier choisi (jpg, png, heic, mp4…).
+function fileMetaFromUri(uri) {
+  const clean = uri.split(/[?#]/)[0];
+  let ext = (clean.split('.').pop() || 'jpg').toLowerCase();
+  if (!/^[a-z0-9]{1,5}$/.test(ext)) ext = 'jpg';
+  const mimes = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif',
+    mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+  };
+  return { ext, mime: mimes[ext] || 'image/jpeg' };
+}
+// ── SUPABASE ALBUMS : fin ──
 
 export function StoreProvider({ children }) {
   const [state, setState] = useState(defaultState);
@@ -368,25 +406,40 @@ export function StoreProvider({ children }) {
         try {
            // Préparation du fichier (Compatible Web Data URI et Mobile File)
           let fileToUpload;
+          // ── SUPABASE ALBUMS : intégration ──
+          // MIME/extension réels (photo jpg/png/heic, vidéo mp4…)
+          let fileMime = 'image/jpeg';
+          let fileExt = 'jpg';
+          // ── SUPABASE ALBUMS : fin ──
 
           if (uri.startsWith('data:') || uri.startsWith('blob:')) {
             // SUR LE WEB : On convertit le Data URI en objet Blob que Supabase comprend parfaitement
             const response = await fetch(uri);
             fileToUpload = await response.blob();
+            if (fileToUpload.type) fileMime = fileToUpload.type;
           } else {
-            // SUR MOBILE (iOS/Android) : On garde le format fichier classique
-            fileToUpload = {
-              uri: uri,
-              type: 'image/jpeg', 
-              name: `${Date.now()}.jpg`
-            };
+            // ── SUPABASE ALBUMS : intégration ──
+            // FIX MOBILE : un objet {uri,name,type} envoyé à supabase-js
+            // partait comme TEXTE (« [object Object] » ou fichier vide) :
+            // la ligne SQL existait mais l'image était corrompue (vignette
+            // blanche + visionneuse noire sur téléphone). On lit les VRAIS
+            // octets en base64 (expo-file-system) puis on envoie un
+            // Uint8Array, que le fetch de RN sait transmettre.
+            const meta = fileMetaFromUri(uri);
+            fileMime = meta.mime;
+            fileExt = meta.ext;
+            const base64 = await FileSystem.readAsStringAsync(uri, {
+              encoding: 'base64',
+            });
+            fileToUpload = base64ToUint8Array(base64);
+            // ── SUPABASE ALBUMS : fin ──
           }
 
           // Étape A : Uploader le fichier physique dans le bucket Supabase
-          const filePath = `${albumId}/${Date.now()}.jpg`;
+          const filePath = `${albumId}/${Date.now()}.${fileExt}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('album-photos')
-            .upload(filePath, fileToUpload, { contentType: 'image/jpeg', upsert: false });
+            .upload(filePath, fileToUpload, { contentType: fileMime, upsert: false });
 
           if (uploadError) {
             console.log('📛 storage upload error:', uploadError);
