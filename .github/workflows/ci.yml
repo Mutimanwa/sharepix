@@ -50,7 +50,18 @@ jobs:
         env:
           EXPO_DOCTOR_WARN_ON_NETWORK_ERRORS: '1'
           EXPO_DOCTOR_ENABLE_DIRECTORY_CHECK: '0'
-        run: npx expo-doctor
+        run: |
+          set +e
+          OUT=$(npx expo-doctor 2>&1)
+          CODE=$?
+          echo "$OUT"
+          if [ $CODE -ne 0 ]; then
+            # Les journaux complets ne sont pas toujours accessibles :
+            # on republie la cause en annotation, lisible via l'API.
+            MSG=$(echo "$OUT" | sed -n '1,40p' | tr '\n' ' ' | tr -d '%' | cut -c1-900)
+            echo "::error title=expo-doctor::${MSG}"
+          fi
+          exit $CODE
 
   edge-function:
     name: Edge Function (Deno)
