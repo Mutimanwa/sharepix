@@ -13,6 +13,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { StoreProvider } from './src/store';
+import { initSentry, wrapRoot } from './src/lib/sentry';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { colors } from './src/theme';
 import SplashScreen from './src/screens/SplashScreen';
@@ -30,6 +31,9 @@ import {
   PremiumScreen,
   PcUploadScreen,
 } from './src/screens/ExtraScreens';
+
+// Avant tout rendu : sans DSN configuré, cette fonction ne fait rien.
+initSentry();
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -136,7 +140,7 @@ function Tabs() {
   );
 }
 
-export default function App() {
+function App() {
   // ── Gestion des deep links OAuth ──
   useEffect(() => {
     // Fonction pour traiter les URLs reçues
@@ -223,3 +227,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+// `wrapRoot` renvoie `App` inchangé quand Sentry n'est pas configuré.
+export default wrapRoot(App);

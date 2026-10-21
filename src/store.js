@@ -532,6 +532,17 @@ export function StoreProvider({ children }) {
           // pour pouvoir diagnostiquer au lieu de deviner.
           if (dbError) {
             console.log('📛 photos insert error:', dbError);
+            // ── Compensation (fuite de stockage) ──
+            // Le fichier est DÉJÀ dans le bucket : si on s'arrête ici, il
+            // reste pour toujours, invisible dans l'app mais facturé au
+            // quota. Constaté en production : 26 fichiers fantômes pour
+            // 21 photos visibles, soit 95 % du stockage occupé par des
+            // déchets. On supprime donc l'objet avant de remonter l'erreur.
+            try {
+              await supabase.storage.from('album-photos').remove([uploadData.path]);
+            } catch {
+              // Best-effort : ne jamais masquer l'erreur d'origine.
+            }
             throw new Error(dbError.message || "Erreur d'enregistrement en base de données.");
           }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme';
+import { reportError } from '../lib/sentry';
 
 /**
  * ── FILET DE SÉCURITÉ (audit P1-14) ──────────────────────────────────────
@@ -23,8 +24,9 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // Pas de service de crash pour l'instant : au moins la trace reste
-    // exploitable dans les logs de développement.
+    // Le service de crash est optionnel : `reportError` ne fait rien si
+    // aucun DSN n'est configuré (voir src/lib/sentry.js).
+    reportError(error, { componentStack: info?.componentStack });
     if (__DEV__) {
       console.error('💥 ErrorBoundary:', error, info?.componentStack);
     }

@@ -98,6 +98,49 @@ absentes — plutôt que de retomber silencieusement sur la production.
 
 ---
 
+## D-08 — Le SMTP ne peut venir ni de Firebase ni de Supabase
+
+**Question posée le 22/10 :** peut-on utiliser Firebase ou Supabase pour
+envoyer les e-mails d'authentification ?
+
+**Réponse : non, aucun des deux.**
+
+- **Firebase** n'expose pas de serveur SMTP utilisable par un tiers.
+  Firebase Auth envoie ses propres e-mails *pour Firebase Auth*, et ne se
+  branche pas comme relais pour Supabase.
+- **Supabase** fournit bien un service intégré, mais il est inutilisable en
+  production, pour une raison plus grave que la limite de débit :
+  **il n'envoie qu'aux adresses membres de l'organisation Supabase**, au
+  rythme de **2 e-mails par heure** et sans aucune garantie de livraison.
+
+  C'est vérifié : `rate_limit_email_sent = 2` sur le projet. Conséquence
+  concrète : un utilisateur réel qui clique sur « mot de passe oublié »
+  **ne reçoit rien**, et rien ne le signale — l'appel réussit, l'e-mail
+  n'arrive pas. Le mot de passe oublié livré en Sprint 3 est donc inopérant
+  tant qu'un vrai SMTP n'est pas branché.
+
+**Ce qu'il faut :** un fournisseur SMTP tiers, gratuit à cette échelle.
+
+| Fournisseur | Offre gratuite | Hôte / port | Remarque |
+|---|---|---|---|
+| **Brevo** | 300 e-mails/jour | `smtp-relay.brevo.com:587` | Pas de domaine obligatoire au départ ; bonne délivrabilité. |
+| **Resend** | 100/jour | `smtp.resend.com:465` | Nécessite de vérifier `sharepix.app` (enregistrements DNS) pour envoyer à n'importe qui. |
+| **Mailgun / SendGrid** | quotas variables | — | Équivalents. |
+
+**Procédure (identique pour tous) :**
+1. Créer un compte, valider l'adresse d'envoi (ou le domaine `sharepix.app`).
+2. Récupérer l'hôte, le port, l'utilisateur et la clé SMTP.
+3. Supabase → **Authentication → Emails → SMTP Settings** → *Enable
+   custom SMTP* → coller les valeurs → expéditeur `noreply@sharepix.app`.
+4. **Ensuite seulement**, Authentication → **Rate Limits** → relever la
+   limite d'e-mails (30/h par défaut après activation ; monter à 100).
+5. Tester avec une vraie adresse : « mot de passe oublié » doit arriver.
+
+> La configuration finale se fait dans la console : aucun outil de l'agent
+> ne couvre les champs SMTP.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
@@ -105,7 +148,7 @@ absentes — plutôt que de retomber silencieusement sur la production.
 | # | Point | Statut | Impact |
 |---|-------|--------|--------|
 | 1 | **Aucun SMTP configuré** (`smtp_host` = `null`, `rate_limit_email_sent` = 2/h) | ❌ | Le mot de passe oublié et les confirmations d'adresse ne partent pas de façon fiable. Un utilisateur qui perd son mot de passe perd son compte. |
-| 2 | **Sentry annoncé dans la politique de confidentialité, absent du code** | ❌ | Écart entre un document public et la réalité. Soit on l'installe, soit on corrige le document. |
+| 2 | **Sentry annoncé dans la politique de confidentialité, absent du code** | ✅ codé le 22/10 | SDK intégré (`src/lib/sentry.js`), inactif sans DSN. **Reste à créer le projet et fournir `EXPO_PUBLIC_SENTRY_DSN`.** Sans DSN, la mention de la politique reste inexacte. |
 | 3 | `password_min_length` = 6, protection HIBP désactivée | ⚠️ | Mots de passe faibles acceptés (`123456` passe). |
 | 4 | 81 comptes anonymes sur 84, 11 albums | ⚠️ | Le correctif P1-08 devrait tarir la source ; à remesurer après déploiement. |
 | 5 | Secrets `STAGING_*` posés, mais **comptes anonymes désactivés** sur le projet de test | ⚠️ | Le script ne peut pas créer son compte de contrôle : il sort en code `2` (non vérifié) au lieu d'un faux vert. Une case à cocher dans la console du projet de test. |

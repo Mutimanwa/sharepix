@@ -173,6 +173,20 @@ supabase/
   rls-check.cjs         test d'intrusion RLS (nécessite un projet de test)
 ```
 
+## Sentry (rapport de crash)
+
+Le SDK est intégré mais **inactif tant qu'aucun DSN n'est fourni** — sans
+elle, l'application se comporte comme avant.
+
+```bash
+cp .env.example .env
+# puis renseigner EXPO_PUBLIC_SENTRY_DSN=https://…@o….ingest.sentry.io/…
+```
+
+Sentry est un module natif : il faut un build (EAS ou dev client), pas
+Expo Go. Les rapports excluent toute donnée personnelle (`sendDefaultPii:
+false`) et retirent les URL d'authentification contenant un `?code=`.
+
 ## Qualité
 
 ```bash
