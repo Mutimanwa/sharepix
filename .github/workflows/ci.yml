@@ -35,7 +35,14 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
 
+      # expo-doctor interroge l'API Expo et React Native Directory. Ces
+      # services externes renvoient parfois une erreur : on ne veut pas
+      # qu'une panne réseau rougisse la CI alors que le projet est sain.
+      # Ce drapeau ne transforme en succès QUE les échecs dont toutes les
+      # causes sont des erreurs réseau ; un vrai problème reste bloquant.
       - name: Expo Doctor
+        env:
+          EXPO_DOCTOR_WARN_ON_NETWORK_ERRORS: '1'
         run: npx expo-doctor
 
   edge-function:
