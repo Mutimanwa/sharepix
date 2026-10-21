@@ -6,13 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  KeyboardAvoidingView,
-  Platform,
-  Alert, // <-- AJOUT
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors } from '../theme';
-import { CoralButton, Field, Logo, Sheet, Page, SmallButton } from '../components/UI';
+import { CoralButton, Field, Logo, Sheet, Page } from '../components/UI';
 // ── SQUELETTES : intégration ──
 // Couvertures d'albums : pulsation jusqu'à onLoad, puis révélation en fondu
 import { ProgressiveImage } from '../components/Skeleton';

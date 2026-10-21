@@ -11,7 +11,9 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  Animated
+  Animated,
+  Image,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { colors } from '../theme';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
@@ -21,13 +23,9 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 // les écrans Télécharger sur PC / Premium / Membres / QR collaient à la barre
 // de statut. `useSafeAreaInsets` venait déjà du bon paquet.
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { TouchableWithoutFeedback } from 'react-native';
 
 const LOGO = require('../../assets/sharepix-logo.png');
-
-const { width } = Dimensions.get('window');
 
 export function Logo({ size = 42, color = colors.ink }) {
   return (
@@ -453,7 +451,11 @@ const styles = StyleSheet.create({
   },
     // Right Modal (Menu coulissant)
   rightOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   rightContainer: {

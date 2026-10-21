@@ -176,13 +176,24 @@ supabase/
 ## Qualité
 
 ```bash
-npm run typecheck                        # tsc --noEmit
-npx expo export --platform web           # build de contrôle
+npm run typecheck                        # tsc --noEmit (JS vérifié par @ts-check)
+npm run lint                             # ESLint 9 (config Expo)
+npm test                                 # Jest (jest-expo)
+npm run verify                           # les trois d'affilée
+npx expo export --platform web           # build de contrôle (graphe Metro)
 node supabase/rls-check.cjs              # audit RLS (projet de test)
 ```
 
-CI (`.github/workflows/ci.yml`) : TypeScript + Expo Doctor, Edge Function
-(Deno check & lint), RLS/Storage. Détail : [`CICD.md`](CICD.md).
+Le typage est **incrémental** : `checkJs` reste désactivé globalement (le
+projet est en JS) et les fichiers sensibles portent `// @ts-check` en tête
+(génération des codes, auth, albums, store, push, carrousel d'images). Les
+tests couvrent la logique pure — codes d'invitation, calcul de
+redimensionnement, contrat du deep link OAuth — c'est-à-dire les règles qui
+ne peuvent pas être vérifiées à l'œil sur un téléphone.
+
+CI (`.github/workflows/ci.yml`) : TypeScript, ESLint, Jest, Expo Doctor,
+Edge Function (Deno check & lint), RLS/Storage. Détail :
+[`CICD.md`](CICD.md).
 
 ## Limites connues
 

@@ -17,7 +17,7 @@
 // En CI, ce sont les secrets du projet de staging qui sont injectés.
 // ────────────────────────────────────────────────────────────────────────
 
-/* eslint-disable no-console */
+ 
 
 // Realtime (inclus dans supabase-js) exige un WebSocket natif sous Node :
 // on réutilise celui installé avec les dépendances du projet.

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   FlatList,
   Modal,
   Share,
@@ -90,7 +89,6 @@ export default function AlbumScreen({ route, navigation }) {
   // Filtre
   const [filtre, setFilter] = useState(false);
   const [order, setOrder] = useState('recent');
-  const orderDirty = order !== 'recent';
 
   // Menu / gestion album
   const [menuModal, setMenuModal] = useState(false);
@@ -291,24 +289,8 @@ export default function AlbumScreen({ route, navigation }) {
 
   // ── Sous-composants ───────────────────────────────────────────────────
 
-  function Row({ icon, title, hint, onPress, last, danger }) {
-    return (
-      <TouchableOpacity
-        style={[styles.row, last && { borderBottomWidth: 0 }]}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.rowIco, danger && { backgroundColor: '#FDECEA' }]}>
-          <HugeiconsIcon icon={icon} size={20} color={danger ? colors.coral : colors.tealDark} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.rowT, danger && { color: colors.coral }]}>{title}</Text>
-          {hint ? <Text style={styles.rowH}>{hint}</Text> : null}
-        </View>
-        <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={colors.muted} />
-      </TouchableOpacity>
-    );
-  }
+  // `Row` est défini au niveau module (voir plus bas) : un composant créé
+  // pendant le rendu est démonté/remonté à chaque re-rendu de l'écran.
 
   const renderPhoto = ({ item }) => {
     const isSel = selecting && selected.includes(item.id);
@@ -773,7 +755,7 @@ export default function AlbumScreen({ route, navigation }) {
         <View style={styles.scannerModal}>
           {permission?.granted ? (
             <CameraView
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               facing="back"
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               onBarcodeScanned={scanHandled.current ? undefined : handleBarcodeScanned}
@@ -833,6 +815,29 @@ export default function AlbumScreen({ route, navigation }) {
   );
 }
 
+// ── Sous-composant hors du composant écran ────────────────────────────
+// Défini ici (et non dans `AlbumScreen`) pour que son identité de type reste
+// stable d'un rendu à l'autre : sinon React démonte/remonte les lignes de menu
+// à chaque frappe ou animation, ce qui casse le focus et le scroll.
+function Row({ icon, title, hint, onPress, last, danger }) {
+  return (
+    <TouchableOpacity
+      style={[styles.row, last && { borderBottomWidth: 0 }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.rowIco, danger && { backgroundColor: '#FDECEA' }]}>
+        <HugeiconsIcon icon={icon} size={20} color={danger ? colors.coral : colors.tealDark} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowT, danger && { color: colors.coral }]}>{title}</Text>
+        {hint ? <Text style={styles.rowH}>{hint}</Text> : null}
+      </View>
+      <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={colors.muted} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.cream },
   top: {
@@ -883,7 +888,11 @@ const styles = StyleSheet.create({
   // ── SQUELETTES : grille fantôme (mêmes dimensions que la vraie) ──
   skelGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingTop: 4 },
   selLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     margin: 1.5,
     borderRadius: 4,
     backgroundColor: 'rgba(22,78,82,0.12)',
@@ -1137,14 +1146,22 @@ const styles = StyleSheet.create({
     // Plein écran SANS <Modal> native : absoluteFill + zIndex/elevation
     // élevés pour passer au-dessus du header, des tabs et du FAB
     // (sur Android, c'est elevation qui décide de l'ordre de dessin).
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     zIndex: 999,
     elevation: 999,
     // ── DEEP LINK QR : fin ──
     backgroundColor: '#101317',
   },
   scannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     paddingTop: 54,
     paddingHorizontal: 24,
     paddingBottom: 44,

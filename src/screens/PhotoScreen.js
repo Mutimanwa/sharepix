@@ -119,6 +119,24 @@ export default function PhotoScreen({ route, navigation }) {
   }, [albumId, album?.cloud]);
   // ── SUPABASE ALBUMS : fin ──
 
+  // Stable : le carrousel est mémoïsé, ses callbacks ne doivent pas changer
+  // d'identité à chaque rendu (sinon le `memo` garderait une closure morte).
+  // ⚠️ Déclarés AVANT le `return` anticipé ci-dessous : un composant doit
+  // appeler le même nombre de hooks à chaque rendu, sinon React plante
+  // (« Rendered fewer hooks than expected ») dès que la photo est supprimée.
+  const dismissTip = useCallback(() => {
+    setTip(false);
+    globalHasSeenTip = true;
+  }, []);
+
+  const handleIndexChange = useCallback(
+    (index) => {
+      setCurrentIndex(index);
+      dismissTip();
+    },
+    [dismissTip]
+  );
+
   // ── Album/photo introuvable ────────────────────────────────────────────
   if (!album || photos.length === 0 || initialIndex < 0) {
     return (
@@ -161,21 +179,6 @@ export default function PhotoScreen({ route, navigation }) {
     setText('');
     Keyboard.dismiss();
   };
-
-  // Stable : le carrousel est mémoïsé, ses callbacks ne doivent pas changer
-  // d'identité à chaque rendu (sinon le `memo` garderait une closure morte).
-  const dismissTip = useCallback(() => {
-    setTip(false);
-    globalHasSeenTip = true;
-  }, []);
-
-  const handleIndexChange = useCallback(
-    (index) => {
-      setCurrentIndex(index);
-      dismissTip();
-    },
-    [dismissTip]
-  );
 
   const toggleCommentLike = (commentId) =>
     setLikedComments((prev) => ({ ...prev, [commentId]: !prev[commentId] }));

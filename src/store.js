@@ -1,3 +1,4 @@
+// @ts-check
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // ── SUPABASE ALBUMS : intégration ──
@@ -5,10 +6,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 // ── SUPABASE ALBUMS : fin ──
 import { isSupabaseConfigured } from './config';
-import { restoreSession, syncProfile, initializeAuth, signOut } from './services/auth';
+import { generateInviteCode, randomId } from './lib/inviteCode';
+import { resizeForUpload } from './lib/imageResize';
 // ── SUPABASE ALBUMS : intégration ──
 // Détection d'une erreur OAuth renvoyée dans l'URL (ex. liaison Google refusée)
-import { consumeOAuthErrorFromUrl, translateAuthError } from './services/auth';
+import {
+  consumeOAuthErrorFromUrl,
+  translateAuthError,
+  initializeAuth,
+  syncProfile,
+} from './services/auth';
 // ── SUPABASE ALBUMS : fin ──
 import { supabase } from './lib/supabase'; // <-- AJOUT POUR LE CLOUD
 // ── SUPABASE ALBUMS : intégration ──
@@ -59,12 +66,10 @@ const defaultState = {
 
 const StoreContext = createContext(null);
 
-function code8() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = '';
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
+// ── P1-10 : code d'invitation tiré au sort de façon cryptographique ──
+// Voir src/lib/inviteCode.js — Math.random() n'est pas un générateur sûr,
+// et ce code EST la clé d'accès à l'album.
+const code8 = () => generateInviteCode();
 
 // ── SUPABASE ALBUMS : intégration ──
 // base64 → octets (Uint8Array). Sans dépendance : RN n'a ni atob ni Buffer.
@@ -404,7 +409,7 @@ export function StoreProvider({ children }) {
                     ...a,
                     photos: [
                       {
-                        id: Date.now().toString() + Math.random(),
+                        id: randomId(),
                         uri, // URI locale (file://...)
                         createdAt: Date.now(),
                         liked: false,
@@ -451,9 +456,28 @@ export function StoreProvider({ children }) {
             fileMime = meta.mime;
             fileExt = meta.ext;
             // Plafond AVANT lecture : getInfoAsync ne charge pas le fichier.
-            const info = await FileSystem.getInfoAsync(uri, { size: true });
-            if (info?.size && info.size > MAX_UPLOAD_BYTES) throw new Error(TOO_LARGE_MESSAGE);
-            const base64 = await FileSystem.readAsStringAsync(uri, {
+            // P1-11 : `getInfoAsync` n'accepte que { md5 } en option ; la
+            // taille est TOUJOURS renvoyée pour un fichier existant, mais
+            // elle n'existe pas dans la branche `exists: false` du type.
+            const info = await FileSystem.getInfoAsync(uri);
+            if (info.exists && info.size > MAX_UPLOAD_BYTES) throw new Error(TOO_LARGE_MESSAGE);
+
+            // ── P1-11 : alléger AVANT de charger en mémoire ──
+            // Une photo de téléphone (3-8 Mo) partait telle quelle : quota
+            // de 1 Go vite consommé et envoi très long en 3G/4G. On réduit
+            // le grand côté à 2048 px et on recompresse en JPEG 0.82.
+            // `resizeForUpload` renvoie null quand ce n'est pas utile ou
+            // impossible → on garde alors le fichier d'origine.
+            const light = await resizeForUpload(uri, fileMime, {
+              sizeBytes: info.exists ? info.size : 0,
+            });
+            const sourceUri = light ? light.uri : uri;
+            if (light) {
+              fileMime = light.mime;
+              fileExt = light.ext;
+            }
+
+            const base64 = await FileSystem.readAsStringAsync(sourceUri, {
               encoding: 'base64',
             });
             fileToUpload = base64ToUint8Array(base64);

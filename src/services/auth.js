@@ -1,7 +1,7 @@
+// @ts-check
 import { supabase } from '../lib/supabase';
-import { APP_SCHEME, REDIRECT_URI } from '../config';
+import { REDIRECT_URI } from '../config';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -164,8 +164,10 @@ export async function linkGoogleIdentity() {
 
   // La liaison peut être refusée côté serveur (ex : compte Google déjà
   // lié à un autre utilisateur) → l'erreur revient dans l'URL de retour.
-  if (result.url) {
-    const errDesc = result.url.match(/[?&#]error_description=([^&]+)/);
+  // `url` n'existe que sur la variante « success » du résultat.
+  const linkUrl = result.type === 'success' ? result.url : null;
+  if (linkUrl) {
+    const errDesc = linkUrl.match(/[?&#]error_description=([^&]+)/);
     if (errDesc) {
       throw new Error(
         decodeURIComponent(errDesc[1].replace(/\+/g, ' ')) || 'La liaison Google a échoué'
@@ -174,10 +176,10 @@ export async function linkGoogleIdentity() {
   }
 
   // Établir la session depuis l'URL de retour (code PKCE ou tokens)
-  if (result.type === 'success' && result.url) {
-    const codeMatch = result.url.match(/[?&#]code=([^&]+)/);
-    const accessMatch = result.url.match(/[?&#]access_token=([^&]+)/);
-    const refreshMatch = result.url.match(/[?&#]refresh_token=([^&]+)/);
+  if (linkUrl) {
+    const codeMatch = linkUrl.match(/[?&#]code=([^&]+)/);
+    const accessMatch = linkUrl.match(/[?&#]access_token=([^&]+)/);
+    const refreshMatch = linkUrl.match(/[?&#]refresh_token=([^&]+)/);
     try {
       if (codeMatch) {
         await supabase.auth.exchangeCodeForSession(codeMatch[1]);
@@ -277,7 +279,9 @@ export async function signInWithGoogleMobile() {
       provider: 'google',
       options: {
         redirectTo: REDIRECT_URI,
-        skipBrowserRedirect: false,
+        // On ouvre nous-mêmes le navigateur (openAuthSessionAsync) :
+        // laisser le SDK tenter une redirection n'a pas de sens en natif.
+        skipBrowserRedirect: true,
       },
     });
 
@@ -300,10 +304,62 @@ export async function signInWithGoogleMobile() {
 
     // 3. Gérer le retour
     if (result.type === 'success') {
-      return {
-        success: true,
-        url: result.url,
-      };
+      // ── P1-07 : le code PKCE doit être échangé ICI ──────────────────
+      // Avec flowType 'pkce' et detectSessionInUrl désactivé sur mobile,
+      // personne n'échangeait ce code : openAuthSessionAsync renvoyait
+      // bien l'URL de retour, mais AUCUNE session n'était créée. L'écran
+      // d'auth attendait 1,5 s puis affichait l'accueil « connecté » avec
+      // en réalité le compte anonyme précédent. Google était donc cassé
+      // sur mobile, en silence.
+      const returned = result.url || '';
+
+      // Erreur renvoyée par le fournisseur (?error=...&error_description=...)
+      const errDesc = returned.match(/[?&#]error_description=([^&]+)/);
+      if (errDesc) {
+        throw new Error(
+          decodeURIComponent(errDesc[1].replace(/\+/g, ' ')) || 'Connexion Google refusée'
+        );
+      }
+
+      const codeMatch = returned.match(/[?&#]code=([^&]+)/);
+      const accessMatch = returned.match(/[?&#]access_token=([^&]+)/);
+      const refreshMatch = returned.match(/[?&#]refresh_token=([^&]+)/);
+
+      // Aucun justificatif dans l'URL : on ne doit SURTOUT pas se rabattre
+      // sur `getSession()`, qui renverrait le compte anonyme encore ouvert
+      // et ferait croire à une connexion Google réussie.
+      if (!codeMatch && !(accessMatch && refreshMatch)) {
+        throw new Error("La connexion Google n'a pas abouti. Réessaie.");
+      }
+
+      try {
+        if (codeMatch) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+            decodeURIComponent(codeMatch[1])
+          );
+          if (exchangeError) throw exchangeError;
+        } else if (accessMatch && refreshMatch) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: decodeURIComponent(accessMatch[1]),
+            refresh_token: decodeURIComponent(refreshMatch[1]),
+          });
+          if (sessionError) throw sessionError;
+        }
+      } catch (e) {
+        console.log('⚠️ OAuth code exchange error:', e?.message || e);
+        throw new Error("La connexion Google n'a pas abouti. Réessaie.");
+      }
+
+      // On ne se fie pas au type renvoyé par le navigateur : on relit la
+      // session réelle. C'est elle qui prouve que la connexion a marché.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData?.session;
+      if (!session) {
+        throw new Error("La connexion Google n'a pas abouti. Réessaie.");
+      }
+
+      const profile = await fetchProfile(session.user.id);
+      return { success: true, user: toAppUser(session.user, profile) };
     } else if (result.type === 'cancel') {
       throw new Error('Connexion Google annulée');
     } else if (result.type === 'dismiss') {
@@ -341,46 +397,93 @@ export async function signInWithGoogle() {
 
 export async function restoreSession() {
   if (!supabase) return null;
-  
+
   try {
-    return new Promise((resolve) => {
-      let resolved = false;
-      
-      // Fonction pour terminer la promesse proprement
+    // ── P1-08 : la session en cache est la source de vérité ────────────
+    // Avant : une course de 2,5 s. Si le profil mettait plus de temps à
+    // revenir (réseau lent, 3G), on rendait `null` — et initializeAuth()
+    // créait alors un NOUVEAU compte anonyme. L'utilisateur perdait
+    // l'accès à ses albums, sans message et sans retour possible.
+    //
+    // Désormais : si le stockage local contient une session, on la rend,
+    // quel que soit le temps que met le profil. Aucun délai ne peut plus
+    // aboutir à écraser un compte existant.
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      // Session illisible ou corrompue : on laisse l'appelant décider.
+      console.log('⚠️ getSession error:', error.message);
+      return null;
+    }
+
+    if (data?.session) {
+      const profile = await fetchProfile(data.session.user.id);
+      return toAppUser(data.session.user, profile);
+    }
+
+    // Aucune session en cache. Sur le WEB uniquement, le SDK peut être en
+    // train d'échanger le ?code= de la redirection OAuth : on lui laisse
+    // une fenêtre courte pour terminer. En natif, ce cas n'existe pas —
+    // l'échange PKCE se fait explicitement (voir signInWithGoogleMobile).
+    if (Platform.OS !== 'web') return null;
+
+    return await new Promise((resolve) => {
+      let done = false;
+      let subscription = null;
+      // Déclaré AVANT `finish` : `const timer` plus bas serait en zone morte
+      // temporelle au moment où `finish` pourrait être appelé.
+      let timer = null;
+
       const finish = (user) => {
-        if (resolved) return;
-        resolved = true;
+        if (done) return;
+        done = true;
+        if (timer) clearTimeout(timer);
+        subscription?.unsubscribe?.();
         resolve(user);
       };
 
-      // 1. Vérifier immédiatement si une session existe déjà en cache
-      supabase.auth.getSession().then(async ({ data }) => {
-        if (data?.session) {
-          const profile = await fetchProfile(data.session.user.id);
-          finish(toAppUser(data.session.user, profile));
-          return;
+      const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+          try {
+            const profile = await fetchProfile(session.user.id);
+            finish(toAppUser(session.user, profile));
+          } catch (e) {
+            // Profil indisponible (réseau) : on rend quand même l'utilisateur,
+            // ses albums restent accessibles avec les données du jeton.
+            finish(toAppUser(session.user, null));
+          }
         }
       });
+      subscription = listener?.subscription;
 
-      // 2. Écouter les changements (C'est ici que le Web va capturer l'échange du code)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          const profile = await fetchProfile(session.user.id);
-          finish(toAppUser(session.user, profile));
-        }
-      });
-
-      // 3. Sécurité : au bout de 2.5 secondes, si toujours rien, on abandonne
-      setTimeout(() => {
-        subscription.unsubscribe();
-        finish(null);
-      }, 2500);
-
+      timer = setTimeout(() => finish(null), 2500);
     });
   } catch (error) {
     console.log('❌ Session restore error:', error);
     return null;
   }
+}
+
+// ── Mot de passe oublié (P1-13) ────────────────────────────────────────
+// Envoie un lien de récupération. La redirection revient sur l'app via le
+// schéma déclaré dans Supabase (sharepix://auth/callback) ; le SDK échange
+// alors le code et émet PASSWORD_RECOVERY.
+export async function requestPasswordReset(email) {
+  if (!supabase) throw new Error('Supabase non configuré');
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: REDIRECT_URI,
+  });
+  if (error) throw error;
+  return true;
+}
+
+// Définit le nouveau mot de passe, une fois le lien de récupération ouvert
+// (la session est alors établie en mode « recovery »).
+export async function updatePassword(newPassword) {
+  if (!supabase) throw new Error('Supabase non configuré');
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+  return true;
 }
 
 // ── Déconnexion ─────────────────────────────────────────────────────────

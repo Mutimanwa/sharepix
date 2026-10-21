@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   PencilEdit02Icon,
@@ -19,7 +18,6 @@ import * as Clipboard from 'expo-clipboard';
 
 export default function MenuScreen({ route, navigation }) {
   const album = useStore().state.albums.find((a) => a.id === route.params.id);
-  const insets = useSafeAreaInsets();
 
   // ── SUPABASE ALBUMS : intégration ──
   // Renommage de l'album : réservé au propriétaire (policy RLS), ou à

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -31,11 +31,12 @@ import {
   signUpWithEmail,
   signInWithGoogle,
   translateAuthError,
+  // ── SUPABASE ALBUMS : intégration ──
+  // Conversion invité → compte permanent (même identité, données conservées)
+  convertAnonymousUser,
+  linkGoogleIdentity,
+  requestPasswordReset,
 } from '../services/auth';
-// ── SUPABASE ALBUMS : intégration ──
-// Conversion invité → compte permanent (même identité, données conservées)
-import { convertAnonymousUser, linkGoogleIdentity } from '../services/auth';
-// ── SUPABASE ALBUMS : fin ──
 import { colors } from '../theme';
 import { GoogleMark, LogoImage } from '../components/UI';
 import { useStore } from '../store';
@@ -46,7 +47,7 @@ const { height } = Dimensions.get('window');
 // Rediriger les appels OAuth vers l'application
 WebBrowser.maybeCompleteAuthSession();
 
-function PremiumInput({ label, icon, ...props }) {
+function PremiumInput({ label: _label, icon, ...props }) {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -101,6 +102,7 @@ export default function AuthScreen({ navigation, route }) {
 
   const insets = useSafeAreaInsets();
   const { setAuthUser } = useStore();
+  const [resetSending, setResetSending] = useState(false);
   const isLogin = mode === 'login';
   // ── SUPABASE ALBUMS : intégration ──
   // converting = onglet inscription actif dans le mode conversion
@@ -200,6 +202,30 @@ export default function AuthScreen({ navigation, route }) {
     }
   };
 
+  // ── P1-13 : mot de passe oublié ────────────────────────────────────
+  // L'envoi se fait à partir de l'email déjà saisi. Message volontairement
+  // neutre : on ne révèle pas si l'adresse correspond à un compte.
+  const handleForgotPassword = async () => {
+    const clean = email.trim();
+    if (!clean || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) {
+      setError("Saisissez d'abord votre adresse email, puis touchez « Mot de passe oublié ».");
+      return;
+    }
+    setResetSending(true);
+    setError('');
+    try {
+      await requestPasswordReset(clean);
+      Alert.alert(
+        'Email envoyé',
+        `Si un compte existe pour ${clean}, un lien de réinitialisation vient d'être envoyé.`
+      );
+    } catch (err) {
+      setError(translateAuthError(err));
+    } finally {
+      setResetSending(false);
+    }
+  };
+
   const handleGoogle = async () => {
     if (!validateTermsForGoogle()) return;
     if (!isSupabaseConfigured) {
@@ -222,12 +248,13 @@ export default function AuthScreen({ navigation, route }) {
       // ── SUPABASE ALBUMS : fin ──
       
       if (result.success) {
-        console.log('✅ Google Auth success, waiting for session...');
-        // La session sera restaurée automatiquement
-        // On navigue après un court délai
-        setTimeout(() => {
-          navigation.replace('Main');
-        }, 1500);
+        // ── P1-07 : plus d'attente à l'aveugle ──
+        // Avant : navigation après 1,5 s, sans vérifier qu'une session
+        // existait — le code PKCE n'ayant jamais été échangé, on arrivait
+        // sur l'accueil avec l'ancien compte anonyme.
+        // Le service renvoie maintenant l'utilisateur réellement connecté.
+        if (result.user) setAuthUser(result.user);
+        navigation.replace('Main');
       }
     } catch (err) {
       const translated = translateAuthError(err);
@@ -371,6 +398,20 @@ export default function AuthScreen({ navigation, route }) {
               }
             />
 
+            {isLogin && !converting && (
+              <Pressable
+                onPress={handleForgotPassword}
+                disabled={resetSending}
+                hitSlop={10}
+                style={styles.forgotRow}
+                accessibilityRole="button"
+              >
+                <Text style={styles.forgotLink}>
+                  {resetSending ? 'Envoi en cours…' : 'Mot de passe oublié ?'}
+                </Text>
+              </Pressable>
+            )}
+
             {!isLogin && (
               <View style={styles.termsRow}>
                 <Pressable
@@ -385,7 +426,7 @@ export default function AuthScreen({ navigation, route }) {
                   J'accepte les{' '}
                   <Text
                     style={styles.termsLink}
-                    onPress={() => Linking.openURL('https://sharepix.app/cgv')}
+                    onPress={() => Linking.openURL('https://sharepix.app/terms')}
                   >
                     conditions générales
                   </Text>{' '}
@@ -596,6 +637,8 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.6,
   },
+  forgotRow: { alignItems: 'flex-end', marginTop: -4, marginBottom: 8 },
+  forgotLink: { color: colors.coral, fontSize: 13, fontWeight: '600' },
   termsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

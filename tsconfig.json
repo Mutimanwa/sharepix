@@ -1,8 +1,14 @@
 {
-  "compilerOptions": {},
+  "compilerOptions": {
+    "checkJs": false,
+    "strict": false,
+    "noImplicitAny": false
+  },
   "extends": "expo/tsconfig.base",
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase",
+    "dist",
+    "web-build"
   ]
 }

@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   typecheck:
-    name: TypeScript + Expo Doctor
+    name: Qualité (types, lint, tests) + Expo Doctor
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,6 +34,12 @@ jobs:
 
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Tests unitaires (Jest)
+        run: npm test -- --ci
 
       # expo-doctor dépend de deux services externes.
       #
