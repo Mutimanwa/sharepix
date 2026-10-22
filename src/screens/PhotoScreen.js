@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  Alert,
   Platform,
   Keyboard,
   Animated,
@@ -21,12 +22,12 @@ import {
   SentIcon,
 } from '@hugeicons/core-free-icons';
 import * as FileSystem from 'expo-file-system/legacy'; // API classique (downloadAsync) conservée par Expo
-import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import { colors } from '../theme';
 import { useKeyboardSpace } from '../lib/keyboard';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
-import { subscribeAlbumChanges } from '../services/albums';
+import { subscribeAlbumChanges, cloudPhotoUrl } from '../services/albums';
 // ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
 // ── SQUELETTES : intégration ──
@@ -205,20 +206,70 @@ export default function PhotoScreen({ route, navigation }) {
 
   const download = async () => {
     if (!currentPhoto || downloading) return;
-    // Sur le web : ouverture dans un nouvel onglet (sauvegarde native)
-    if (Platform.OS === 'web') {
-      window.open(currentPhoto.uri, '_blank');
-      return;
-    }
+
+    const extensionFromPath = (value) => {
+      const clean = String(value || '').split('?')[0];
+      const match = clean.match(/\.([a-zA-Z0-9]{2,5})$/);
+      return match ? match[1].toLowerCase() : 'jpg';
+    };
+    const extension = extensionFromPath(currentPhoto.storagePath || currentPhoto.uri);
+    const filename = `SharePix-${currentPhoto.id}.${extension}`;
+    const showMessage = (title, message) => {
+      if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`);
+      else Alert.alert(title, message);
+    };
+
     try {
       setDownloading(true);
-      const target = `${FileSystem.cacheDirectory}sharepix-${currentPhoto.id}.jpg`;
-      const { uri } = await FileSystem.downloadAsync(currentPhoto.uri, target);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
+
+      // Les URLs Supabase sont temporaires (1 h). On récupère une URL encore
+      // valide à partir du chemin du Storage plutôt que de réutiliser une URL
+      // potentiellement expirée restée dans l'écran.
+      const sourceUri = currentPhoto.storagePath
+        ? await cloudPhotoUrl(currentPhoto.storagePath)
+        : currentPhoto.uri;
+      if (!sourceUri) throw new Error("La photo n'est plus disponible. Actualisez l'album puis réessayez.");
+
+      if (Platform.OS === 'web') {
+        // Le lien download seul est ignoré pour une URL de domaine différent.
+        // Passer par un Blob force un vrai téléchargement au lieu d'ouvrir
+        // l'image dans un nouvel onglet.
+        const response = await fetch(sourceUri);
+        if (!response.ok) throw new Error(`Le serveur a refusé le téléchargement (${response.status}).`);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        // Laisser le navigateur commencer la lecture avant de libérer le Blob.
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        return;
       }
-    } catch (e) {
-      console.log('Download error:', e);
+
+      const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
+      if (!permission.granted) {
+        showMessage(
+          'Autorisation requise',
+          "SharePix a besoin de l'accès aux photos pour les enregistrer dans votre galerie."
+        );
+        return;
+      }
+
+      const target = `${FileSystem.cacheDirectory}${filename}`;
+      const existing = await FileSystem.getInfoAsync(target);
+      if (existing.exists) await FileSystem.deleteAsync(target, { idempotent: true });
+
+      const result = await FileSystem.downloadAsync(sourceUri, target);
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(`Le serveur a refusé le téléchargement (${result.status}).`);
+      }
+      await MediaLibrary.saveToLibraryAsync(result.uri);
+      showMessage('Téléchargement terminé', 'La photo a été enregistrée dans votre galerie.');
+    } catch (error) {
+      showMessage('Téléchargement impossible', error?.message || 'Vérifiez votre connexion puis réessayez.');
     } finally {
       setDownloading(false);
     }
@@ -372,6 +423,8 @@ export default function PhotoScreen({ route, navigation }) {
               onPress={download}
               disabled={downloading}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={downloading ? 'Enregistrement en cours' : 'Enregistrer la photo dans la galerie'}
             >
               <HugeiconsIcon
                 icon={Download01Icon}

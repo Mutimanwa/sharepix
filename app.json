@@ -13,7 +13,9 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["sharepix"]
+            "CFBundleURLSchemes": [
+              "sharepix"
+            ]
           }
         ]
       }
@@ -51,8 +53,17 @@
           "imageWidth": 200
         }
       ],
-      "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Autoriser SharePix à enregistrer les photos dans votre galerie.",
+          "savePhotosPermission": "Autoriser SharePix à sauvegarder les photos dans votre galerie.",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -243,6 +243,43 @@ le clavier et la caméra ne se testent pas en CI.
 
 ---
 
+## D-10 — « Télécharger » enregistre dans la galerie (pas dans le menu Partager)
+
+Date : 22/10/2026. Défaut signalé après les captures mobiles.
+
+### Diagnostic
+
+L'ancien bouton de téléchargement :
+1. téléchargeait la photo uniquement dans le cache temporaire de l'application ;
+2. ouvrait ensuite le menu système **Partager** (`expo-sharing`) ;
+3. ne sauvegardait rien dans la galerie, n'affichait aucun succès et avalait
+   les erreurs dans un `console.log` ;
+4. sur le web, ouvrait l'image dans un nouvel onglet au lieu de télécharger.
+
+### Correction
+
+- **iOS / Android** : actualise l'URL signée depuis `storagePath` (évite les
+  liens Supabase expirés), télécharge dans le cache, vérifie le statut HTTP,
+  demande l'autorisation « photos » uniquement, puis enregistre dans la
+  galerie avec `expo-media-library`.
+- **Web** : récupère un Blob puis déclenche un téléchargement navigateur
+  avec le nom `SharePix-<id>.<extension>` (au lieu d'ouvrir une nouvelle page).
+- Affiche le résultat ou une erreur compréhensible ; accessible et désactivé
+  pendant le téléchargement.
+- `app.json` déclare le plugin avec permission photos et `granularPermissions`
+  photo ; `expo-sharing` retiré, car il n'est plus utilisé.
+- **Vidéos** : hors périmètre de ce correctif. La priorité reste photos →
+  vidéos ensuite → premium après la mise en production (D-05).
+
+### Validation
+
+TypeScript, ESLint, Jest (21/21) et export web passent. La permission native
+nécessite un nouvel APK ; il faut vérifier sur téléphone que la photo apparaît
+dans la galerie après avoir accordé l'accès. Le sandbox ne peut pas valider
+le stockage physique iOS/Android.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
