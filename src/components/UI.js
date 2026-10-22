@@ -156,16 +156,17 @@ export function Field({
 }
 
 // Sheet avec gestion du clavier
-export function Sheet({ 
-  visible, 
-  onClose, 
-  title, 
+export function Sheet({
+  visible,
+  onClose,
+  title,
   children,
+  inline = false,
 }) {
   const scrollRef = useRef(null);
   const insets = useSafeAreaInsets();
-  // Le booléen n'ajuste que les insets ; le viewport du Modal Android est
-  // redimensionné par `adjustResize`, sans appliquer une deuxième hauteur.
+  // Le booléen réduit les insets décoratifs ; la feuille inline évite de
+  // dépendre du focus dans une fenêtre Dialog native sur les formulaires.
   const keyboardOpen = useKeyboardStatus();
 
   useEffect(() => {
@@ -178,54 +179,57 @@ export function Sheet({
     }
   }, [visible]);
 
+  const sheetContent = (
+    <KeyboardAvoidingView
+      style={styles.sheetWrap}
+      // `padding` suit la zone réellement occupée par le clavier sans ajouter
+      // une seconde hauteur manuelle lorsque la fenêtre est déjà redimensionnée.
+      behavior="padding"
+    >
+      <Pressable style={styles.sheetOverlay} onPress={onClose} />
+      <View
+        style={[
+          styles.sheet,
+          { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 20) },
+        ]}
+      >
+        <View style={styles.sheetHead}>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Text style={{ fontSize: 15 }}>✕</Text>
+          </TouchableOpacity>
+          <Text style={styles.sheetTitle}>{title}</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.sheetContent}
+          contentContainerStyle={[
+            styles.sheetContentContainer,
+            { paddingBottom: keyboardOpen ? 12 : Math.max(insets.bottom, 20) },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          scrollEnabled
+        >
+          {children}
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  if (inline) {
+    return visible ? <View style={styles.sheetPortal}>{sheetContent}</View> : null;
+  }
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      // Nécessaire sur Android récent : sans ces deux props, la fenêtre du
-      // Modal ne remonte pas avec le clavier et la saisie devient impossible.
       statusBarTranslucent
       navigationBarTranslucent
     >
-      <KeyboardAvoidingView
-        style={styles.sheetWrap}
-        // Le mode `padding` suit la zone réellement occupée par le clavier ;
-        // il évite une marge manuelle doublée si Android redimensionne déjà la fenêtre.
-        behavior="padding"
-      >
-        <Pressable style={styles.sheetOverlay} onPress={onClose} />
-        <View
-          style={[
-            styles.sheet,
-            { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 20) },
-          ]}
-        >
-          <View style={styles.sheetHead}>
-            <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Text style={{ fontSize: 15 }}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <View style={{ width: 22 }} />
-          </View>
-          <ScrollView 
-            ref={scrollRef}
-            style={styles.sheetContent}
-            contentContainerStyle={[
-              styles.sheetContentContainer,
-              { paddingBottom: keyboardOpen ? 12 : Math.max(insets.bottom, 20) },
-            ]}
-            showsVerticalScrollIndicator={false}
-            // `always` et non `handled` : le premier tap sur un champ dans
-            // une Modal Android était parfois avalé (clavier qui ne s'ouvre
-            // pas) au lieu d'être transmis au TextInput.
-            keyboardShouldPersistTaps="always"
-            scrollEnabled={true}
-          >
-            {children}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+      {sheetContent}
     </Modal>
   );
 }
@@ -438,6 +442,11 @@ const styles = StyleSheet.create({
   },
   
   // Sheet
+  sheetPortal: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 40,
+  },
   sheetWrap: {
     flex: 1,
     justifyContent: 'flex-end',

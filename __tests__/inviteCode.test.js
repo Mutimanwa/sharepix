@@ -26,6 +26,7 @@ const {
   randomId,
   INVITE_ALPHABET,
   INVITE_LENGTH,
+  extractInviteCode,
 } = require('../src/lib/inviteCode');
 
 describe('alphabet', () => {
@@ -101,5 +102,21 @@ describe('randomId', () => {
     expect(typeof a).toBe('string');
     expect(a.length).toBeGreaterThan(8);
     expect(a).not.toBe(b);
+  });
+});
+
+describe('extractInviteCode', () => {
+  it('accepte un code brut et le normalise en majuscules', () => {
+    expect(extractInviteCode('ab12cd34')).toBe('AB12CD34');
+  });
+
+  it('extrait le code des liens d’invitation SharePix', () => {
+    expect(extractInviteCode('sharepix://join?code=AB12CD34')).toBe('AB12CD34');
+    expect(extractInviteCode('https://sharepix.app/join?code=EF56GH78')).toBe('EF56GH78');
+  });
+
+  it('rejette les codes invalides et les liens d’autres domaines', () => {
+    expect(extractInviteCode('AB12')).toBeNull();
+    expect(extractInviteCode('https://example.com/join?code=AB12CD34')).toBeNull();
   });
 });
