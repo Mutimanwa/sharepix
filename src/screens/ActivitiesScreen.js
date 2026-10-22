@@ -77,7 +77,8 @@ const KINDS = {
 
 export default function ActivitiesScreen({ navigation }) {
   const { state, updateProfile } = useStore();
-  const [asked, setAsked] = useState(state.profile.notifications);
+  // Préférence partagée avec Profil : aucun état local qui pourrait diverger.
+  const notificationsEnabled = Boolean(state.profile.notifications);
   const insets = useSafeAreaInsets();
 
   // ── SUPABASE ALBUMS : intégration ──
@@ -146,40 +147,33 @@ export default function ActivitiesScreen({ navigation }) {
   };
   // ── SUPABASE ALBUMS : fin ──
 
-  // Porte notifications (inchangée)
-  if (!asked) {
-    return (
-      <SafeAreaView style={styles.root} edges={['top']}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Activités</Text>
-        </View>
-        <View style={styles.centerContent}>
-          <Image
-            source={require('../../assets/empty/activity.png')}
-            style={{ width: 120, height: 120 }}
+  // Le titre reste dans un emplacement stable avant/après l'activation.
+  const renderEnablePrompt = () => (
+    <View style={styles.enableContent}>
+      <View style={styles.centerContent}>
+        <Image
+          source={require('../../assets/empty/activity.png')}
+          style={{ width: 120, height: 120 }}
+        />
+        <Text style={styles.h}>Activer les notifications</Text>
+        <Text style={styles.p}>
+          Ne manquez pas le moment où quelqu'un vous mentionne dans les commentaires,
+          télécharge de nouvelles photos ou réagit à vos photos.
+        </Text>
+        <View style={styles.buttonContainer}>
+          <CoralButton
+            title="Activer"
+            onPress={() => {
+              updateProfile({ notifications: true });
+              // La préférence partagée s'active immédiatement ; la permission
+              // système et le jeton push sont demandés en parallèle.
+              registerPushToken().catch(() => {});
+            }}
           />
-          <Text style={styles.h}>Activer les notifications</Text>
-          <Text style={styles.p}>
-            Ne manquez pas le moment où quelqu'un vous mentionne dans les commentaires,
-            télécharge de nouvelles photos ou réagit à vos photos.
-          </Text>
-          <View style={styles.buttonContainer}>
-            <CoralButton
-              title="Activer"
-              onPress={() => {
-                updateProfile({ notifications: true });
-                setAsked(true);
-                // ── SUPABASE PUSH : intégration ──
-                // Permission + token Expo Push (no-op sur web/émulateur)
-                registerPushToken().catch(() => {});
-                // ── SUPABASE PUSH : fin ──
-              }}
-            />
-          </View>
         </View>
-      </SafeAreaView>
-    );
-  }
+      </View>
+    </View>
+  );
 
   const renderItem = ({ item }) => {
     const kind = KINDS[item.kind] || KINDS.photo_added;
@@ -253,7 +247,7 @@ export default function ActivitiesScreen({ navigation }) {
         ) : (
           <>
             <Text style={[styles.title, { flex: 1 }]}>Activités</Text>
-            {items.length > 0 && (
+            {notificationsEnabled && items.length > 0 && (
               <TouchableOpacity onPress={() => setSelected([])} hitSlop={10}>
                 <Text style={styles.selectLink}>Sélectionner</Text>
               </TouchableOpacity>
@@ -262,38 +256,42 @@ export default function ActivitiesScreen({ navigation }) {
         )}
       </View>
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        extraData={selected}
-        contentContainerStyle={[
-          items.length === 0 && styles.content,
-          { paddingBottom: insets.bottom + 20 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.teal}
-            colors={[colors.teal]}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.centerContent}>
-            <Image
-              source={require('../../assets/empty/activity.png')}
-              style={{ width: 120, height: 120 }}
+      {notificationsEnabled ? (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          extraData={selected}
+          contentContainerStyle={[
+            items.length === 0 && styles.content,
+            { paddingBottom: insets.bottom + 20 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.teal}
+              colors={[colors.teal]}
             />
-            <Text style={styles.h}>Il n'y a pas encore d'activités</Text>
-            <Text style={styles.p}>
-              Quand un membre rejoint un album, ajoute une photo, commente ou aime,
-              l'événement apparaîtra ici.
-            </Text>
-          </View>
-        }
-      />
+          }
+          ListEmptyComponent={
+            <View style={styles.centerContent}>
+              <Image
+                source={require('../../assets/empty/activity.png')}
+                style={{ width: 120, height: 120 }}
+              />
+              <Text style={styles.h}>Il n'y a pas encore d'activités</Text>
+              <Text style={styles.p}>
+                Quand un membre rejoint un album, ajoute une photo, commente ou aime,
+                l'événement apparaîtra ici.
+              </Text>
+            </View>
+          }
+        />
+      ) : (
+        renderEnablePrompt()
+      )}
     </SafeAreaView>
   );
 }
@@ -308,6 +306,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '600', color: colors.tealDark },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28 },
+  enableContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
   centerContent: {
     alignItems: 'center',
     justifyContent: 'center',

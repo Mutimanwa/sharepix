@@ -280,6 +280,31 @@ le stockage physique iOS/Android.
 
 ---
 
+## D-11 — Préférence notifications unique et animation du splash non rognée
+
+Date : 22/10/2026. Contexte : captures mobile (Activités avant/après
+activation, préférence du Profil, animation des anneaux du splash).
+
+- `ActivitiesScreen` ne conserve plus un booléen `asked` local : il lit
+  directement `state.profile.notifications`, identique au switch principal
+  du Profil. Activer depuis Activités met à jour le même champ ; activer ou
+  désactiver depuis Profil change immédiatement l'état de l'écran Activités.
+  Le chargement des événements et l'abonnement Realtime suivent la même
+  préférence.
+- Le titre **Activités** est désormais dans un en-tête commun aux deux états,
+  avant/après permission. Le panneau d'activation prend toute la hauteur
+  restante et centre son contenu comme l'état « aucune activité ».
+- Le conteneur du splash faisait `1,55 × logo`, plus petit que l'anneau à
+  son expansion maximale (environ `1,76 × logo`) ; la zone passe à `2,15 ×`
+  et laisse explicitement le débordement visible. Le routage après
+  authentification attend 3,2 s (au lieu de 2,2) pour ne pas couper la boucle
+  d'animation trop tôt.
+
+Vérifications : `tsc`, `eslint`, Jest 21/21 et export web OK. La permission
+push native et le rendu de l'animation restent à vérifier sur l'APK Android.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
