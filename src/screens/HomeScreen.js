@@ -226,12 +226,14 @@ export default function HomeScreen() {
           value={name}
           onChangeText={setName}
           inputRef={nameInputRef}
+          autoCapitalize="sentences"
           returnKeyType="next"
         />
         <Field 
           label="Votre prénom" 
           value={first} 
-          onChangeText={setFirst} 
+          onChangeText={setFirst}
+          autoCapitalize="words" 
         />
         <Text style={styles.sheetHint}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton

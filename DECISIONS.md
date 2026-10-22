@@ -210,6 +210,15 @@ Date : 22/10/2026. Contexte : 9 captures d'écran, 5 défauts signalés.
 - **Aucun patch de `node_modules`** : tout passe par les props publiques.
 - Le bug « caméra noire dans une `<Modal>` » n'est pas contourné par une
   réécriture : on garde le rendu dans la fenêtre principale.
+- Revue exhaustive des champs de saisie (`TextInput`, `Field`, `CodeBoxes`) :
+  formulaire de connexion/inscription, création (Home + onboarding),
+  rejoindre (Home + onboarding), renommage album (deux chemins), profil,
+  commentaire. Les `autoFocus` natifs prématurés dans les modales ont été
+  retirés ; `CodeBoxes` garde le focus temporisé parce qu'il n'est monté
+  qu'à l'ouverture de « Rejoindre ». `Field` force `showSoftInputOnFocus`,
+  coupe autocorrection/majuscule par défaut (surcharges explicites pour les
+  noms), expose les propriétés clavier usuelles. Les deux types de panneaux
+  (Sheet et RightModal) gèrent désormais le clavier et la persistance des taps.
 
 ### Vérifications
 

@@ -69,6 +69,7 @@ function PremiumInput({ label: _label, icon, ...props }) {
         <TextInput
           placeholderTextColor={colors.muted}
           style={styles.input}
+          showSoftInputOnFocus
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...props}
@@ -275,7 +276,7 @@ export default function AuthScreen({ navigation, route }) {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           contentContainerStyle={styles.scroll}
         >
           {/* Header */}

@@ -528,8 +528,7 @@ export default function AlbumScreen({ route, navigation }) {
             placeholder="Nom de l'album"
             placeholderTextColor={colors.muted}
             maxLength={60}
-            autoFocus
-          />
+            />
           <CoralButton title="Enregistrer" onPress={submitRename} color={colors.coral} />
         </View>
       </Sheet>

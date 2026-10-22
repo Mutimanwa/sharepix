@@ -249,16 +249,30 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
     }
   }, [visible, screenW, slideAnim]);
 
+  const { space: keyboardSpace } = useKeyboardSpace();
+
   if (!mounted) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <View style={{ flex: 1 }}>
         <Pressable style={styles.rightOverlay} onPress={onClose} />
         <Animated.View
           style={[
             styles.rightContainer,
-            { width, paddingTop: insets.top, transform: [{ translateX: slideAnim }] },
+            {
+              width,
+              paddingTop: insets.top,
+              paddingBottom: keyboardSpace,
+              transform: [{ translateX: slideAnim }],
+            },
           ]}
         >
           {title ? (
@@ -272,7 +286,7 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
           <ScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
             {children}

@@ -135,7 +135,6 @@ export default function MenuScreen({ route, navigation }) {
           value={draftName}
           onChangeText={setDraftName}
           placeholder="Ex : Anniversaire de Marie"
-          autoFocus
         />
         <CoralButton
           title="Enregistrer"
