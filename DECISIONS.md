@@ -379,6 +379,23 @@ changer d'identité n'est proposée.
 
 ---
 
+## D-14 — Les actions du onboarding n'ouvrent pas leurs formulaires
+
+Date : 22/10/2026. Retour utilisateur sur téléphone : les deux boutons du
+onboarding (créer un album / utiliser un code) semblent ne rien faire.
+
+### Correction implémentée
+
+- Les boutons ouvrent maintenant des vues de formulaire intégrées directement
+  au rendu du onboarding, avec un bouton Retour ; ils ne dépendent plus d'un
+  `Sheet inline` absolu.
+- Les formulaires conservent les mêmes appels de création et de jointure, avec
+  `KeyboardAvoidingView`, `ScrollView` et persistance des taps pour les champs.
+- TypeScript, ESLint, Jest (28/28), export web et `git diff --check` réussis.
+  L'ouverture des écrans et la saisie restent à confirmer sur un APK Android.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
