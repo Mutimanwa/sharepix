@@ -46,11 +46,11 @@ export default function OnboardingScreen({ navigation }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [first, setFirst] = useState('');
-  
+
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
-  
+
   // <-- AJOUT de joinAlbum dans le destructuring
   const { createAlbum, joinAlbum, setOnboarded, state } = useStore();
   const insets = useSafeAreaInsets();
@@ -167,15 +167,15 @@ export default function OnboardingScreen({ navigation }) {
         inline
         useSafeArea={true}
       >
-        <Field 
-          label="Nom de l'album" 
-          value={name} 
+        <Field
+          label="Nom de l'album"
+          value={name}
           onChangeText={setName}
           autoCapitalize="sentences"
         />
-        <Field 
-          label="Votre prénom" 
-          value={first} 
+        <Field
+          label="Votre prénom"
+          value={first}
           onChangeText={setFirst}
           autoCapitalize="words"
         />

@@ -379,6 +379,23 @@ changer d'identité n'est proposée.
 
 ---
 
+## D-14 — Onboarding : conserver le parcours en popup
+
+Date : 22/10/2026. Les boutons « Créez un nouvel album » et « Utilisez le code
+ d'accès » semblaient sans effet sur le téléphone de test. L'utilisateur précise
+que le système popup est voulu et attribue le problème à son téléphone.
+
+- Les formulaires restent dans le système popup `Sheet`; la tentative de les
+  remplacer par des écrans complets a été annulée pour préserver l'UX voulue.
+- Le code conserve les actions existantes `setCreate(true)` / `setJoin(true)`;
+  aucun changement du mécanisme popup n'est nécessaire sans reproduction sur un
+  autre appareil.
+- Vérification à faire après le prochain APK : tester ces deux boutons sur le
+  téléphone Android 14. Ne pas modifier l'UX popup sur la seule base du téléphone
+  de test ancien.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.
