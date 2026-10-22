@@ -198,8 +198,8 @@ Date : 22/10/2026. Contexte : 9 captures d'écran, 5 défauts signalés.
 | a | L'onde de clic « se propage » hors des onglets de la tab bar | `@react-navigation/bottom-tabs` code en dur `android_ripple: { borderless: true }` (`BottomTabItem.tsx:354`) et n'expose pas `pressColor` | `tabBarButton` personnalisé : `PlatformPressable` **avec l'onde bornée** (`borderless: false`) + `overflow: hidden`. Aucun patch de `node_modules`. |
 | a' | Ombre visible sous la tab bar | La lib applique `elevation: 8` par défaut sur Android | `elevation: 0` + ombre iOS neutralisée ; il ne reste qu'un filet de séparation de 1 px. |
 | b | Le scanner QR ne s'affiche pas (seule une bande noire en bas) | L'overlay était une `View` `position: absolute` **dans l'arbre de l'écran Album**, sous `SafeAreaView` + `RightModal` : selon le conteneur, il se réduit à une bande | Scanner extrait dans `src/components/QrScanner.js`, monté **une seule fois à la racine de l'app** (`QrScannerProvider` dans `App.js`), au-dessus de tout. Fond noir opaque garanti, `onMountError` remonté à l'écran. Toujours **pas de `<Modal>` native** (la SurfaceView d'expo-camera reste noire dans une fenêtre modale sur Android). |
-| c | Barre de commentaire collée à la barre de navigation, puis trop haute à l'ouverture du clavier | `KeyboardAvoidingView` `behavior="height"` + `paddingBottom` d'encoche cumulés. En edge-to-edge (Expo 57 / RN 0.86), `adjustResize` est ignoré sur Android | `src/lib/keyboard.js` suit la hauteur réelle du clavier. La barre est ancrée au clavier ouvert, au bord bas fermé, sans marge en double. Comportement de référence : WhatsApp. |
-| d | Toucher un champ « Ajouter un album » / « Rejoindre » n'ouvre pas le clavier | `autoFocus`/`focus()` demandés **pendant l'animation d'ouverture de la `<Modal>`** (le focus est perdu sur Android) + `adjustResize` ignoré + `keyboardShouldPersistTaps="handled"` qui avalait le premier tap | Focus différé (450 ms), `keyboardShouldPersistTaps="always"`, `showSoftInputOnFocus`, `Modal` avec `statusBarTranslucent` / `navigationBarTranslucent`, `CodeBoxes` re-focalisable en tapant n'importe où. |
+| c | Barre de commentaire masquée par le clavier (constaté sur l'APK réel) | La compensation manuelle par hauteur du clavier s'ajoutait au redimensionnement de fenêtre et pouvait déplacer le compositeur hors écran | Révision : suppression de toute marge dynamique basée sur la hauteur ; `KeyboardAvoidingView` en `padding` prend en charge les deux plateformes, et Android déclare aussi `softwareKeyboardLayoutMode: "resize"`. La hauteur système ne sert plus qu'à réduire les insets décoratifs. **À retester sur appareil Android.** |
+| d | Saisie du nom d'album et du code impossible sur Android (constaté après l'APK précédent) | Le focus différé n'a pas résolu le problème ; le code était dessiné par-dessus un `TextInput` transparent, dont le focus n'était pas fiable dans la Modal | Révision : retrait du focus programmé pour le nom d'album ; le code est désormais un véritable champ visible, saisissable et tapable. `keyboardShouldPersistTaps="always"`, `showSoftInputOnFocus` et insets translucides restent activés. **À retester sur appareil Android.** |
 | e | Vérifier tous les champs | `Field` ne transmettait ni `keyboardType`, ni `autoCapitalize`, ni `maxLength`, ni `returnKeyType` | `Field` expose ces props (valeurs par défaut sûres : pas d'autocorrection, pas de majuscule auto), `inputRef` pour le focus programmé. |
 
 ### Ce qui n'a **pas** été fait, volontairement
@@ -210,15 +210,13 @@ Date : 22/10/2026. Contexte : 9 captures d'écran, 5 défauts signalés.
 - **Aucun patch de `node_modules`** : tout passe par les props publiques.
 - Le bug « caméra noire dans une `<Modal>` » n'est pas contourné par une
   réécriture : on garde le rendu dans la fenêtre principale.
-- Revue exhaustive des champs de saisie (`TextInput`, `Field`, `CodeBoxes`) :
-  formulaire de connexion/inscription, création (Home + onboarding),
-  rejoindre (Home + onboarding), renommage album (deux chemins), profil,
-  commentaire. Les `autoFocus` natifs prématurés dans les modales ont été
-  retirés ; `CodeBoxes` garde le focus temporisé parce qu'il n'est monté
-  qu'à l'ouverture de « Rejoindre ». `Field` force `showSoftInputOnFocus`,
-  coupe autocorrection/majuscule par défaut (surcharges explicites pour les
-  noms), expose les propriétés clavier usuelles. Les deux types de panneaux
-  (Sheet et RightModal) gèrent désormais le clavier et la persistance des taps.
+- Les champs restent couverts par `Field` (props de clavier explicites) et
+  `keyboardShouldPersistTaps="always"`. Le précédent test sur téléphone a
+  invalidé la correction initiale du focus/code et du compositeur ; le correctif
+  actuel retire le focus programmé du nom, remplace le code masqué par un vrai
+  champ visible, et ne cumule plus de compensation manuelle avec le resize.
+  Ces comportements ne sont pas validables par la CI et restent en attente du
+  prochain APK Android réel.
 
 ### Vérifications
 
@@ -261,7 +259,8 @@ L'ancien bouton de téléchargement :
 - **iOS / Android** : actualise l'URL signée depuis `storagePath` (évite les
   liens Supabase expirés), télécharge dans le cache, vérifie le statut HTTP,
   demande l'autorisation « photos » uniquement, puis enregistre dans la
-  galerie avec `expo-media-library`.
+  galerie via l'API de compatibilité `expo-media-library/legacy` (l'API
+  principale a marqué `saveToLibraryAsync` comme dépréciée).
 - **Web** : récupère un Blob puis déclenche un téléchargement navigateur
   avec le nom `SharePix-<id>.<extension>` (au lieu d'ouvrir une nouvelle page).
 - Affiche le résultat ou une erreur compréhensible ; accessible et désactivé
@@ -294,14 +293,29 @@ activation, préférence du Profil, animation des anneaux du splash).
 - Le titre **Activités** est désormais dans un en-tête commun aux deux états,
   avant/après permission. Le panneau d'activation prend toute la hauteur
   restante et centre son contenu comme l'état « aucune activité ».
-- Le conteneur du splash faisait `1,55 × logo`, plus petit que l'anneau à
-  son expansion maximale (environ `1,76 × logo`) ; la zone passe à `2,15 ×`
-  et laisse explicitement le débordement visible. Le routage après
-  authentification attend 3,2 s (au lieu de 2,2) pour ne pas couper la boucle
-  d'animation trop tôt.
+- Première correction : le stage passait de `1,55 × logo` à `2,15 ×` pour
+  contenir l'expansion maximale (~`1,76 × logo`). Malgré ce calcul, le test
+  Android réel a confirmé que les cercles restaient coupés ; cette correction
+  seule n'était donc pas suffisante.
+- Nouvelle correction : les vues animées des anneaux occupent maintenant dès
+  le layout l'aire maximale native et sont réduites par `transform` (l'échelle
+  ne dépasse jamais 1), avec débordement visible sur le stage, le centre et la
+  racine. Le centre occupe toute la largeur. Le diamètre et l'épaisseur visibles
+  de l'anneau sont conservés. **À confirmer sur un nouvel APK Android.**
+- Le routage après authentification attend 3,2 s (au lieu de 2,2) pour ne pas
+  couper la boucle d'animation trop tôt.
 
-Vérifications : `tsc`, `eslint`, Jest 21/21 et export web OK. La permission
-push native et le rendu de l'animation restent à vérifier sur l'APK Android.
+Vérifications initiales : `tsc`, `eslint`, Jest 21/21 et export web OK.
+L'utilisateur confirme maintenant, après test Android réel, que les anneaux du
+splash sont toujours coupés : l'augmentation à `2,15 × logo` n'a donc pas
+résolu le défaut sur l'appareil.
+
+### État de la reprise
+
+Les changements ci-dessus sont implémentés. TypeScript, ESLint, Jest (21/21),
+export web et `git diff --check` passent. Le rendu final exige un nouvel APK
+et un test Android réel ; ne pas considérer le défaut comme résolu avant
+confirmation utilisateur.
 
 ---
 

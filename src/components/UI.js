@@ -7,6 +7,7 @@ import {
   TextInput,
   Modal,
   Pressable,
+  KeyboardAvoidingView,
   ScrollView,
   Dimensions,
   Keyboard,
@@ -14,7 +15,7 @@ import {
   Image,
 } from 'react-native';
 import { colors } from '../theme';
-import { useKeyboardSpace } from '../lib/keyboard';
+import { useKeyboardStatus } from '../lib/keyboard';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 // ── BUG-03 : SafeAreaView doit venir de react-native-safe-area-context ──
@@ -163,10 +164,9 @@ export function Sheet({
 }) {
   const scrollRef = useRef(null);
   const insets = useSafeAreaInsets();
-  // Hauteur réelle du clavier (voir src/lib/keyboard.js) : en edge-to-edge,
-  // `adjustResize` est ignoré sur Android et le KAV « height » ne remonte
-  // plus le sheet — les champs restaient sous le clavier.
-  const { space: keyboardSpace } = useKeyboardSpace();
+  // Le booléen n'ajuste que les insets ; le viewport du Modal Android est
+  // redimensionné par `adjustResize`, sans appliquer une deuxième hauteur.
+  const keyboardOpen = useKeyboardStatus();
 
   useEffect(() => {
     if (!visible) Keyboard.dismiss(); // sinon le clavier reste ouvert sur l'écran
@@ -188,9 +188,19 @@ export function Sheet({
       statusBarTranslucent
       navigationBarTranslucent
     >
-      <Animated.View style={[styles.sheetWrap, { paddingBottom: keyboardSpace }]}>
+      <KeyboardAvoidingView
+        style={styles.sheetWrap}
+        // Le mode `padding` suit la zone réellement occupée par le clavier ;
+        // il évite une marge manuelle doublée si Android redimensionne déjà la fenêtre.
+        behavior="padding"
+      >
         <Pressable style={styles.sheetOverlay} onPress={onClose} />
-        <View style={[styles.sheet , { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 20) },
+          ]}
+        >
           <View style={styles.sheetHead}>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
               <Text style={{ fontSize: 15 }}>✕</Text>
@@ -201,7 +211,10 @@ export function Sheet({
           <ScrollView 
             ref={scrollRef}
             style={styles.sheetContent}
-            contentContainerStyle={[styles.sheetContentContainer , { paddingBottom: Math.max(insets.bottom, 20) }]}
+            contentContainerStyle={[
+              styles.sheetContentContainer,
+              { paddingBottom: keyboardOpen ? 12 : Math.max(insets.bottom, 20) },
+            ]}
             showsVerticalScrollIndicator={false}
             // `always` et non `handled` : le premier tap sur un champ dans
             // une Modal Android était parfois avalé (clavier qui ne s'ouvre
@@ -212,7 +225,7 @@ export function Sheet({
             {children}
           </ScrollView>
         </View>
-      </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -249,8 +262,6 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
     }
   }, [visible, screenW, slideAnim]);
 
-  const { space: keyboardSpace } = useKeyboardSpace();
-
   if (!mounted) return null;
 
   return (
@@ -270,7 +281,6 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
             {
               width,
               paddingTop: insets.top,
-              paddingBottom: keyboardSpace,
               transform: [{ translateX: slideAnim }],
             },
           ]}
@@ -283,14 +293,16 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
               </TouchableOpacity>
             </View>
           ) : null}
-          <ScrollView
-            style={{ flex: 1 }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="always"
-            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
-          >
-            {children}
-          </ScrollView>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+            <ScrollView
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+              contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
+            >
+              {children}
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Animated.View>
       </View>
     </Modal>

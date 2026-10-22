@@ -43,15 +43,6 @@ export default function HomeScreen() {
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
-  const nameInputRef = useRef(null);
-
-  // ── Saisie : focus différé (la <Modal> s'anime encore au montage, un
-  // `autoFocus` immédiat est perdu sur Android et le clavier ne s'ouvre pas).
-  useEffect(() => {
-    if (!create) return undefined;
-    const t = setTimeout(() => nameInputRef.current?.focus(), 450);
-    return () => clearTimeout(t);
-  }, [create]);
 
   // ── DEEP LINK QR : intégration ──
   // Jointure factorisée : utilisée par le bouton "Continuer" ET par
@@ -225,7 +216,7 @@ export default function HomeScreen() {
           label="Nom de l'album"
           value={name}
           onChangeText={setName}
-          inputRef={nameInputRef}
+          keyboardType="default"
           autoCapitalize="sentences"
           returnKeyType="next"
         />
@@ -233,7 +224,8 @@ export default function HomeScreen() {
           label="Votre prénom" 
           value={first} 
           onChangeText={setFirst}
-          autoCapitalize="words" 
+          autoCapitalize="words"
+          keyboardType="default"
         />
         <Text style={styles.sheetHint}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton

@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
   Keyboard,
-  Animated,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -22,9 +22,9 @@ import {
   SentIcon,
 } from '@hugeicons/core-free-icons';
 import * as FileSystem from 'expo-file-system/legacy'; // API classique (downloadAsync) conservée par Expo
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { colors } from '../theme';
-import { useKeyboardSpace } from '../lib/keyboard';
+import { useKeyboardStatus } from '../lib/keyboard';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
 import { subscribeAlbumChanges, cloudPhotoUrl } from '../services/albums';
@@ -67,13 +67,10 @@ export default function PhotoScreen({ route, navigation }) {
   } = useStore();
   const insets = useSafeAreaInsets();
 
-  // ── Barre de commentaire façon WhatsApp ──────────────────────────────
-  // La barre suit la hauteur réelle du clavier : collée au clavier quand il
-  // est ouvert, collée au bord bas de l'écran (au-dessus de la barre de
-  // geste) quand il est fermé. Voir src/lib/keyboard.js — en edge-to-edge
-  // Android, `adjustResize` et KeyboardAvoidingView ne suffisent plus.
-  const { space: keyboardSpace, isOpen: keyboardOpen } = useKeyboardSpace();
-  // ── fin ──
+  // Le KeyboardAvoidingView suit l'espace réellement occupé par le clavier.
+  // Pas de marge manuelle basée sur sa hauteur : elle se cumulait avec le
+  // redimensionnement de fenêtre et poussait le composer hors de l'écran.
+  const keyboardOpen = useKeyboardStatus();
 
   const commentInputRef = useRef(null);
 
@@ -524,6 +521,7 @@ export default function PhotoScreen({ route, navigation }) {
           onSubmitEditing={send}
           returnKeyType="send"
           blurOnSubmit={false}
+          showSoftInputOnFocus
         />
         <TouchableOpacity
           style={[styles.send, !text.trim() && { opacity: 0.45 }]}
@@ -556,7 +554,10 @@ export default function PhotoScreen({ route, navigation }) {
       </View>
 
       {/* Contenu */}
-      <Animated.View style={[styles.mainContent, { marginBottom: keyboardSpace }]}>
+      <KeyboardAvoidingView
+        style={styles.mainContent}
+        behavior="padding"
+      >
         <FlatList
           data={comments}
           keyExtractor={(item) => item.id}
@@ -564,14 +565,14 @@ export default function PhotoScreen({ route, navigation }) {
           ListHeaderComponent={renderHeader()} // BUG-02 : élément, pas fonction
           ListEmptyComponent={renderEmptyComments}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           style={{ flex: 1 }}
           extraData={`${safeIndex}|${Object.keys(likedComments).length}|${photos.length}`} // BUG-02 : primitive stable
         />
 
         {renderCommentInput()}
-      </Animated.View>
+      </KeyboardAvoidingView>
 
       {/* Confirmation suppression */}
       <Sheet visible={del} onClose={() => setDel(false)} title="Supprimer">
