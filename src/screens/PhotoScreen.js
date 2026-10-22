@@ -25,6 +25,7 @@ import * as FileSystem from 'expo-file-system/legacy'; // API classique (downloa
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { colors } from '../theme';
 import { useKeyboardStatus } from '../lib/keyboard';
+import { classifyPhotoUri } from '../lib/photoUri';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
 import { subscribeAlbumChanges, cloudPhotoUrl } from '../services/albums';
@@ -255,15 +256,36 @@ export default function PhotoScreen({ route, navigation }) {
         return;
       }
 
-      const target = `${FileSystem.cacheDirectory}${filename}`;
-      const existing = await FileSystem.getInfoAsync(target);
-      if (existing.exists) await FileSystem.deleteAsync(target, { idempotent: true });
+      let saveUri = sourceUri;
+      const sourceType = classifyPhotoUri(sourceUri);
+      if (sourceType === 'remote') {
+        const target = `${FileSystem.cacheDirectory}${filename}`;
+        const existing = await FileSystem.getInfoAsync(target);
+        if (existing.exists) await FileSystem.deleteAsync(target, { idempotent: true });
 
-      const result = await FileSystem.downloadAsync(sourceUri, target);
-      if (result.status < 200 || result.status >= 300) {
-        throw new Error(`Le serveur a refusé le téléchargement (${result.status}).`);
+        const result = await FileSystem.downloadAsync(sourceUri, target);
+        if (result.status < 200 || result.status >= 300) {
+          throw new Error(`Le serveur a refusé le téléchargement (${result.status}).`);
+        }
+        saveUri = result.uri;
+      } else if (sourceType === 'file') {
+        // Une photo choisie localement est déjà un fichier : downloadAsync
+        // n'accepte que HTTP(S), il faut l'envoyer directement à MediaLibrary.
+        const localFile = await FileSystem.getInfoAsync(sourceUri);
+        if (!localFile.exists) throw new Error("Le fichier photo n'existe plus sur cet appareil.");
+      } else if (sourceType === 'content') {
+        // Certains sélecteurs Android exposent une URI content:// ; la copier
+        // en cache fournit un vrai fichier local à la bibliothèque média.
+        const target = `${FileSystem.cacheDirectory}${filename}`;
+        const existing = await FileSystem.getInfoAsync(target);
+        if (existing.exists) await FileSystem.deleteAsync(target, { idempotent: true });
+        await FileSystem.copyAsync({ from: sourceUri, to: target });
+        saveUri = target;
+      } else {
+        throw new Error('Format de photo non pris en charge pour l’enregistrement.');
       }
-      await MediaLibrary.saveToLibraryAsync(result.uri);
+
+      await MediaLibrary.saveToLibraryAsync(saveUri);
       showMessage('Téléchargement terminé', 'La photo a été enregistrée dans votre galerie.');
     } catch (error) {
       showMessage('Téléchargement impossible', error?.message || 'Vérifiez votre connexion puis réessayez.');
@@ -489,9 +511,9 @@ export default function PhotoScreen({ route, navigation }) {
     <View
       style={[
         styles.bar,
-        // Clavier ouvert : la barre est déjà posée dessus → marge minimale.
-        // Clavier fermé : on réserve la barre de geste Android / l'encoche iOS.
-        { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 10) },
+        // Clavier ouvert : garder la position validée, marge minimale.
+        // Clavier fermé : ajouter 24 dp d'air au-dessus de la barre système.
+        { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 10) + 24 },
       ]}
     >
       {replyTo && (

@@ -131,10 +131,11 @@ export default function OnboardingScreen({ navigation }) {
           setCode('');
         }}
         title="Rejoindre un album"
+        inline
         useSafeArea={true}
       >
         <Text style={styles.center}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
-        {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
+        {join ? <CodeBoxes value={code} onChange={setCode} autoFocus /> : null}
         <CoralButton
           title={loadingJoin ? "Recherche en cours..." : "Continuer"}
           disabled={code.length < 8 || loadingJoin}
@@ -163,6 +164,7 @@ export default function OnboardingScreen({ navigation }) {
         visible={create}
         onClose={() => setCreate(false)}
         title="Personnalisez votre album"
+        inline
         useSafeArea={true}
       >
         <Field 

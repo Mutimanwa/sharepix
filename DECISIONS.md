@@ -319,6 +319,66 @@ confirmation utilisateur.
 
 ---
 
+## D-12 — Retour Android : téléchargement local, saisie et parcours « Rejoindre »
+
+Date : 22/10/2026. Défauts rapportés avec capture Android et demandes UX.
+Le téléphone de test utilise Android 7 (API 24/25 ; point release à confirmer) :
+les comportements clavier, fenêtres et clipping doivent donc être validés sur
+cette version ancienne, pas seulement sur un Android récent.
+
+### Corrections implémentées
+
+- `downloadAsync` est réservé aux URL HTTP(S). Les URI `file://` sont vérifiées
+  puis envoyées directement à `MediaLibrary`; les URI `content://` sont copiées
+  dans le cache avant sauvegarde. Les schémas non pris en charge donnent une
+  erreur explicite.
+- Les feuilles de création et de saisie sur Accueil, ainsi que celles
+  d'inscription, sont rendues dans l'arbre normal de l'écran au lieu d'une
+  fenêtre native `Modal`, pour éviter que le focus des `TextInput` dépende d'un
+  Dialog Android.
+- « Rejoindre » affiche d'abord « Saisir un code » ou « Scanner un QR ». Le
+  scanner global accepte les codes bruts de huit caractères et les liens
+  SharePix (`sharepix://join?code=...` / URL SharePix). Les liens entrants
+  existants restent pris en charge. Le champ de code reçoit le focus à son
+  ouverture.
+- Dans PhotoScreen, la position clavier ouvert est inchangée ; clavier fermé,
+  le compositeur a 24 dp de dégagement supplémentaire au-dessus de la barre
+  système.
+
+### Critères d'acceptation
+
+- Téléchargement fonctionne avec URL HTTP(S) comme avec URI locale `file://` ;
+  aucun appel HTTP-only ne reçoit une URI fichier.
+- Le formulaire création et le champ code sont saisissables sur Android ; le
+  flux Rejoindre affiche le choix puis lance le mode choisi.
+- Composer inchangé clavier ouvert, plus haut clavier fermé.
+- TypeScript, ESLint, Jest (28/28), export web et `git diff --check` réussis.
+  Les points tactiles, le clavier, l'accès caméra et la galerie restent à
+  confirmer par un nouvel APK Android.
+
+---
+
+## D-13 — Profil : action de compte absente après déconnexion
+
+Date : 22/10/2026. Capture Android 14 reçue après le diagnostic du compte.
+Le Profil affiche l'avatar puis les préférences, sans carte de compte. Dans le
+code, les cartes « Compte invité » / « Compte connecté » dépendent toutes deux
+de `state.user`; si l'initialisation Auth échoue ou qu'une déconnexion vient
+d'avoir lieu (`state.user === null`), aucune action pour se reconnecter ou
+changer d'identité n'est proposée.
+
+### Correction implémentée
+
+- Une rubrique « Compte » s'affiche dès que Supabase est configuré. Si aucun
+  utilisateur n'est actif, une carte explique l'état et propose « Se connecter /
+  changer de compte », ouvrant Auth en mode connexion.
+- Les cartes invité (sécuriser/conversion) et connecté (identité/déconnexion)
+  sont conservées. Aucun compte ni album n'est supprimé par ce changement.
+- Vérifier le rendu Profil et le parcours Auth par tests statiques; la navigation
+  réelle devra être vérifiée sur l'APK Android 14.
+
+---
+
 # Ce qui bloque la mise en production
 
 État vérifié le 2026-10-22, en base et dans les workflows.

@@ -16,6 +16,8 @@ import { CoralButton, Field, Logo, Sheet, Page } from '../components/UI';
 import { ProgressiveImage } from '../components/Skeleton';
 // ── SQUELETTES : fin ──
 import CodeBoxes from '../components/CodeBoxes';
+import { useQrScanner } from '../components/QrScanner';
+import { extractInviteCode } from '../lib/inviteCode';
 import { IconVacances, IconFamille, IconBebe, IconSpecial } from '../components/HomeArt';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Add01Icon, UserAdd01Icon } from '@hugeicons/core-free-icons';
@@ -32,10 +34,11 @@ const suggestions = [
 export default function HomeScreen() {
   const nav = useNavigation();
   const route = useRoute(); // ── DEEP LINK QR : param ?code= du scan ──
-  const { state, createAlbum, joinAlbum } = useStore(); 
+  const { state, createAlbum, joinAlbum } = useStore();
+  const scanner = useQrScanner();
   
   const [create, setCreate] = useState(false);
-  const [join, setJoin] = useState(false);
+  const [joinStage, setJoinStage] = useState(null);
   const [name, setName] = useState('');
   const [first, setFirst] = useState(state.profile.firstName);
   const [code, setCode] = useState('');
@@ -55,7 +58,7 @@ export default function HomeScreen() {
       // Utilise la fonction cloud du store au lieu de chercher localement
       const album = await joinAlbum(finalCode);
       if (album) {
-        setJoin(false);
+        setJoinStage(null);
         setCode('');
         nav.navigate('Album', { id: album.id });
       } else if (!state.user?.id) {
@@ -81,8 +84,34 @@ export default function HomeScreen() {
     submitJoinRef.current = submitJoin;
   });
 
+  const openJoinQrScanner = () => {
+    setJoinStage(null);
+    setCode('');
+    // Laisser le panneau se retirer avant de monter la caméra plein écran.
+    setTimeout(async () => {
+      try {
+        const opened = await scanner.openScanner({
+          onScan: (data) => {
+            const inviteCode = extractInviteCode(data);
+            if (!inviteCode) {
+              Alert.alert('QR non reconnu', "Scannez un code QR d'invitation SharePix.");
+              return false;
+            }
+            submitJoinRef.current(inviteCode);
+            return true;
+          },
+        });
+        if (!opened) {
+          Alert.alert('Caméra indisponible', "Autorisez l'accès à la caméra pour scanner un QR.");
+        }
+      } catch (error) {
+        Alert.alert('Scanner indisponible', error?.message || 'Impossible d’ouvrir la caméra.');
+      }
+    }, 180);
+  };
+
   // Lien sharepix://join?code=XXXXXXXX (QR scanné) :
-  // 1. pré-remplit les cases + ouvre la feuille "Rejoindre"
+  // 1. pré-remplit le code + ouvre la feuille de saisie
   // 2. auto-submit dès que la session est prête (au 1er démarrage l'auth
   //    anonyme peut encore être en cours → on garde le code en attente)
   const pendingJoin = useRef(null);
@@ -91,7 +120,7 @@ export default function HomeScreen() {
     if (incoming) {
       pendingJoin.current = String(incoming).trim().toUpperCase();
       setCode(pendingJoin.current);
-      setJoin(true);
+      setJoinStage('code');
       // paramètre consommé : ne pas relancer le flux à la navigation suivante
       nav.setParams({ code: undefined });
     }
@@ -126,7 +155,7 @@ export default function HomeScreen() {
             style={styles.actTeal}
             onPress={() => {
               setCode('');
-              setJoin(true);
+              setJoinStage('options');
             }}
             activeOpacity={0.88}
           >
@@ -211,7 +240,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* Sheet Créer */}
-      <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album">
+      <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album" inline>
         <Field
           label="Nom de l'album"
           value={name}
@@ -246,23 +275,52 @@ export default function HomeScreen() {
         />
       </Sheet>
 
-      {/* Sheet Rejoindre */}
+      {/* Parcours « Rejoindre » : choix code/QR puis saisie si nécessaire */}
       <Sheet
-        visible={join}
+        visible={Boolean(joinStage)}
         onClose={() => {
-          setJoin(false);
+          setJoinStage(null);
           setCode('');
         }}
-        title="Rejoindre un album"
+        title={joinStage === 'options' ? 'Rejoindre un album' : 'Saisir le code'}
+        inline
       >
-        <Text style={styles.sheetHint}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
-        {join ? <CodeBoxes value={code} onChange={setCode} /> : null}
-        <CoralButton 
-          title={loadingJoin ? "Recherche..." : "Continuer"} 
-          disabled={code.length < 8 || loadingJoin}
-          // ── DEEP LINK QR : logique factorisée dans submitJoin (voir plus haut) ──
-          onPress={() => submitJoin()}
-        />
+        {joinStage === 'options' ? (
+          <>
+            <Text style={styles.sheetHint}>Comment souhaitez-vous rejoindre l’album ?</Text>
+            <CoralButton
+              title="Saisir un code à 8 caractères"
+              onPress={() => {
+                setCode('');
+                setJoinStage('code');
+              }}
+            />
+            <CoralButton
+              title="Scanner un QR code"
+              color={colors.teal}
+              style={{ marginTop: 12 }}
+              onPress={openJoinQrScanner}
+            />
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              onPress={() => setJoinStage('options')}
+              style={{ marginBottom: 8, paddingVertical: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="Retour aux options de connexion"
+            >
+              <Text style={{ color: colors.tealDark, fontWeight: '700' }}>← Autres options</Text>
+            </TouchableOpacity>
+            <Text style={styles.sheetHint}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
+            <CodeBoxes value={code} onChange={setCode} autoFocus />
+            <CoralButton
+              title={loadingJoin ? 'Recherche...' : 'Continuer'}
+              disabled={code.length < 8 || loadingJoin}
+              onPress={() => submitJoin()}
+            />
+          </>
+        )}
       </Sheet>
     </Page>
   );

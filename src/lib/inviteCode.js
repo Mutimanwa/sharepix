@@ -50,3 +50,24 @@ export function randomId() {
   const bytes = Crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+/** Extrait un code de 8 caractères d'un QR brut ou d'un lien SharePix. */
+export function extractInviteCode(value) {
+  const input = String(value || '').trim();
+  if (/^[A-Z0-9]{8}$/i.test(input)) return input.toUpperCase();
+
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    return null;
+  }
+
+  const isSharePixLink = url.protocol === 'sharepix:' || (
+    url.protocol === 'https:' && ['sharepix.app', 'www.sharepix.app'].includes(url.hostname.toLowerCase())
+  );
+  if (!isSharePixLink) return null;
+
+  const code = url.searchParams.get('code')?.trim().toUpperCase();
+  return code && /^[A-Z0-9]{8}$/.test(code) ? code : null;
+}
