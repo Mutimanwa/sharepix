@@ -1,92 +1,48 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
+import React from 'react';
+import { StyleSheet, TextInput } from 'react-native';
 import { colors } from '../theme';
 
-export default function CodeBoxes({
-  value,
-  onChange,
-  length = 8,
-  autoFocus = true,
-  // Délai avant la demande de focus. Dans une <Modal> Android animée, un
-  // focus demandé trop tôt est perdu et le clavier ne s'ouvre jamais :
-  // on attend la fin de l'animation d'ouverture.
-  focusDelay = 450,
-}) {
-  const input = useRef(null);
-
-  useEffect(() => {
-    if (autoFocus) {
-      const t = setTimeout(() => input.current?.focus(), focusDelay);
-      return () => clearTimeout(t);
-    }
-  }, [autoFocus, focusDelay]);
-
-  // Taper n'importe où dans les cases ramène le clavier (et le réouvre s'il
-  // a été fermé par la barre de navigation), comme un vrai champ OTP.
-  const focusInput = () => input.current?.focus();
-
-  const active = Math.min(value.length, length - 1);
-
+/**
+ * Champ visible de code d'invitation.
+ *
+ * L'ancienne version dessinait des cases puis superposait un TextInput invisible.
+ * Plusieurs claviers Android ne donnaient pas le focus à ce champ transparent
+ * dans une Modal : on utilise désormais un vrai TextInput visible et tactile.
+ */
+export default function CodeBoxes({ value, onChange, length = 8, autoFocus = false }) {
   return (
-    <Pressable style={styles.wrap} onPressIn={focusInput} onPress={focusInput}>
-      <View style={styles.row}>
-        {Array.from({ length }).map((_, k) => (
-          <View key={k} style={[styles.box, k === active && styles.boxOn, value[k] && styles.boxFilled]}>
-            <Text style={styles.char}>{value[k] || ''}</Text>
-            {k === active && !value[k] ? <View style={styles.caret} /> : null}
-          </View>
-        ))}
-      </View>
-      <TextInput
-        ref={input}
-        value={value}
-        onChangeText={(t) => onChange(t.replace(/[^A-Za-z0-9]/g, '').slice(0, length).toUpperCase())}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        keyboardType="default"
-        maxLength={length}
-        caretHidden
-        style={styles.hidden}
-        importantForAutofill="no"
-        showSoftInputOnFocus
-      />
-    </Pressable>
+    <TextInput
+      value={value}
+      onChangeText={(text) => onChange(text.replace(/[^A-Za-z0-9]/g, '').slice(0, length).toUpperCase())}
+      placeholder="AB12CD34"
+      placeholderTextColor="#9AABAB"
+      autoCapitalize="characters"
+      autoCorrect={false}
+      keyboardType="default"
+      maxLength={length}
+      autoFocus={autoFocus}
+      showSoftInputOnFocus
+      selectTextOnFocus={false}
+      accessibilityLabel="Code d’invitation à huit caractères"
+      style={styles.input}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginVertical: 16 },
-  row: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  box: {
-    width: 36,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: '#EEF5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
+  input: {
+    marginVertical: 16,
+    height: 52,
     borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  boxOn: {
     borderColor: colors.teal,
+    borderRadius: 12,
     backgroundColor: '#fff',
-  },
-  boxFilled: {
-    backgroundColor: '#fff',
-    borderColor: colors.tealDark,
-  },
-  char: { fontSize: 18, fontWeight: '800', color: colors.tealDark },
-  caret: {
-    position: 'absolute',
-    width: 1.5,
-    height: 20,
-    backgroundColor: colors.teal,
-    borderRadius: 1,
-  },
-  hidden: {
-    position: 'absolute',
-    opacity: 0,
-    height: 48,
-    width: '100%',
+    paddingHorizontal: 16,
+    color: colors.tealDark,
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 5,
+    includeFontPadding: false,
   },
 });
