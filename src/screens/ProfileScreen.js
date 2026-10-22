@@ -223,7 +223,9 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.avatarHint}>Photo de profil</Text>
         </View>
 
-        {/* ── BANNIÈRE COMPTE ── */}
+        {isSupabaseConfigured ? <Text style={styles.sectionTitle}>Compte</Text> : null}
+
+        {/* ── BANNIÈRE COMPTE INVITÉ ── */}
         {isSupabaseConfigured && isAnonymous && (
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
@@ -288,6 +290,34 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.logoutBtnText}>
                 {busyOut ? 'Déconnexion…' : 'Se déconnecter'}
               </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Aucun état Auth actif : proposer clairement la connexion/changement
+            de compte au lieu de masquer entièrement la section Compte. */}
+        {isSupabaseConfigured && !user && (
+          <View style={styles.card}>
+            <View style={styles.accountRow}>
+              <View style={styles.accountIcon}>
+                <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.tealDark} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountT}>Aucun compte connecté</Text>
+                <Text style={styles.accountS}>
+                  Connectez-vous pour retrouver vos albums ou utiliser un autre compte.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() => navigation.navigate('Auth', { mode: 'login' })}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Se connecter ou changer de compte"
+            >
+              <HugeiconsIcon icon={UserCircle02Icon} size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>Se connecter / changer de compte</Text>
             </TouchableOpacity>
           </View>
         )}
