@@ -3,7 +3,7 @@
     "name": "SharePix",
     "slug": "sharepix",
     "scheme": "sharepix",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/sharepix-icon.png",
     "userInterfaceStyle": "light",

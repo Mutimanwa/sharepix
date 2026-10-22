@@ -10,8 +10,7 @@ import {
   View,
   Dimensions,
   Alert,
-  TextInput,
-  Linking
+  TextInput
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -38,6 +37,8 @@ import {
   requestPasswordReset,
 } from '../services/auth';
 import { colors } from '../theme';
+import LocalDocumentModal from '../components/LocalDocumentModal';
+import { PRIVACY_INTRO, PRIVACY_SECTIONS, TERMS_INTRO, TERMS_SECTIONS } from '../data/localInfo';
 import { GoogleMark, LogoImage } from '../components/UI';
 import { useStore } from '../store';
 import { isSupabaseConfigured } from '../config';
@@ -100,6 +101,7 @@ export default function AuthScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [legalDocument, setLegalDocument] = useState(null);
 
   const insets = useSafeAreaInsets();
   const { setAuthUser } = useStore();
@@ -427,14 +429,24 @@ export default function AuthScreen({ navigation, route }) {
                   J'accepte les{' '}
                   <Text
                     style={styles.termsLink}
-                    onPress={() => Linking.openURL('https://sharepix.app/terms')}
+                    onPress={() => setLegalDocument({
+                      title: 'Conditions générales d’utilisation',
+                      intro: TERMS_INTRO,
+                      updatedAt: 'Dernière mise à jour : août 2026',
+                      sections: TERMS_SECTIONS,
+                    })}
                   >
                     conditions générales
                   </Text>{' '}
                   et la{' '}
                   <Text
                     style={styles.termsLink}
-                    onPress={() => Linking.openURL('https://sharepix.app/privacy')}
+                    onPress={() => setLegalDocument({
+                      title: 'Politique de confidentialité',
+                      intro: PRIVACY_INTRO,
+                      updatedAt: 'Dernière mise à jour : août 2026',
+                      sections: PRIVACY_SECTIONS,
+                    })}
                   >
                     politique de confidentialité
                   </Text>.
@@ -502,6 +514,11 @@ export default function AuthScreen({ navigation, route }) {
 
         </ScrollView>
       </KeyboardAvoidingView>
+      <LocalDocumentModal
+        visible={Boolean(legalDocument)}
+        document={legalDocument}
+        onClose={() => setLegalDocument(null)}
+      />
     </View>
   );
 }

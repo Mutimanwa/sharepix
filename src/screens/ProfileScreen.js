@@ -21,7 +21,10 @@ import { registerPushToken, unregisterPushToken } from '../services/push';
 // ── BUG-03 : SafeAreaView depuis react-native-safe-area-context ──
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Constants from 'expo-constants'; 
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
+import LocalInfoAccordion from '../components/LocalInfoAccordion';
+import { FAQ_SECTIONS, PRIVACY_INTRO, PRIVACY_SECTIONS, TERMS_INTRO, TERMS_SECTIONS } from '../data/localInfo';
 
 // ── COMPOSANTS RÉUTILISABLES POUR L'UI ──
 
@@ -102,8 +105,13 @@ export default function ProfileScreen({ navigation }) {
   if (initialProfileRef.current === null) initialProfileRef.current = profileSignature;
   const hasProfileChanges = profileSignature !== initialProfileRef.current;
 
-  // Récupération dynamique de la version depuis app.json
-  const appVersion = Constants.expoConfig?.version || '1.0.1';
+  // En build installé, lire la version du binaire lui-même. En Expo Go / web,
+  // utiliser la version de configuration du projet (app.json).
+  const isNativeBuild = ['standalone', 'bare'].includes(Constants.executionEnvironment);
+  const appVersion =
+    (isNativeBuild ? Application.nativeApplicationVersion : null) ||
+    Constants.expoConfig?.version ||
+    '1.0.4';
 
   const handleLogout = () => {
     Alert.alert(
@@ -326,22 +334,40 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* ── LIENS LÉGAUX ET AUTRES ── */}
+        {/* ── AIDE ET INFORMATIONS LOCALES (fonctionnent hors connexion) ── */}
+        <Text style={styles.sectionTitle}>Aide et informations</Text>
         <View style={styles.card}>
-          <LinkRow title="FAQ - Questions Fréquentes" onPress={() => Linking.openURL('https://sharepix.app/faq')} />
-          <LinkRow title="Restaurer les achats" onPress={() => Alert.alert("Achats", "Vous n'avez actuellement aucun achat in-app à restaurer.")} />
-          <LinkRow title="Conditions Générales (CGV)" onPress={() => Linking.openURL('https://sharepix.app/cgv')} />
-          <LinkRow title="Sécurité des données" onPress={() => Linking.openURL('https://sharepix.app/privacy')} />
-          <LinkRow 
-            title={user ? "Supprimer mon compte" : "Réinitialiser l'application"} 
-            isDestructive 
-            onPress={handleDeleteAccount} 
-            isLast 
+          <LocalInfoAccordion
+            title="FAQ - Questions fréquentes"
+            intro="Réponses aux questions courantes sur SharePix."
+            sections={FAQ_SECTIONS}
+          />
+          <LinkRow
+            title="Restaurer les achats"
+            onPress={() => Alert.alert('Achats', "Vous n'avez actuellement aucun achat in-app à restaurer.")}
+          />
+          <LocalInfoAccordion
+            title="Conditions générales d’utilisation"
+            intro={TERMS_INTRO}
+            updatedAt="Dernière mise à jour : août 2026"
+            sections={TERMS_SECTIONS}
+          />
+          <LocalInfoAccordion
+            title="Politique de confidentialité"
+            intro={PRIVACY_INTRO}
+            updatedAt="Dernière mise à jour : août 2026"
+            sections={PRIVACY_SECTIONS}
+          />
+          <LinkRow
+            title={user ? 'Supprimer mon compte' : "Réinitialiser l'application"}
+            isDestructive
+            onPress={handleDeleteAccount}
+            isLast
           />
         </View>
 
-        {/* VERSION DYNAMIQUE */}
-        <Text style={styles.versionText}> Version {appVersion}</Text>
+        {/* Version du binaire installé (ou de la configuration en Expo Go/web). */}
+        <Text style={styles.versionText}>Version {appVersion}</Text>
       </ScrollView>
 
        {/* MODAL DE SAUVEGARDE DU PROFIL */}

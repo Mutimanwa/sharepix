@@ -1,6 +1,6 @@
 {
   "name": "sharepix",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "main": "index.js",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.17",
@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.112.3",
     "@types/react": "~19.2.4",
     "expo": "~57.0.31",
+    "expo-application": "~57.0.3",
     "expo-camera": "~57.0.6",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.22",
