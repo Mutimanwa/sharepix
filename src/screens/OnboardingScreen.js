@@ -6,13 +6,11 @@ import {
   Dimensions,
   FlatList,
   TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  ScrollView,
+  Alert, // <-- AJOUT
 } from 'react-native';
 import { colors } from '../theme';
 
-import { CoralButton, Logo, Field } from '../components/UI';
+import { CoralButton, Logo, Sheet, Field } from '../components/UI';
 import { ArtShare, ArtPrivate, ArtQuality } from '../components/OnboardingArt';
 import CodeBoxes from '../components/CodeBoxes';
 import { useStore } from '../store';
@@ -48,11 +46,11 @@ export default function OnboardingScreen({ navigation }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [first, setFirst] = useState('');
-  
+
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
-  
+
   // <-- AJOUT de joinAlbum dans le destructuring
   const { createAlbum, joinAlbum, setOnboarded, state } = useStore();
   const insets = useSafeAreaInsets();
@@ -72,101 +70,6 @@ export default function OnboardingScreen({ navigation }) {
     const next = Math.round(e.nativeEvent.contentOffset.x / width);
     if (next !== i) setI(next);
   };
-
-  if (join) {
-    return (
-      <View style={[styles.root, styles.formRoot, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <StatusBar style="dark" />
-        <View style={styles.formHeader}>
-          <TouchableOpacity onPress={() => { setJoin(false); setCode(''); }} style={styles.backButton}>
-            <Text style={styles.backText}>← Retour</Text>
-          </TouchableOpacity>
-          <Text style={styles.formHeaderTitle}>Rejoindre un album</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-          <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="always">
-            <Text style={styles.formTitle}>Entrez votre code</Text>
-            <Text style={styles.center}>Saisissez le code à 8 caractères pour rejoindre l'album.</Text>
-            <CodeBoxes value={code} onChange={setCode} autoFocus />
-            <CoralButton
-              title={loadingJoin ? 'Recherche en cours…' : 'Continuer'}
-              disabled={code.length < 8 || loadingJoin}
-              onPress={async () => {
-                setLoadingJoin(true);
-                try {
-                  const album = await joinAlbum(code);
-                  if (!album) {
-                    Alert.alert('Introuvable', "Ce code d'album n'existe pas ou a été supprimé.");
-                    return;
-                  }
-                  setJoin(false);
-                  setCode('');
-                  goHome();
-                } catch (err) {
-                  Alert.alert('Erreur', err.message || "Impossible de rejoindre l'album.");
-                } finally {
-                  setLoadingJoin(false);
-                }
-              }}
-            />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
-
-  if (create) {
-    return (
-      <View style={[styles.root, styles.formRoot, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <StatusBar style="dark" />
-        <View style={styles.formHeader}>
-          <TouchableOpacity onPress={() => setCreate(false)} style={styles.backButton}>
-            <Text style={styles.backText}>← Retour</Text>
-          </TouchableOpacity>
-          <Text style={styles.formHeaderTitle}>Créer un album</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-          <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="always">
-            <Text style={styles.formTitle}>Personnalisez votre album</Text>
-            <Field
-              label="Nom de l'album"
-              value={name}
-              onChangeText={setName}
-              keyboardType="default"
-              autoCapitalize="sentences"
-              returnKeyType="next"
-            />
-            <Field
-              label="Votre prénom"
-              value={first}
-              onChangeText={setFirst}
-              autoCapitalize="words"
-              keyboardType="default"
-            />
-            <Text style={styles.center}>Vous pouvez à nouveau changer les deux.</Text>
-            <CoralButton
-              title={loadingCreate ? 'Création en cours…' : 'Créer un album'}
-              disabled={!name.trim() || !first.trim() || loadingCreate}
-              onPress={async () => {
-                setLoadingCreate(true);
-                try {
-                  await createAlbum({ name: name.trim(), firstName: first.trim() });
-                  setCreate(false);
-                  goHome();
-                } catch (err) {
-                  Alert.alert('Erreur', err.message || "Impossible de créer l'album.");
-                } finally {
-                  setLoadingCreate(false);
-                }
-              }}
-            />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -220,7 +123,80 @@ export default function OnboardingScreen({ navigation }) {
         />
       </View>
 
+      {/* Sheet Rejoindre */}
+      <Sheet
+        visible={join}
+        onClose={() => {
+          setJoin(false);
+          setCode('');
+        }}
+        title="Rejoindre un album"
+        inline
+        useSafeArea={true}
+      >
+        <Text style={styles.center}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
+        {join ? <CodeBoxes value={code} onChange={setCode} autoFocus /> : null}
+        <CoralButton
+          title={loadingJoin ? "Recherche en cours..." : "Continuer"}
+          disabled={code.length < 8 || loadingJoin}
+          onPress={async () => {
+            setLoadingJoin(true);
+            try {
+              const album = await joinAlbum(code);
+              if (!album) {
+                Alert.alert("Introuvable", "Ce code d'album n'existe pas ou a été supprimé.");
+                return;
+              }
+              setJoin(false);
+              setCode('');
+              goHome();
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de rejoindre l'album.");
+            } finally {
+              setLoadingJoin(false);
+            }
+          }}
+        />
+      </Sheet>
 
+      {/* Sheet Créer */}
+      <Sheet
+        visible={create}
+        onClose={() => setCreate(false)}
+        title="Personnalisez votre album"
+        inline
+        useSafeArea={true}
+      >
+        <Field
+          label="Nom de l'album"
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="sentences"
+        />
+        <Field
+          label="Votre prénom"
+          value={first}
+          onChangeText={setFirst}
+          autoCapitalize="words"
+        />
+        <Text style={styles.center}>Vous pouvez à nouveau changer les deux.</Text>
+        <CoralButton
+          title={loadingCreate ? "Création en cours..." : "Créer un album"}
+          disabled={!name.trim() || !first.trim() || loadingCreate}
+          onPress={async () => {
+            setLoadingCreate(true);
+            try {
+              await createAlbum({ name: name.trim(), firstName: first.trim() });
+              setCreate(false);
+              goHome();
+            } catch (err) {
+              Alert.alert("Erreur", err.message || "Impossible de créer l'album.");
+            } finally {
+              setLoadingCreate(false);
+            }
+          }}
+        />
+      </Sheet>
     </View>
   );
 }
@@ -229,49 +205,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.cream,
-  },
-  formRoot: {
-    paddingHorizontal: 20,
-  },
-  formHeader: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    width: 88,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  backText: {
-    color: colors.tealDark,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  formHeaderTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: colors.tealDark,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  headerSpacer: {
-    width: 88,
-  },
-  formContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingVertical: 24,
-  },
-  formTitle: {
-    color: colors.tealDark,
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 12,
   },
   brand: {
     alignItems: 'center',

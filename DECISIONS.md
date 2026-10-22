@@ -379,20 +379,20 @@ changer d'identité n'est proposée.
 
 ---
 
-## D-14 — Les actions du onboarding n'ouvrent pas leurs formulaires
+## D-14 — Onboarding : conserver le parcours en popup
 
-Date : 22/10/2026. Retour utilisateur sur téléphone : les deux boutons du
-onboarding (créer un album / utiliser un code) semblent ne rien faire.
+Date : 22/10/2026. Les boutons « Créez un nouvel album » et « Utilisez le code
+ d'accès » semblaient sans effet sur le téléphone de test. L'utilisateur précise
+que le système popup est voulu et attribue le problème à son téléphone.
 
-### Correction implémentée
-
-- Les boutons ouvrent maintenant des vues de formulaire intégrées directement
-  au rendu du onboarding, avec un bouton Retour ; ils ne dépendent plus d'un
-  `Sheet inline` absolu.
-- Les formulaires conservent les mêmes appels de création et de jointure, avec
-  `KeyboardAvoidingView`, `ScrollView` et persistance des taps pour les champs.
-- TypeScript, ESLint, Jest (28/28), export web et `git diff --check` réussis.
-  L'ouverture des écrans et la saisie restent à confirmer sur un APK Android.
+- Les formulaires restent dans le système popup `Sheet`; la tentative de les
+  remplacer par des écrans complets a été annulée pour préserver l'UX voulue.
+- Le code conserve les actions existantes `setCreate(true)` / `setJoin(true)`;
+  aucun changement du mécanisme popup n'est nécessaire sans reproduction sur un
+  autre appareil.
+- Vérification à faire après le prochain APK : tester ces deux boutons sur le
+  téléphone Android 14. Ne pas modifier l'UX popup sur la seule base du téléphone
+  de test ancien.
 
 ---
 
