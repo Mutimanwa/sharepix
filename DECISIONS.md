@@ -293,14 +293,29 @@ activation, préférence du Profil, animation des anneaux du splash).
 - Le titre **Activités** est désormais dans un en-tête commun aux deux états,
   avant/après permission. Le panneau d'activation prend toute la hauteur
   restante et centre son contenu comme l'état « aucune activité ».
-- Le conteneur du splash faisait `1,55 × logo`, plus petit que l'anneau à
-  son expansion maximale (environ `1,76 × logo`) ; la zone passe à `2,15 ×`
-  et laisse explicitement le débordement visible. Le routage après
-  authentification attend 3,2 s (au lieu de 2,2) pour ne pas couper la boucle
-  d'animation trop tôt.
+- Première correction : le stage passait de `1,55 × logo` à `2,15 ×` pour
+  contenir l'expansion maximale (~`1,76 × logo`). Malgré ce calcul, le test
+  Android réel a confirmé que les cercles restaient coupés ; cette correction
+  seule n'était donc pas suffisante.
+- Nouvelle correction : les vues animées des anneaux occupent maintenant dès
+  le layout l'aire maximale native et sont réduites par `transform` (l'échelle
+  ne dépasse jamais 1), avec débordement visible sur le stage, le centre et la
+  racine. Le centre occupe toute la largeur. Le diamètre et l'épaisseur visibles
+  de l'anneau sont conservés. **À confirmer sur un nouvel APK Android.**
+- Le routage après authentification attend 3,2 s (au lieu de 2,2) pour ne pas
+  couper la boucle d'animation trop tôt.
 
-Vérifications : `tsc`, `eslint`, Jest 21/21 et export web OK. La permission
-push native et le rendu de l'animation restent à vérifier sur l'APK Android.
+Vérifications initiales : `tsc`, `eslint`, Jest 21/21 et export web OK.
+L'utilisateur confirme maintenant, après test Android réel, que les anneaux du
+splash sont toujours coupés : l'augmentation à `2,15 × logo` n'a donc pas
+résolu le défaut sur l'appareil.
+
+### État de la reprise
+
+Les changements ci-dessus sont implémentés. TypeScript, ESLint, Jest (21/21),
+export web et `git diff --check` passent. Le rendu final exige un nouvel APK
+et un test Android réel ; ne pas considérer le défaut comme résolu avant
+confirmation utilisateur.
 
 ---
 

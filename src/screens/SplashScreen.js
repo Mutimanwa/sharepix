@@ -17,9 +17,13 @@ export default function SplashScreen({ navigation }) {
   // ── SUPABASE AUTH : fin ──
   const { width, height } = useWindowDimensions();
   const logoSize = Math.min(176, Math.round(width * 0.42));
-  // Les anneaux montent à 1,85× leur taille : laisser une vraie marge
-  // dans leur conteneur évite que le cercle soit rogné pendant son expansion.
-  const stage = Math.round(logoSize * 2.15);
+  // Aire native assez grande pour l'expansion complète des anneaux. Les vues
+  // des anneaux occupent déjà cette aire et sont réduites par transform : elles
+  // ne s'agrandissent jamais au-delà de leurs limites natives (clipping Android).
+  const stage = Math.round(logoSize * 2.2);
+  const ringScaleStart = (logoSize * 0.95 * 0.7) / stage;
+  const ringScaleEnd = (logoSize * 0.95 * 1.85) / stage;
+  const ringBorderWidth = (2 * stage) / (logoSize * 0.95);
 
   const pop = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
@@ -128,7 +132,7 @@ export default function SplashScreen({ navigation }) {
   );
 
   const makeRingStyle = (val) => ({
-    transform: [{ scale: val.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.85] }) }],
+    transform: [{ scale: val.interpolate({ inputRange: [0, 1], outputRange: [ringScaleStart, ringScaleEnd] }) }],
     opacity: val.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.45, 0.28, 0] }),
   });
 
@@ -141,11 +145,12 @@ export default function SplashScreen({ navigation }) {
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar style="light" />
       <View style={[styles.center, { minHeight: height * 0.55 }]}>
-        <View style={{ width: stage, height: stage, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+        <View style={[styles.ringStage, { width: stage, height: stage }]}>
+
           <Animated.View
             style={[
               styles.ring,
-              { width: logoSize * 0.95, height: logoSize * 0.95, borderRadius: logoSize },
+              { width: stage, height: stage, borderRadius: stage / 2, borderWidth: ringBorderWidth },
               makeRingStyle(ring),
             ]}
           />
@@ -153,7 +158,7 @@ export default function SplashScreen({ navigation }) {
             style={[
               styles.ring,
               styles.ringAlt,
-              { width: logoSize * 0.95, height: logoSize * 0.95, borderRadius: logoSize },
+              { width: stage, height: stage, borderRadius: stage / 2, borderWidth: ringBorderWidth },
               makeRingStyle(ring2),
             ]}
           />
@@ -184,8 +189,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
-  center: { alignItems: 'center', justifyContent: 'center', flex: 1 },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    width: '100%',
+    overflow: 'visible',
+  },
+  ringStage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
   ring: {
     position: 'absolute',
     borderWidth: 2,
