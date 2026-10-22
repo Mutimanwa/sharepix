@@ -1,5 +1,4 @@
 import React from 'react';
-import { colors } from '../theme';
 import { Image } from 'react-native';
 const image1 = require('../../assets/ilustration/01.png');
 const image2 = require('../../assets/ilustration/02.png');

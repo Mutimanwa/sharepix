@@ -169,12 +169,13 @@ export default function OnboardingScreen({ navigation }) {
           label="Nom de l'album" 
           value={name} 
           onChangeText={setName}
-          autoFocus
+          autoCapitalize="sentences"
         />
         <Field 
           label="Votre prénom" 
           value={first} 
           onChangeText={setFirst}
+          autoCapitalize="words"
         />
         <Text style={styles.center}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton

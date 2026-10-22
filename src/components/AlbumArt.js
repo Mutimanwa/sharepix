@@ -1,6 +1,4 @@
 import React from 'react';
-import Svg, { Rect, Circle, Path, Ellipse } from 'react-native-svg';
-import { colors } from '../theme';
 import { Image } from 'react-native';
 
 // Images

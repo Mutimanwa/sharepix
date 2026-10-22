@@ -291,8 +291,8 @@ export default function ProfileScreen({ navigation }) {
           <>
             <Text style={styles.sectionTitle}>Informations personnelles</Text>
             <View style={styles.card}>
-              <Field label="Prénom" value={p.firstName} onChangeText={(firstName) => updateProfile({ firstName })} />
-              <Field label="Nom de famille" value={p.lastName} onChangeText={(lastName) => updateProfile({ lastName })} />
+              <Field label="Prénom" value={p.firstName} onChangeText={(firstName) => updateProfile({ firstName })} autoCapitalize="words" />
+              <Field label="Nom de famille" value={p.lastName} onChangeText={(lastName) => updateProfile({ lastName })} autoCapitalize="words" />
             </View>
           </>
         )}

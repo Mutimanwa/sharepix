@@ -1,3 +1,4 @@
+// @ts-check
 // ── Configuration Supabase ──────────────────────────────────────────────
 
 export const SUPABASE_URL = 'https://bpillwvvxqiduxtkftuh.supabase.co';

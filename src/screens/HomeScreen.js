@@ -6,13 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  KeyboardAvoidingView,
-  Platform,
-  Alert, // <-- AJOUT
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors } from '../theme';
-import { CoralButton, Field, Logo, Sheet, Page, SmallButton } from '../components/UI';
+import { CoralButton, Field, Logo, Sheet, Page } from '../components/UI';
 // ── SQUELETTES : intégration ──
 // Couvertures d'albums : pulsation jusqu'à onLoad, puis révélation en fondu
 import { ProgressiveImage } from '../components/Skeleton';
@@ -45,6 +43,15 @@ export default function HomeScreen() {
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
+  const nameInputRef = useRef(null);
+
+  // ── Saisie : focus différé (la <Modal> s'anime encore au montage, un
+  // `autoFocus` immédiat est perdu sur Android et le clavier ne s'ouvre pas).
+  useEffect(() => {
+    if (!create) return undefined;
+    const t = setTimeout(() => nameInputRef.current?.focus(), 450);
+    return () => clearTimeout(t);
+  }, [create]);
 
   // ── DEEP LINK QR : intégration ──
   // Jointure factorisée : utilisée par le bouton "Continuer" ET par
@@ -73,6 +80,16 @@ export default function HomeScreen() {
     }
   };
 
+  // `submitJoin` est recréée à chaque rendu : on l'expose via une ref pour
+  // que l'effet de deep link ci-dessous n'ait pas à la mettre en dépendance
+  // (sinon l'effet se relancerait à chaque frappe dans les champs).
+  const submitJoinRef = useRef(submitJoin);
+  // Sans tableau de dépendances : la ref suit la dernière version de
+  // `submitJoin` à chaque rendu (pattern « latest callback »).
+  useEffect(() => {
+    submitJoinRef.current = submitJoin;
+  });
+
   // Lien sharepix://join?code=XXXXXXXX (QR scanné) :
   // 1. pré-remplit les cases + ouvre la feuille "Rejoindre"
   // 2. auto-submit dès que la session est prête (au 1er démarrage l'auth
@@ -90,9 +107,9 @@ export default function HomeScreen() {
     if (pendingJoin.current && state.authChecked) {
       const toSubmit = pendingJoin.current;
       pendingJoin.current = null;
-      submitJoin(toSubmit);
+      submitJoinRef.current(toSubmit);
     }
-  }, [route.params?.code, state.authChecked]);
+  }, [route.params?.code, state.authChecked, nav]);
   // ── DEEP LINK QR : fin ──
 
   return (
@@ -204,16 +221,19 @@ export default function HomeScreen() {
 
       {/* Sheet Créer */}
       <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album">
-        <Field 
-          label="Nom de l'album" 
-          value={name} 
-          onChangeText={setName} 
-          autoFocus
+        <Field
+          label="Nom de l'album"
+          value={name}
+          onChangeText={setName}
+          inputRef={nameInputRef}
+          autoCapitalize="sentences"
+          returnKeyType="next"
         />
         <Field 
           label="Votre prénom" 
           value={first} 
-          onChangeText={setFirst} 
+          onChangeText={setFirst}
+          autoCapitalize="words" 
         />
         <Text style={styles.sheetHint}>Vous pouvez à nouveau changer les deux.</Text>
         <CoralButton

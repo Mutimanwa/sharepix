@@ -29,9 +29,20 @@ supabase/functions/** ──────▶ Déploiement Edge Function Supabase
    `--config supabase/functions/deno.json` (le job Deno n'installe pas les
    dépendances npm : la résolution passe par l'import map seule).
 3. **Sécurité RLS / Storage** — exécute `node supabase/rls-check.cjs`
-   contre le projet Supabase réel : vérifie qu'aucune donnée ne fuit sans
-   session, que les comptes invités frais ne voient rien, et que le bucket
-   `album-photos` reste privé (URLs signées uniquement).
+   contre le **projet de test** (jamais la production : ce script écrit).
+   Il vérifie qu'aucune donnée ne fuit sans session, qu'un compte invité
+   frais ne voit rien, et que le bucket `album-photos` reste privé (URLs
+   signées uniquement).
+
+   Codes de sortie : `0` = protégé, `1` = fuite réelle, `2` = vérification
+   **impossible** (projet injoignable, ou compte jetable non créable). Le
+   code `2` est un échec volontaire : une panne réseau ne doit jamais être
+   comptée comme une protection.
+
+   > **Prérequis du projet de test :** *Anonymous sign-ins* doit être
+   > **activé** (Authentication → Sign In / Providers). La production les
+   > utilise ; si le projet de test les refuse, la configuration testée
+   > n'est pas celle de la production et le job sort en code `2`.
 
 ## Prérequis : secrets GitHub
 
@@ -43,6 +54,8 @@ Actions**. Les workflows s'arrêtent proprement si un secret manque
 | --- | --- | --- |
 | `EXPO_TOKEN` | Preview + Production (EAS) | `npx eas-cli whoami` / expo.dev → Settings → Access Tokens |
 | `SUPABASE_ACCESS_TOKEN` | Déploiement Edge Functions | dashboard Supabase → Account → Access Tokens |
+| `STAGING_SUPABASE_URL` | Test RLS / Storage | projet de test → Settings → API |
+| `STAGING_SUPABASE_ANON_KEY` | Test RLS / Storage | même écran, clé **anon** (jamais `service_role`) |
 
 > ℹ️ Les clés **anon** (`src/config.js`, `supabase/rls-check.cjs`) sont déjà
 > dans le dépôt : elles sont publiques par nature (la sécurité repose sur la
@@ -89,10 +102,31 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 > l'import map `supabase/functions/deno.json` (specifier nu, donc conforme
 > au lint Deno `no-import-prefix`).
 
-> Le **schéma SQL** (`supabase/schema.sql`) n'est **pas** appliqué
-> automatiquement : il est ré-exécutable/idempotent mais modifie la
-> production. On l'applique volontairement après revue, puis on relance
-> la CI (le job *RLS & Storage* sert de filet de sécurité).
+> Le **schéma** vit dans `supabase/migrations/` et n'est **pas** appliqué
+> automatiquement sur la production : toute évolution passe par une
+> migration horodatée, revue puis appliquée volontairement.
+> `20261021000000_initial_schema.sql` reconstruit l'état complet et sert à
+> provisionner un projet de test.
+>
+> Le job *RLS & Storage* **écrit** (comptes anonymes, album, fichier) : il
+> vise donc un projet de test via `STAGING_SUPABASE_URL` /
+> `STAGING_SUPABASE_ANON_KEY`. Sans ces secrets, il est **ignoré** avec un
+> avertissement visible dans l'onglet Actions — il ne retombe jamais sur la
+> production.
+>
+> Projet de test provisionné le 21/10/2026 : `sharepix-staging`
+> (`slxljxllyjitnjnqaapk`, eu-west-1). Son schéma est identique à la
+> production (9 tables, 9 RLS, 21 policies `public` + 3 `storage`,
+> 10 fonctions, 6 triggers, bucket privé 25 Mo). Il ne contient **aucun**
+> secret Vault : la fonction webhook y est donc inerte et ne peut pas
+> notifier la production.
+>
+> Secrets posés le 22/10/2026 : le job s'exécute désormais pour de vrai.
+>
+> Reste à faire sur le projet de test : **activer les comptes anonymes**
+> (Authentication → Sign In / Providers → *Anonymous sign-ins*). Sans cela,
+> le script ne peut pas créer son compte de contrôle et sort en code `2` —
+> volontairement, plutôt que d'afficher un vert qui ne prouve rien.
 
 ## Lancer les vérifications en local
 

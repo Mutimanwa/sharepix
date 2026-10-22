@@ -1,3 +1,4 @@
+// @ts-check
 // ── CARROUSEL PHOTO (écran détail) : correctif du rechargement d'image ────
 //
 // ── CE QUI N'ALLAIT PAS ────────────────────────────────────────────────
@@ -39,9 +40,9 @@ import { Skeleton } from './Skeleton';
 // React Native au lieu de faire planter l'écran photo sur les anciens binaires.
 let ExpoImage = null;
 try {
-  // eslint-disable-next-line global-require
+   
   const mod = require('expo-image');
-  ExpoImage = mod?.Image || mod?.default || null;
+  ExpoImage = mod?.Image || null;
 } catch (e) {
   ExpoImage = null;
 }
@@ -243,7 +244,11 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   failed: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

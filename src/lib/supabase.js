@@ -24,7 +24,9 @@ export const supabase = isSupabaseConfigured
 if (supabase) {
   // Gérer les deep links entrants
   Linking.addEventListener('url', ({ url }) => {
-    console.log('🔗 Deep link received in client:', url);
+    // L'URL peut contenir un ?code= OAuth : jamais dans les journaux d'un
+    // build de production (elle est lisible par tout outil qui collecte les logs).
+    if (__DEV__) console.log('🔗 Deep link received in client:', url);
     // Le SDK Supabase traite automatiquement les tokens OAuth
   });
 }

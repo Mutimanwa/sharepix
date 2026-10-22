@@ -7,13 +7,14 @@ import {
   TextInput,
   Modal,
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Dimensions,
-  Animated
+  Keyboard,
+  Animated,
+  Image,
 } from 'react-native';
 import { colors } from '../theme';
+import { useKeyboardSpace } from '../lib/keyboard';
 import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 // ── BUG-03 : SafeAreaView doit venir de react-native-safe-area-context ──
@@ -21,13 +22,9 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 // les écrans Télécharger sur PC / Premium / Membres / QR collaient à la barre
 // de statut. `useSafeAreaInsets` venait déjà du bon paquet.
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { TouchableWithoutFeedback } from 'react-native';
 
 const LOGO = require('../../assets/sharepix-logo.png');
-
-const { width } = Dimensions.get('window');
 
 export function Logo({ size = 42, color = colors.ink }) {
   return (
@@ -107,18 +104,51 @@ export function OutlinePill({ title, onPress, icon, style = {} }) {
   );
 }
 
-export function Field({ label, value, onChangeText, placeholder, autoFocus, secureTextEntry, style = {} }) {
+export function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  autoFocus,
+  secureTextEntry,
+  style = {},
+  // ── Saisie : tout ce qui évite un clavier qui refuse de s'ouvrir ou une
+  // correction automatique qui abîme un code d'invitation / une adresse.
+  inputRef,
+  keyboardType,
+  autoCapitalize = 'none',
+  autoCorrect = false,
+  maxLength,
+  returnKeyType,
+  onSubmitEditing,
+  editable = true,
+  multiline = false,
+  textContentType,
+}) {
   return (
     <View style={[styles.fieldContainer, style]}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         autoFocus={autoFocus}
         secureTextEntry={secureTextEntry}
-        style={styles.input}
+        style={[styles.input, multiline && { maxHeight: 120, textAlignVertical: 'top' }]}
         placeholderTextColor="#B0B0B0"
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        maxLength={maxLength}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        editable={editable}
+        multiline={multiline}
+        textContentType={textContentType}
+        // Android edge-to-edge : sans ça, le clavier peut rester fermé
+        // quand le champ est dans une <Modal>.
+        showSoftInputOnFocus
       />
     </View>
   );
@@ -130,12 +160,16 @@ export function Sheet({
   onClose, 
   title, 
   children,
-  keyboardVerticalOffset = Platform.OS === 'ios' ? 0 : 0,
 }) {
   const scrollRef = useRef(null);
   const insets = useSafeAreaInsets();
+  // Hauteur réelle du clavier (voir src/lib/keyboard.js) : en edge-to-edge,
+  // `adjustResize` est ignoré sur Android et le KAV « height » ne remonte
+  // plus le sheet — les champs restaient sous le clavier.
+  const { space: keyboardSpace } = useKeyboardSpace();
 
   useEffect(() => {
+    if (!visible) Keyboard.dismiss(); // sinon le clavier reste ouvert sur l'écran
     if (visible) {
       // Reset scroll quand le sheet s'ouvre
       setTimeout(() => {
@@ -145,12 +179,16 @@ export function Sheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.sheetWrap}
-        keyboardVerticalOffset={keyboardVerticalOffset}
-      >
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      // Nécessaire sur Android récent : sans ces deux props, la fenêtre du
+      // Modal ne remonte pas avec le clavier et la saisie devient impossible.
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
+      <Animated.View style={[styles.sheetWrap, { paddingBottom: keyboardSpace }]}>
         <Pressable style={styles.sheetOverlay} onPress={onClose} />
         <View style={[styles.sheet , { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.sheetHead}>
@@ -165,13 +203,16 @@ export function Sheet({
             style={styles.sheetContent}
             contentContainerStyle={[styles.sheetContentContainer , { paddingBottom: Math.max(insets.bottom, 20) }]}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            // `always` et non `handled` : le premier tap sur un champ dans
+            // une Modal Android était parfois avalé (clavier qui ne s'ouvre
+            // pas) au lieu d'être transmis au TextInput.
+            keyboardShouldPersistTaps="always"
             scrollEnabled={true}
           >
             {children}
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 }
@@ -181,35 +222,57 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
   const screenW = Dimensions.get('window').width;
   const slideAnim = useRef(new Animated.Value(screenW)).current;
   const [mounted, setMounted] = useState(false);
+  // `mounted` en ref : le lire dans l'effet évite de relancer l'animation
+  // d'ouverture à chaque `setMounted(true)` (double durée sinon).
+  const mountedRef = useRef(false);
 
   useEffect(() => {
+    if (!visible) Keyboard.dismiss(); // sinon le clavier reste ouvert sur l'écran
     if (visible) {
+      mountedRef.current = true;
       setMounted(true);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 280,
         useNativeDriver: true,
       }).start();
-    } else if (mounted) {
+    } else if (mountedRef.current) {
       // Animation de sortie AVANT le démontage (Modal visible={false} coupe net sinon)
       Animated.timing(slideAnim, {
         toValue: screenW,
         duration: 240,
         useNativeDriver: true,
-      }).start(() => setMounted(false));
+      }).start(() => {
+        mountedRef.current = false;
+        setMounted(false);
+      });
     }
-  }, [visible]);
+  }, [visible, screenW, slideAnim]);
+
+  const { space: keyboardSpace } = useKeyboardSpace();
 
   if (!mounted) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <View style={{ flex: 1 }}>
         <Pressable style={styles.rightOverlay} onPress={onClose} />
         <Animated.View
           style={[
             styles.rightContainer,
-            { width, paddingTop: insets.top, transform: [{ translateX: slideAnim }] },
+            {
+              width,
+              paddingTop: insets.top,
+              paddingBottom: keyboardSpace,
+              transform: [{ translateX: slideAnim }],
+            },
           ]}
         >
           {title ? (
@@ -223,7 +286,7 @@ export function RightModal({ visible, onClose, title, children, width = '82%' })
           <ScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
             {children}
@@ -453,7 +516,11 @@ const styles = StyleSheet.create({
   },
     // Right Modal (Menu coulissant)
   rightOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   rightContainer: {

@@ -7,7 +7,9 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+# expo-env.d.ts est VERSIONNÉ : il déclare les modules *.png/*.svg dont
+# dépend tsc. Le regénérer ne doit pas le faire disparaître du dépôt.
+coverage/
 
 # Native
 .kotlin/

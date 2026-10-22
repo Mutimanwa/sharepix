@@ -1,3 +1,4 @@
+// @ts-check
 // ── SUPABASE ALBUMS : intégration ─────────────────────────────────────
 // Repository cloud des albums (étape 2).
 // Règle d'architecture (api.md) : les écrans / le store n'écrivent jamais
@@ -7,6 +8,7 @@
 // bascule en mode 100 % local.
 
 import { supabase } from '../lib/supabase';
+import { randomId } from '../lib/inviteCode';
 
 /** Normalise une ligne Supabase `albums` en objet album de l'app. */
 export function mapCloudAlbum(row) {
@@ -474,7 +476,7 @@ export function subscribeAlbumChanges(albumId, onChange) {
   // Nom de canal UNIQUE par abonné : supabase-js peut rendre un canal déjà
   // souscrit si le nom est identique (écrans Album + Photo en même temps),
   // et ".on()" après "subscribe()" lève une erreur.
-  const topic = `album:${albumId}:${Math.random().toString(36).slice(2, 8)}`;
+  const topic = `album:${albumId}:${randomId().slice(0, 8)}`;
 
   const channel = supabase
     .channel(topic)
@@ -520,7 +522,7 @@ export function subscribePhotosSummary(onChange) {
 
   // Topic unique : voir subscribeAlbumChanges (supabase-js rendrait un
   // canal déjà souscrit sinon, et .on() après subscribe() lève une erreur).
-  const topic = `photos-summary:${Math.random().toString(36).slice(2, 8)}`;
+  const topic = `photos-summary:${randomId().slice(0, 8)}`;
 
   const channel = supabase
     .channel(topic)
@@ -614,7 +616,8 @@ export async function cloudDismissActivities(activityIds) {
 
 /**
  * Realtime du centre d'activités : prévient dès qu'un événement est
- * journalisé dans activity_log (publication activée dans schema.sql §12).
+ * journalisé dans activity_log (trigger trg_activity_photo, voir
+ * supabase/migrations/20261021000000_initial_schema.sql §9).
  * Pas de filtre serveur possible (l'écran agrège plusieurs albums) :
  * la RLS Realtime limite déjà aux albums dont on est membre.
  * `onChange` doit debouncer puis re-fetcher (cloudFetchActivity).
@@ -624,7 +627,7 @@ export function subscribeActivityChanges(onChange) {
 
   // Topic unique : voir subscribeAlbumChanges (supabase-js rendrait un
   // canal déjà souscrit sinon, et .on() après subscribe() lève une erreur).
-  const topic = `activity:${Math.random().toString(36).slice(2, 8)}`;
+  const topic = `activity:${randomId().slice(0, 8)}`;
 
   const channel = supabase
     .channel(topic)

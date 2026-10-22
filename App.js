@@ -11,9 +11,12 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
+import { PlatformPressable } from '@react-navigation/elements';
 import * as Linking from 'expo-linking';
 import { StoreProvider } from './src/store';
+import { initSentry, wrapRoot } from './src/lib/sentry';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import { QrScannerProvider } from './src/components/QrScanner';
 import { colors } from './src/theme';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
@@ -30,6 +33,9 @@ import {
   PremiumScreen,
   PcUploadScreen,
 } from './src/screens/ExtraScreens';
+
+// Avant tout rendu : sans DSN configuré, cette fonction ne fait rien.
+initSentry();
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -102,7 +108,30 @@ function Tabs() {
           height: 52 + insets.bottom,
           paddingBottom: Math.max(insets.bottom, 1),
           paddingTop: 1,
+          // ── Affichage : aucune ombre sous la tab bar ──
+          // @react-navigation applique `elevation: 8` par défaut sur Android,
+          // ce qui dessine une ombre portée sous la barre. On l'annule, ainsi
+          // que l'ombre iOS, pour n'avoir qu'un filet de séparation.
+          elevation: 0,
+          shadowColor: 'transparent',
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          shadowOffset: { width: 0, height: 0 },
+          // ── fin ──
         },
+        // ── Affichage : onde de clic contenue dans l'onglet ──
+        // `BottomTabItem` code en dur `android_ripple: { borderless: true }`,
+        // d'où l'onde qui déborde de l'onglet (« propagation du clic »).
+        // On fournit notre propre bouton : même composant, ripple borné.
+        tabBarButton: (props) => (
+          <PlatformPressable
+            {...props}
+            android_ripple={{ color: 'rgba(59,110,110,0.10)', borderless: false }}
+            pressOpacity={1}
+            style={[props.style, { borderRadius: 12, overflow: 'hidden' }]}
+          />
+        ),
+        // ── fin ──
       }}
     >
       <Tab.Screen
@@ -136,7 +165,7 @@ function Tabs() {
   );
 }
 
-export default function App() {
+function App() {
   // ── Gestion des deep links OAuth ──
   useEffect(() => {
     // Fonction pour traiter les URLs reçues
@@ -197,29 +226,34 @@ export default function App() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <StoreProvider>
-          <NavigationContainer linking={linking}>
-            <StatusBar style="light" />
-            <Stack.Navigator
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.cream },
-              }}
-            >
-              <Stack.Screen name="Splash" component={SplashScreen} />
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-              <Stack.Screen name="Auth" component={AuthScreen} />
-              <Stack.Screen name="Main" component={Tabs} />
-              <Stack.Screen name="Album" component={AlbumScreen} />
-              <Stack.Screen name="Photo" component={PhotoScreen} />
-              <Stack.Screen name="Menu" component={MenuScreen} />
-              <Stack.Screen name="QR" component={QRScreen} />
-              <Stack.Screen name="Members" component={MembersScreen} />
-              <Stack.Screen name="Premium" component={PremiumScreen} />
-              <Stack.Screen name="PcUpload" component={PcUploadScreen} />
-            </Stack.Navigator>
-          </NavigationContainer>
+          <QrScannerProvider>
+            <NavigationContainer linking={linking}>
+              <StatusBar style="light" />
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.cream },
+                }}
+              >
+                <Stack.Screen name="Splash" component={SplashScreen} />
+                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                <Stack.Screen name="Auth" component={AuthScreen} />
+                <Stack.Screen name="Main" component={Tabs} />
+                <Stack.Screen name="Album" component={AlbumScreen} />
+                <Stack.Screen name="Photo" component={PhotoScreen} />
+                <Stack.Screen name="Menu" component={MenuScreen} />
+                <Stack.Screen name="QR" component={QRScreen} />
+                <Stack.Screen name="Members" component={MembersScreen} />
+                <Stack.Screen name="Premium" component={PremiumScreen} />
+                <Stack.Screen name="PcUpload" component={PcUploadScreen} />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </QrScannerProvider>
         </StoreProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
+
+// `wrapRoot` renvoie `App` inchangé quand Sentry n'est pas configuré.
+export default wrapRoot(App);

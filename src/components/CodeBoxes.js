@@ -2,20 +2,33 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
 import { colors } from '../theme';
 
-export default function CodeBoxes({ value, onChange, length = 8, autoFocus = true }) {
+export default function CodeBoxes({
+  value,
+  onChange,
+  length = 8,
+  autoFocus = true,
+  // Délai avant la demande de focus. Dans une <Modal> Android animée, un
+  // focus demandé trop tôt est perdu et le clavier ne s'ouvre jamais :
+  // on attend la fin de l'animation d'ouverture.
+  focusDelay = 450,
+}) {
   const input = useRef(null);
 
   useEffect(() => {
     if (autoFocus) {
-      const t = setTimeout(() => input.current?.focus(), 280);
+      const t = setTimeout(() => input.current?.focus(), focusDelay);
       return () => clearTimeout(t);
     }
-  }, [autoFocus]);
+  }, [autoFocus, focusDelay]);
+
+  // Taper n'importe où dans les cases ramène le clavier (et le réouvre s'il
+  // a été fermé par la barre de navigation), comme un vrai champ OTP.
+  const focusInput = () => input.current?.focus();
 
   const active = Math.min(value.length, length - 1);
 
   return (
-    <Pressable style={styles.wrap} onPress={() => input.current?.focus()}>
+    <Pressable style={styles.wrap} onPressIn={focusInput} onPress={focusInput}>
       <View style={styles.row}>
         {Array.from({ length }).map((_, k) => (
           <View key={k} style={[styles.box, k === active && styles.boxOn, value[k] && styles.boxFilled]}>
@@ -35,6 +48,7 @@ export default function CodeBoxes({ value, onChange, length = 8, autoFocus = tru
         caretHidden
         style={styles.hidden}
         importantForAutofill="no"
+        showSoftInputOnFocus
       />
     </Pressable>
   );

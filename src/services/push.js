@@ -1,6 +1,7 @@
+// @ts-check
 // ── SUPABASE PUSH : intégration ─────────────────────────────────────────
 // Enregistrement des tokens Expo Push dans la table `push_tokens`
-// (schema.sql §13). L'envoi est fait côté serveur par l'Edge Function
+// (migration initiale §8-9). L'envoi est fait côté serveur par l'Edge Function
 // `activity-push` branchée sur activity_log (voir supabase/PUSH.md §2-3).
 //
 // Limites assumées :

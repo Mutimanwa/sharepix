@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 
 // couvertures, avatars… Couleur adaptable (viewer Photo = fond noir).
+/**
+ * @param {{ width?: number|string, height?: number|string, radius?: number,
+ *           color?: string, style?: any }} props
+ */
 export function Skeleton({ width = '100%', height = 16, radius = 8, color = '#E2EEEE', style = {} }) {
   const opacity = useRef(new Animated.Value(0.45)).current;
   useEffect(() => {
@@ -143,7 +147,11 @@ export function ProgressiveImage({
 
 const styles = StyleSheet.create({
   failedBox: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.06)',
