@@ -38,9 +38,60 @@ jobs:
 
       - name: Build APK and Download
         run: |
+          set -euo pipefail
           eas build --platform android --profile preview --non-interactive --json > build-result.json
-          BUILD_URL=$(jq -r '.[0].artifacts.buildUrl // .artifacts.buildUrl' build-result.json)
-          curl -L "$BUILD_URL" -o sharepix-latest.apk
+
+          BUILD_URL="$(jq -er 'if type == "array" then (.[0].artifacts.buildUrl // empty) else (.artifacts.buildUrl // empty) end' build-result.json)"
+          if [[ -z "$BUILD_URL" ]]; then
+            echo "EAS n’a pas fourni d’URL pour l’APK." >&2
+            exit 1
+          fi
+
+          # Les APK dépassent souvent 100 Mio : reprendre le transfert interrompu
+          # dans une nouvelle invocation curl (Range depuis le fichier partiel).
+          download_complete=false
+          for attempt in {1..8}; do
+            if curl \
+              --fail \
+              --location \
+              --show-error \
+              --connect-timeout 30 \
+              --max-time 900 \
+              --continue-at - \
+              --output sharepix-latest.apk \
+              "$BUILD_URL"; then
+              download_complete=true
+              break
+            else
+              curl_status=$?
+              if (( attempt == 8 )); then
+                echo "Échec du téléchargement de l’APK après $attempt tentatives (curl $curl_status)." >&2
+                exit "$curl_status"
+              fi
+              retry_delay=$((attempt * 3))
+              echo "Téléchargement interrompu (curl $curl_status); reprise dans ${retry_delay}s, tentative $((attempt + 1))/8." >&2
+              sleep "$retry_delay"
+            fi
+          done
+
+          if [[ "$download_complete" != true ]]; then
+            echo "Le téléchargement de l’APK n’a pas abouti." >&2
+            exit 1
+          fi
+
+          test -s sharepix-latest.apk
+          python3 - <<'PY'
+          from zipfile import ZipFile
+
+          apk_path = "sharepix-latest.apk"
+          with ZipFile(apk_path) as apk:
+              broken_entry = apk.testzip()
+              if broken_entry:
+                  raise SystemExit(f"APK incomplet ou corrompu : {broken_entry}")
+              if "AndroidManifest.xml" not in apk.namelist():
+                  raise SystemExit("L’artefact téléchargé n’est pas un APK Android valide.")
+          print("APK téléchargé et vérifié.")
+          PY
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
