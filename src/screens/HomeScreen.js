@@ -20,7 +20,13 @@ import { useQrScanner } from '../components/QrScanner';
 import { extractInviteCode } from '../lib/inviteCode';
 import { IconVacances, IconFamille, IconBebe, IconSpecial } from '../components/HomeArt';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Add01Icon, UserAdd01Icon } from '@hugeicons/core-free-icons';
+import {
+  Add01Icon,
+  UserAdd01Icon,
+  KeyboardIcon,
+  QrCodeScanIcon,
+  ArrowRight01Icon,
+} from '@hugeicons/core-free-icons';
 import { useStore } from '../store';
 import { StatusBar } from 'expo-status-bar';
 
@@ -46,6 +52,17 @@ export default function HomeScreen() {
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
+
+  const openCreatePopup = () => {
+    setJoinStage(null);
+    setCreate(true);
+  };
+
+  const openJoinPopup = () => {
+    setCreate(false);
+    setCode('');
+    setJoinStage('options');
+  };
 
   // ── DEEP LINK QR : intégration ──
   // Jointure factorisée : utilisée par le bouton "Continuer" ET par
@@ -145,19 +162,26 @@ export default function HomeScreen() {
         </View> 
 
         {/* Actions Buttons */}
-        <View style={[styles.actions,{paddingBottom: 10}]}>
-          <TouchableOpacity style={[styles.actCoral]} onPress={() => setCreate(true)} activeOpacity={0.88}>
+        <View style={[styles.actions, { paddingBottom: 10 }]} collapsable={false}>
+          <TouchableOpacity
+            style={styles.actCoral}
+            onPress={openCreatePopup}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Créer un nouvel album"
+            testID="home-create-album"
+          >
             <HugeiconsIcon icon={Add01Icon} size={22} color={colors.coral} strokeWidth={2} />
-            <Text style={[styles.actTitle , {color: colors.coral}]}>Nouvel album</Text>
+            <Text style={[styles.actTitle, { color: colors.coral }]}>Nouvel album</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actTeal}
-            onPress={() => {
-              setCode('');
-              setJoinStage('options');
-            }}
+            onPress={openJoinPopup}
             activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Rejoindre un album"
+            testID="home-join-album"
           >
             <HugeiconsIcon icon={UserAdd01Icon} size={22} color={colors.tealDark} strokeWidth={2} />
             <Text style={[styles.actTitle , {color: colors.tealDark}]}>Rejoindre</Text>
@@ -240,7 +264,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* Sheet Créer */}
-      <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album" inline>
+      <Sheet visible={create} onClose={() => setCreate(false)} title="Personnalisez votre album">
         <Field
           label="Nom de l'album"
           value={name}
@@ -283,25 +307,53 @@ export default function HomeScreen() {
           setCode('');
         }}
         title={joinStage === 'options' ? 'Rejoindre un album' : 'Saisir le code'}
-        inline
       >
         {joinStage === 'options' ? (
-          <>
-            <Text style={styles.sheetHint}>Comment souhaitez-vous rejoindre l’album ?</Text>
-            <CoralButton
-              title="Saisir un code à 8 caractères"
+          <View style={styles.joinOptions}>
+            <Text style={styles.joinIntro}>
+              Choisissez comment vous avez reçu l’invitation.
+            </Text>
+            <TouchableOpacity
+              style={styles.joinOption}
+              activeOpacity={0.78}
               onPress={() => {
                 setCode('');
                 setJoinStage('code');
               }}
-            />
-            <CoralButton
-              title="Scanner un QR code"
-              color={colors.teal}
-              style={{ marginTop: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel="Saisir un code"
+              accessibilityHint="Entrez le code à 8 caractères reçu avec l’invitation."
+              testID="home-join-by-code"
+            >
+              <View style={[styles.joinOptionIcon, styles.joinCodeIcon]}>
+                <HugeiconsIcon icon={KeyboardIcon} size={23} color={colors.tealDark} strokeWidth={1.8} />
+              </View>
+              <View style={styles.joinOptionCopy}>
+                <Text style={styles.joinOptionTitle}>Saisir un code</Text>
+                <Text style={styles.joinOptionDescription}>Entrez le code à 8 caractères reçu.</Text>
+              </View>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={20} color={colors.muted} strokeWidth={1.8} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.joinOption}
+              activeOpacity={0.78}
               onPress={openJoinQrScanner}
-            />
-          </>
+              accessibilityRole="button"
+              accessibilityLabel="Scanner un QR code"
+              accessibilityHint="Ouvre l’appareil photo pour scanner une invitation SharePix."
+              testID="home-join-by-qr"
+            >
+              <View style={[styles.joinOptionIcon, styles.joinQrIcon]}>
+                <HugeiconsIcon icon={QrCodeScanIcon} size={23} color={colors.coralDark} strokeWidth={1.8} />
+              </View>
+              <View style={styles.joinOptionCopy}>
+                <Text style={styles.joinOptionTitle}>Scanner un QR code</Text>
+                <Text style={styles.joinOptionDescription}>Scannez le code partagé par l’organisateur.</Text>
+              </View>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={20} color={colors.muted} strokeWidth={1.8} />
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             <TouchableOpacity
@@ -336,10 +388,18 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   sub: { color: colors.muted, marginTop: 4, fontSize: 14 },
-  actions: { flexDirection: 'row', gap: 10, paddingHorizontal: 18, marginTop: 18 },
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 18,
+    marginTop: 18,
+    position: 'relative',
+    zIndex: 10,
+    elevation: 10,
+  },
   actCoral: {
     flex: 1,
-    height: 40,
+    minHeight: 48,
     color: colors.coral,
     borderColor: colors.coral,
     borderWidth: 1,
@@ -351,7 +411,7 @@ const styles = StyleSheet.create({
   },
   actTeal: {
     flex: 1,
-    height: 40,
+    minHeight: 48,
     color: colors.tealDark,
     borderColor: colors.tealDark,
     borderWidth: 1,
@@ -407,10 +467,51 @@ const styles = StyleSheet.create({
   coverImg: { width: '100%', height: '100%' },
   albumName: { fontSize: 19, fontWeight: '600', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
   albumMeta: { color: colors.muted, paddingHorizontal: 4, marginTop: 2 },
-  sheetHint: { 
-    textAlign: 'center', 
-    marginVertical: 10, 
-    fontSize: 14, 
+  sheetHint: {
+    textAlign: 'center',
+    marginVertical: 10,
+    fontSize: 14,
     color: colors.muted,
+  },
+  joinOptions: { paddingTop: 2, paddingBottom: 4 },
+  joinIntro: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginHorizontal: 2,
+    marginBottom: 14,
+  },
+  joinOption: {
+    minHeight: 84,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 13,
+    marginBottom: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+  },
+  joinOptionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  joinCodeIcon: { backgroundColor: colors.peach },
+  joinQrIcon: { backgroundColor: '#FBEDE9' },
+  joinOptionCopy: { flex: 1, paddingRight: 8 },
+  joinOptionTitle: {
+    color: colors.tealDark,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  joinOptionDescription: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
   },
 });

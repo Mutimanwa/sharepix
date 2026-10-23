@@ -11,6 +11,8 @@ import {
   Platform,
   Keyboard,
   KeyboardAvoidingView,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -21,14 +23,12 @@ import {
   Download01Icon,
   SentIcon,
 } from '@hugeicons/core-free-icons';
-import * as FileSystem from 'expo-file-system/legacy'; // API classique (downloadAsync) conservée par Expo
-import * as MediaLibrary from 'expo-media-library/legacy';
 import { colors } from '../theme';
 import { useKeyboardStatus } from '../lib/keyboard';
-import { classifyPhotoUri } from '../lib/photoUri';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
 import { subscribeAlbumChanges, cloudPhotoUrl } from '../services/albums';
+import { requestSharePixGalleryPermission, savePhotoToSharePix } from '../services/galleryDownloads';
 // ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
 // ── SQUELETTES : intégration ──
@@ -96,6 +96,7 @@ export default function PhotoScreen({ route, navigation }) {
   const [likedComments, setLikedComments] = useState({});
   const [replyTo, setReplyTo] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   // Garde-fou si la liste rétrécit (suppression, synchro)
   const safeIndex = Math.min(currentIndex, Math.max(photos.length - 1, 0));
@@ -205,33 +206,23 @@ export default function PhotoScreen({ route, navigation }) {
   const download = async () => {
     if (!currentPhoto || downloading) return;
 
-    const extensionFromPath = (value) => {
-      const clean = String(value || '').split('?')[0];
-      const match = clean.match(/\.([a-zA-Z0-9]{2,5})$/);
-      return match ? match[1].toLowerCase() : 'jpg';
-    };
-    const extension = extensionFromPath(currentPhoto.storagePath || currentPhoto.uri);
-    const filename = `SharePix-${currentPhoto.id}.${extension}`;
+    const photoId = String(currentPhoto.id || 'photo').replace(/[^a-zA-Z0-9_-]/g, '') || 'photo';
+    const sourcePath = currentPhoto.storagePath || currentPhoto.uri || '';
+    const extensionMatch = String(sourcePath).split(/[?#]/)[0].match(/\.([a-zA-Z0-9]{2,5})$/);
+    const filename = `SharePix-${photoId}.${extensionMatch?.[1]?.toLowerCase() || 'jpg'}`;
     const showMessage = (title, message) => {
       if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`);
       else Alert.alert(title, message);
     };
 
     try {
-      setDownloading(true);
-
-      // Les URLs Supabase sont temporaires (1 h). On récupère une URL encore
-      // valide à partir du chemin du Storage plutôt que de réutiliser une URL
-      // potentiellement expirée restée dans l'écran.
-      const sourceUri = currentPhoto.storagePath
-        ? await cloudPhotoUrl(currentPhoto.storagePath)
-        : currentPhoto.uri;
-      if (!sourceUri) throw new Error("La photo n'est plus disponible. Actualisez l'album puis réessayez.");
-
+      setDownloadProgress(0);
       if (Platform.OS === 'web') {
-        // Le lien download seul est ignoré pour une URL de domaine différent.
-        // Passer par un Blob force un vrai téléchargement au lieu d'ouvrir
-        // l'image dans un nouvel onglet.
+        setDownloading(true);
+        const sourceUri = currentPhoto.storagePath
+          ? await cloudPhotoUrl(currentPhoto.storagePath)
+          : currentPhoto.uri;
+        if (!sourceUri) throw new Error("La photo n'est plus disponible. Actualisez l'album puis réessayez.");
         const response = await fetch(sourceUri);
         if (!response.ok) throw new Error(`Le serveur a refusé le téléchargement (${response.status}).`);
         const blob = await response.blob();
@@ -242,55 +233,31 @@ export default function PhotoScreen({ route, navigation }) {
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        // Laisser le navigateur commencer la lecture avant de libérer le Blob.
         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
         return;
       }
 
-      const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
-      if (!permission.granted) {
-        showMessage(
-          'Autorisation requise',
-          "SharePix a besoin de l'accès aux photos pour les enregistrer dans votre galerie."
-        );
-        return;
-      }
-
-      let saveUri = sourceUri;
-      const sourceType = classifyPhotoUri(sourceUri);
-      if (sourceType === 'remote') {
-        const target = `${FileSystem.cacheDirectory}${filename}`;
-        const existing = await FileSystem.getInfoAsync(target);
-        if (existing.exists) await FileSystem.deleteAsync(target, { idempotent: true });
-
-        const result = await FileSystem.downloadAsync(sourceUri, target);
-        if (result.status < 200 || result.status >= 300) {
-          throw new Error(`Le serveur a refusé le téléchargement (${result.status}).`);
-        }
-        saveUri = result.uri;
-      } else if (sourceType === 'file') {
-        // Une photo choisie localement est déjà un fichier : downloadAsync
-        // n'accepte que HTTP(S), il faut l'envoyer directement à MediaLibrary.
-        const localFile = await FileSystem.getInfoAsync(sourceUri);
-        if (!localFile.exists) throw new Error("Le fichier photo n'existe plus sur cet appareil.");
-      } else if (sourceType === 'content') {
-        // Certains sélecteurs Android exposent une URI content:// ; la copier
-        // en cache fournit un vrai fichier local à la bibliothèque média.
-        const target = `${FileSystem.cacheDirectory}${filename}`;
-        const existing = await FileSystem.getInfoAsync(target);
-        if (existing.exists) await FileSystem.deleteAsync(target, { idempotent: true });
-        await FileSystem.copyAsync({ from: sourceUri, to: target });
-        saveUri = target;
-      } else {
-        throw new Error('Format de photo non pris en charge pour l’enregistrement.');
-      }
-
-      await MediaLibrary.saveToLibraryAsync(saveUri);
-      showMessage('Téléchargement terminé', 'La photo a été enregistrée dans votre galerie.');
+      await requestSharePixGalleryPermission();
+      setDownloading(true);
+      await savePhotoToSharePix(currentPhoto, {
+        permissionGranted: true,
+        onProgress: (fraction) => {
+          if (typeof fraction === 'number') setDownloadProgress(Math.round(fraction * 100));
+        },
+      });
+      showMessage(
+        'Téléchargement terminé',
+        'La photo a été enregistrée dans l’album SharePix. Sur Android, retrouvez-la dans Pictures/SharePix.'
+      );
     } catch (error) {
-      showMessage('Téléchargement impossible', error?.message || 'Vérifiez votre connexion puis réessayez.');
+      const permissionDenied = /autorisez l’accès aux photos/i.test(error?.message || '');
+      showMessage(
+        permissionDenied ? 'Autorisation requise' : 'Téléchargement impossible',
+        error?.message || 'Vérifiez votre connexion puis réessayez.'
+      );
     } finally {
       setDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -596,6 +563,26 @@ export default function PhotoScreen({ route, navigation }) {
         {renderCommentInput()}
       </KeyboardAvoidingView>
 
+      <Modal
+        visible={downloading && Platform.OS !== 'web'}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.downloadOverlay}>
+          <View style={styles.downloadCard}>
+            <ActivityIndicator size="small" color={colors.teal} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.downloadTitle}>Enregistrement dans SharePix…</Text>
+              <Text style={styles.downloadSub}>{downloadProgress}% terminé</Text>
+              <View style={styles.downloadTrack}>
+                <View style={[styles.downloadFill, { width: `${Math.max(downloadProgress, 4)}%` }]} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Confirmation suppression */}
       <Sheet visible={del} onClose={() => setDel(false)} title="Supprimer">
         <View style={styles.delIco}>
@@ -619,6 +606,30 @@ export default function PhotoScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#fff' },
   mainContent: { flex: 1 },
+  downloadOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  downloadCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  downloadTitle: { color: colors.tealDark, fontWeight: '700', fontSize: 14 },
+  downloadSub: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  downloadTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#D7E8E8',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  downloadFill: { height: '100%', borderRadius: 3, backgroundColor: colors.teal },
 
   top: {
     flexDirection: 'row',

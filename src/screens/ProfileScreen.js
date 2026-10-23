@@ -7,7 +7,10 @@ import {
   Camera01Icon, 
   ArrowRight01Icon, 
   CheckmarkBadge01Icon,
-  Delete02Icon
+  Delete02Icon,
+  BubbleChatQuestionIcon,
+  FileTextIcon,
+  Shield01Icon,
 } from '@hugeicons/core-free-icons';
 import { Field } from '../components/UI';
 import { useStore } from '../store';
@@ -444,6 +447,7 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.card}>
           <LocalInfoAccordion
             title="FAQ - Questions fréquentes"
+            icon={BubbleChatQuestionIcon}
             intro="Réponses aux questions courantes sur SharePix."
             sections={FAQ_SECTIONS}
           />
@@ -453,12 +457,14 @@ export default function ProfileScreen({ navigation }) {
           />
           <LocalInfoAccordion
             title="Conditions générales d’utilisation"
+            icon={FileTextIcon}
             intro={TERMS_INTRO}
             updatedAt="Dernière mise à jour : août 2026"
             sections={TERMS_SECTIONS}
           />
           <LocalInfoAccordion
             title="Politique de confidentialité"
+            icon={Shield01Icon}
             intro={PRIVACY_INTRO}
             updatedAt="Dernière mise à jour : août 2026"
             sections={PRIVACY_SECTIONS}
