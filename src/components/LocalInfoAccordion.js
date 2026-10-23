@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
 
 /** Groupe d'informations dépliant, intégré dans l'écran (sans navigateur). */
-export default function LocalInfoAccordion({ title, intro, sections, updatedAt, isLast = false }) {
+export default function LocalInfoAccordion({ title, intro, sections, updatedAt, icon, isLast = false }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -15,12 +17,22 @@ export default function LocalInfoAccordion({ title, intro, sections, updatedAt, 
         accessibilityState={{ expanded }}
       >
         <View style={styles.heading}>
-          <Text style={styles.title}>{title}</Text>
-          {updatedAt ? <Text style={styles.updated}>{updatedAt}</Text> : null}
+          {icon ? (
+            <View style={styles.leadingIcon}>
+              <HugeiconsIcon icon={icon} size={19} color={colors.tealDark} />
+            </View>
+          ) : null}
+          <View style={styles.headingCopy}>
+            <Text style={styles.title}>{title}</Text>
+            {updatedAt ? <Text style={styles.updated}>{updatedAt}</Text> : null}
+          </View>
         </View>
-        <Text style={styles.chevron} accessibilityElementsHidden>
-          {expanded ? '⌃' : '⌄'}
-        </Text>
+        <HugeiconsIcon
+          icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
+          size={19}
+          color={colors.teal}
+          accessibilityElementsHidden
+        />
       </Pressable>
 
       {expanded ? (
@@ -47,10 +59,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
   },
-  heading: { flex: 1, paddingRight: 12 },
+  heading: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 12 },
+  leadingIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: '#EAF5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headingCopy: { flex: 1 },
   title: { color: colors.tealDark, fontSize: 15, fontWeight: '600' },
   updated: { color: colors.muted, fontSize: 11, marginTop: 3 },
-  chevron: { color: colors.teal, fontSize: 24, lineHeight: 26, width: 28, textAlign: 'center' },
   body: { paddingBottom: 14, paddingTop: 2 },
   intro: { color: colors.muted, fontSize: 13, lineHeight: 20, marginBottom: 12 },
   section: { marginTop: 10 },
