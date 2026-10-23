@@ -149,6 +149,11 @@ export default function HomeScreen() {
   }, [route.params?.code, state.authChecked, nav]);
   // ── DEEP LINK QR : fin ──
 
+  // Les albums cloud sont ordonnés du plus récent au plus ancien par le store.
+  const featuredAlbum = state.albums[0] || null;
+  const featuredPhoto = featuredAlbum?.photos?.[0];
+  const featuredCover = featuredPhoto?.uri || featuredAlbum?.coverUrl;
+
   return (
     // ── BUG-03 : plus de compensation manuelle — Page applique l'inset top
     // via SafeAreaView (react-native-safe-area-context). La garder ici
@@ -156,13 +161,70 @@ export default function HomeScreen() {
     <Page style={styles.root} edges={['top', 'left', 'right']}>
       <StatusBar style='dark' />
 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
-          <Logo size={36} />
-          <Text style={styles.sub}>Vos souvenirs, en un seul endroit</Text>
-        </View> 
+          <View style={styles.brandRow}>
+            <Logo size={31} />
+            <View style={styles.brandBadge}>
+              <Text style={styles.brandBadgeText}>ALBUMS PARTAGÉS</Text>
+            </View>
+          </View>
+          <Text style={styles.greeting}>
+            {state.profile.firstName ? `Bonjour, ${state.profile.firstName}` : 'Bienvenue sur SharePix'}
+          </Text>
+          <Text style={styles.sub}>Vos moments préférés, réunis au même endroit.</Text>
+        </View>
 
-        {/* Actions Buttons */}
-        <View style={[styles.actions, { paddingBottom: 10 }]} collapsable={false}>
+        <View style={styles.heroCard}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>
+              {featuredAlbum ? 'VOTRE DERNIER ALBUM' : 'DES SOUVENIRS À PARTAGER'}
+            </Text>
+            <Text style={styles.heroTitle} numberOfLines={3}>
+              {featuredAlbum ? featuredAlbum.name : 'Chaque moment mérite d’être partagé.'}
+            </Text>
+            <Text style={styles.heroDescription} numberOfLines={3}>
+              {featuredAlbum
+                ? 'Vos photos restent réunies ici. Ouvrez votre album pour continuer.'
+                : 'Créez un album privé et rassemblez les photos de toute la famille.'}
+            </Text>
+            {featuredAlbum ? (
+              <TouchableOpacity
+                style={styles.heroLink}
+                activeOpacity={0.75}
+                onPress={() => nav.navigate('Album', { id: featuredAlbum.id })}
+                accessibilityRole="button"
+                accessibilityLabel={`Ouvrir l’album ${featuredAlbum.name}`}
+              >
+                <Text style={styles.heroLinkText}>Ouvrir l’album</Text>
+                <HugeiconsIcon icon={ArrowRight01Icon} size={17} color={colors.tealDark} strokeWidth={2} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={styles.heroVisual}>
+            {featuredCover ? (
+              <ProgressiveImage
+                uri={featuredCover}
+                storagePath={featuredPhoto?.storagePath}
+                style={styles.heroPhoto}
+                radius={18}
+              />
+            ) : (
+              <Image
+                source={require('../../assets/ilustration/01.png')}
+                style={styles.heroIllustration}
+                resizeMode="contain"
+                accessibilityLabel="Des proches qui partagent un album photo"
+              />
+            )}
+          </View>
+        </View>
+
+        <View style={styles.actions} collapsable={false}>
           <TouchableOpacity
             style={styles.actCoral}
             onPress={openCreatePopup}
@@ -171,8 +233,8 @@ export default function HomeScreen() {
             accessibilityLabel="Créer un nouvel album"
             testID="home-create-album"
           >
-            <HugeiconsIcon icon={Add01Icon} size={22} color={colors.coral} strokeWidth={2} />
-            <Text style={[styles.actTitle, { color: colors.coral }]}>Nouvel album</Text>
+            <HugeiconsIcon icon={Add01Icon} size={21} color={colors.white} strokeWidth={2.2} />
+            <Text style={[styles.actTitle, { color: colors.white }]}>Créer un album</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -183,84 +245,104 @@ export default function HomeScreen() {
             accessibilityLabel="Rejoindre un album"
             testID="home-join-album"
           >
-            <HugeiconsIcon icon={UserAdd01Icon} size={22} color={colors.tealDark} strokeWidth={2} />
-            <Text style={[styles.actTitle , {color: colors.tealDark}]}>Rejoindre</Text>
+            <HugeiconsIcon icon={UserAdd01Icon} size={21} color={colors.tealDark} strokeWidth={2} />
+            <Text style={[styles.actTitle, { color: colors.tealDark }]}>Rejoindre</Text>
           </TouchableOpacity>
         </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={{ paddingBottom: 28 }}
-        keyboardShouldPersistTaps="handled"
-      >
-
-        {/* Idee d'albums */}
-        <Text style={styles.h}>Idées d'albums</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
-          {suggestions.map((s) => {
-            const Ico = s.Icon;
-            return (
-              <TouchableOpacity
-                key={s.title}
-                style={[styles.idea, { backgroundColor: s.bg }]}
-                onPress={() => {
-                  setName(s.title);
-                  setCreate(true);
-                }}
-              >
-                <Ico />
-                <View style={{ flex: 1, justifyContent: 'center' }}>
-                  <Text style={styles.ideaT}>{s.title}</Text>
-                  <Text style={styles.ideaS}>{s.sub}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Albums */}
-        <View style={styles.rowHead}>
-          <Text style={styles.h}>Mes albums</Text>
+        <View style={styles.sectionHead}>
+          <View>
+            <Text style={styles.sectionTitle}>Mes albums</Text>
+            <Text style={styles.sectionSubtitle}>
+              {state.albums.length > 0 ? 'Tous vos souvenirs partagés.' : 'Ils apparaîtront ici.'}
+            </Text>
+          </View>
           <Text style={styles.count}>{state.albums.length}</Text>
         </View>
 
         {state.albums.length === 0 ? (
           <View style={styles.empty}>
-            <View >
-               <Image source={require('../../assets/empty/album.png')} style={{ width: 120, height: 120 }} />
+            <View style={styles.emptyIcon}>
+              <HugeiconsIcon icon={Add01Icon} size={23} color={colors.tealDark} strokeWidth={2} />
             </View>
-            <Text style={styles.emptyT}>Aucun album pour le moment</Text>
-            <Text style={styles.emptyS}>Créez le premier ou rejoignez un proche.</Text>
+            <View style={styles.emptyCopy}>
+              <Text style={styles.emptyT}>Votre premier album vous attend</Text>
+              <Text style={styles.emptyS}>Créez-le ou rejoignez l’album d’un proche pour commencer.</Text>
+            </View>
           </View>
         ) : (
           <View style={styles.grid}>
-            {state.albums.map((a) => (
-              <TouchableOpacity key={a.id} style={styles.album} onPress={() => nav.navigate('Album', { id: a.id })}>
+            {state.albums.map((album) => (
+              <TouchableOpacity
+                key={album.id}
+                style={styles.album}
+                onPress={() => nav.navigate('Album', { id: album.id })}
+                activeOpacity={0.84}
+                accessibilityRole="button"
+                accessibilityLabel={`Ouvrir l’album ${album.name}`}
+              >
                 <View style={styles.cover}>
-                  {/* ── COUVERTURE ACCUEIL : photos chargées (album déjà ouvert)
-                      sinon couverture cloud pré-signée au boot (coverUrl) ── */}
-                  {(a.photos[0]?.uri || a.coverUrl) ? (
-                    // ── SQUELETTES : intégration ──
+                  {album.photos[0]?.uri || album.coverUrl ? (
                     <ProgressiveImage
-                      uri={a.photos[0]?.uri || a.coverUrl}
-                      storagePath={a.photos[0]?.storagePath}
+                      uri={album.photos[0]?.uri || album.coverUrl}
+                      storagePath={album.photos[0]?.storagePath}
                       style={styles.coverImg}
-                      radius={5}
+                      radius={16}
                     />
-                    // ── SQUELETTES : fin ──
                   ) : (
-                    <Image source={require('../../assets/empty/photo.png')} style={{ width: 150, height: 150 }} />
+                    <Image
+                      source={require('../../assets/empty/photo.png')}
+                      style={styles.coverPlaceholder}
+                      resizeMode="contain"
+                    />
                   )}
                 </View>
-                <Text style={styles.albumName} numberOfLines={1}>{a.name}</Text>
+                <Text style={styles.albumName} numberOfLines={1}>{album.name}</Text>
                 <Text style={styles.albumMeta}>
-                  {/* photos chargées (album ouvert) sinon compteur cloud pré-chargé (photoCount) */}
-                  {a.photos.length || a.photoCount || 0} photo{(a.photos.length || a.photoCount || 0) > 1 ? 's' : ''}
+                  {album.photos.length || album.photoCount || 0} photo{(album.photos.length || album.photoCount || 0) > 1 ? 's' : ''}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
+
+        <View style={styles.ideasSection}>
+          <View style={styles.sectionHead}>
+            <View>
+              <Text style={styles.sectionTitle}>Idées d’albums</Text>
+              <Text style={styles.sectionSubtitle}>Une occasion pour chaque souvenir.</Text>
+            </View>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ideasList}
+          >
+            {suggestions.map((suggestion) => {
+              const SuggestionIcon = suggestion.Icon;
+              return (
+                <TouchableOpacity
+                  key={suggestion.title}
+                  style={[styles.idea, { backgroundColor: suggestion.bg }]}
+                  onPress={() => {
+                    setName(suggestion.title);
+                    setCreate(true);
+                  }}
+                  activeOpacity={0.84}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Créer un album ${suggestion.title}`}
+                >
+                  <SuggestionIcon size={76} />
+                  <View style={styles.ideaCopy}>
+                    <Text style={styles.ideaT}>{suggestion.title}</Text>
+                    <Text style={styles.ideaS}>{suggestion.sub}</Text>
+                  </View>
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={colors.tealDark} strokeWidth={1.8} />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </ScrollView>
 
       {/* Sheet Créer */}
@@ -379,94 +461,177 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, },
-  header: {
-    display: 'flex',
-    flexDirection: 'column' ,
+  root: { flex: 1, backgroundColor: colors.white },
+  content: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 680,
     paddingHorizontal: 18,
-    paddingTop: 3,
-    alignItems: 'center'
+    paddingTop: 8,
+    paddingBottom: 32,
   },
-  sub: { color: colors.muted, marginTop: 4, fontSize: 14 },
-  actions: {
+  header: { marginBottom: 18 },
+  brandRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 18,
-    marginTop: 18,
-    position: 'relative',
-    zIndex: 10,
-    elevation: 10,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
+  brandBadge: {
+    backgroundColor: colors.peach,
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  brandBadgeText: {
+    color: colors.tealDark,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  greeting: {
+    color: colors.tealDark,
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: '700',
+    letterSpacing: -0.35,
+  },
+  sub: { color: colors.muted, marginTop: 3, fontSize: 14, lineHeight: 20 },
+  heroCard: {
+    minHeight: 202,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: colors.peach,
+    borderRadius: 24,
+    padding: 17,
+    marginBottom: 16,
+  },
+  heroCopy: { flex: 1, zIndex: 1 },
+  heroEyebrow: {
+    color: colors.tealDark,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.75,
+    marginBottom: 7,
+  },
+  heroTitle: {
+    color: colors.tealDeep,
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '700',
+    letterSpacing: -0.25,
+  },
+  heroDescription: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 7,
+  },
+  heroLink: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  heroLinkText: { color: colors.tealDark, fontSize: 12, fontWeight: '700', marginRight: 3 },
+  heroVisual: {
+    width: '41%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 3,
+  },
+  heroIllustration: { width: 142, height: 158 },
+  heroPhoto: { width: '100%', height: 146, borderRadius: 18 },
+  actions: { flexDirection: 'row', gap: 10, marginBottom: 25 },
   actCoral: {
     flex: 1,
-    minHeight: 48,
-    color: colors.coral,
-    borderColor: colors.coral,
-    borderWidth: 1,
-    borderRadius: 30,
-    padding: 10,
+    minHeight: 52,
+    backgroundColor: colors.coralDark,
+    borderRadius: 17,
+    paddingHorizontal: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actTeal: {
     flex: 1,
-    minHeight: 48,
-    color: colors.tealDark,
-    borderColor: colors.tealDark,
-    borderWidth: 1,
-    borderRadius: 30,
-    padding: 10,
+    minHeight: 52,
+    backgroundColor: colors.white,
+    borderColor: colors.teal,
+    borderWidth: 1.5,
+    borderRadius: 17,
+    paddingHorizontal: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginLeft: 8 },
-  h: { fontSize: 17, fontWeight: '600', color: colors.tealDark, paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
-  idea: {
-    width: 300,
-    borderRadius: 5,
-    padding: 14,
-    marginLeft: 18,
+  actTitle: { fontSize: 13, fontWeight: '700', marginLeft: 7 },
+  sectionHead: {
     flexDirection: 'row',
-    gap: 15,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
   },
-  ideaT: { fontWeight: '700', color: colors.tealDark, fontSize: 15 },
-  ideaS: { color: '#434848', marginTop: 4, fontSize: 15 },
-  rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18 },
+  sectionTitle: { color: colors.tealDark, fontSize: 19, lineHeight: 24, fontWeight: '700' },
+  sectionSubtitle: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2 },
   count: {
-    marginTop: 10,
-    backgroundColor: colors.teal,
-    color: '#fff',
+    minWidth: 31,
+    textAlign: 'center',
     overflow: 'hidden',
+    backgroundColor: colors.peach,
+    color: colors.tealDark,
     paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-    fontWeight: '600',
+    paddingVertical: 5,
+    borderRadius: 14,
+    fontSize: 12,
+    fontWeight: '700',
   },
   empty: {
-    marginHorizontal: 18,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 22,
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: colors.cream,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 15,
   },
-  emptyT: { fontWeight: '700', color: colors.tealDark },
-  emptyS: { color: colors.muted, marginTop: 6, textAlign: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: colors.peach,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
+  emptyCopy: { flex: 1 },
+  emptyT: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
+  emptyS: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
   album: { width: '50%', padding: 6 },
   cover: {
-    height: 150,
-    borderRadius: 5,
+    height: 148,
+    borderRadius: 16,
     backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   coverImg: { width: '100%', height: '100%' },
-  albumName: { fontSize: 19, fontWeight: '600', marginTop: 8, color: colors.tealDark, paddingHorizontal: 4 },
-  albumMeta: { color: colors.muted, paddingHorizontal: 4, marginTop: 2 },
+  coverPlaceholder: { width: 94, height: 94 },
+  albumName: { fontSize: 15, lineHeight: 20, fontWeight: '700', marginTop: 8, color: colors.tealDark },
+  albumMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  ideasSection: { marginTop: 25 },
+  ideasList: { paddingRight: 18, gap: 10 },
+  idea: {
+    width: 260,
+    minHeight: 105,
+    borderRadius: 20,
+    padding: 12,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  ideaCopy: { flex: 1 },
+  ideaT: { fontWeight: '700', color: colors.tealDark, fontSize: 15 },
+  ideaS: { color: colors.muted, marginTop: 4, fontSize: 12, lineHeight: 16 },
   sheetHint: {
     textAlign: 'center',
     marginVertical: 10,
@@ -503,15 +668,6 @@ const styles = StyleSheet.create({
   joinCodeIcon: { backgroundColor: colors.peach },
   joinQrIcon: { backgroundColor: '#FBEDE9' },
   joinOptionCopy: { flex: 1, paddingRight: 8 },
-  joinOptionTitle: {
-    color: colors.tealDark,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  joinOptionDescription: {
-    color: colors.muted,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 4,
-  },
+  joinOptionTitle: { color: colors.tealDark, fontSize: 15, fontWeight: '700' },
+  joinOptionDescription: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 4 },
 });
