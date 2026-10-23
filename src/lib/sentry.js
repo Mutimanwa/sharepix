@@ -1,20 +1,12 @@
 // @ts-check
 // ── Sentry : rapport de crash, facultatif ───────────────────────────────
-//
-// La politique de confidentialité publiée annonce Sentry ; le code ne
-// l'avait pas. Ce module comble l'écart sans rendre le service obligatoire :
-// **sans `EXPO_PUBLIC_SENTRY_DSN`, rien n'est initialisé** et l'application
-// se comporte exactement comme avant.
-//
-// Créer le DSN :
-//   sentry.io → Projects → Create project → React Native
-//   puis `.env` : EXPO_PUBLIC_SENTRY_DSN=https://…@o…ingest.sentry.io/…
-//
-// Le SDK est natif : il faut un build (EAS / dev client), pas Expo Go.
+// Sans `EXPO_PUBLIC_SENTRY_DSN`, Sentry n'est pas initialisé.
 
 import * as Sentry from '@sentry/react-native';
+import { sanitizeSentryData } from './sentrySanitization';
 
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
+const SENTRY_ENVIRONMENT = process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT || '';
 
 /** Vrai si un DSN est configuré. */
 export const isSentryEnabled = Boolean(DSN);
@@ -28,31 +20,32 @@ export function initSentry() {
 
   Sentry.init({
     dsn: DSN,
-    environment: __DEV__ ? 'development' : 'production',
+    // Permet de distinguer les builds Preview de Production sans publier
+    // d'identifiants différents ni modifier l'app entre les deux profils.
+    environment: SENTRY_ENVIRONMENT || (__DEV__ ? 'development' : 'production'),
 
-    // Échantillonnage volontairement bas : on veut repérer les régressions,
-    // pas financer un service d'observabilité.
+    // Échantillonnage volontairement bas pour le suivi de performance.
     tracesSampleRate: 0.1,
 
-    // Aucune donnée personnelle dans un service tiers : ni e-mail, ni nom,
-    // ni contenu. Les identifiants d'album suffisent au diagnostic.
+    // Ne pas envoyer automatiquement les données personnelles usuelles.
     sendDefaultPii: false,
 
-    // Une URL de retour OAuth (`sharepix://auth/callback?code=…`) est un
-    // justificatif à usage unique : elle ne doit jamais sortir de l'appareil.
+    // Les liens SharePix peuvent contenir des codes d'album ou des données
+    // d'authentification dans la query ou le fragment. Échec du filtre =
+    // abandon de l'événement (fail closed), jamais envoi de la valeur brute.
     beforeSend(event) {
       try {
-        const dropUrl = (holder) => {
-          if (holder && typeof holder.url === 'string' && /[?&]code=/.test(holder.url)) {
-            holder.url = holder.url.split('?')[0];
-          }
-        };
-        dropUrl(event.request);
-        for (const crumb of event.breadcrumbs || []) dropUrl(crumb.data);
+        return sanitizeSentryData(event);
       } catch {
-        // Le filtre ne doit jamais empêcher l'envoi d'un rapport.
+        return null;
       }
-      return event;
+    },
+    beforeBreadcrumb(crumb) {
+      try {
+        return sanitizeSentryData(crumb);
+      } catch {
+        return null;
+      }
     },
   });
 }

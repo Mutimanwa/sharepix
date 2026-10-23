@@ -64,6 +64,22 @@
             "photo"
           ]
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#164E52",
+          "defaultChannel": "sharepix-activity"
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "calvindev",
+          "project": "sharepix",
+          "url": "https://sentry.io/"
+        }
       ]
     ],
     "extra": {

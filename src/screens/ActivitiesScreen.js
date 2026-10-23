@@ -7,6 +7,8 @@ import {
   Image,
   TouchableOpacity,
   RefreshControl,
+  Alert,
+  Linking,
 } from 'react-native';
 // ── BUG-03 : SafeAreaView depuis react-native-safe-area-context ──
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,11 +18,12 @@ import {
   Camera01Icon,
   FavouriteIcon,
   UserAdd01Icon,
+  Notification03Icon,
   SentIcon,
   Delete02Icon,
   Tick02Icon,
 } from '@hugeicons/core-free-icons';
-import { CoralButton, BackButton } from '../components/UI';
+import { BackButton } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
 import { StatusBar } from 'expo-status-bar';
@@ -33,7 +36,7 @@ import {
 } from '../services/albums';
 // ── SUPABASE PUSH : intégration ──
 // Enregistrement du token Expo Push (no-op sur web / Expo Go)
-import { registerPushToken } from '../services/push';
+import { registerPushToken, unregisterPushToken } from '../services/push';
 // ── SUPABASE PUSH : fin ──
 // ── SUPABASE ALBUMS : fin ──
 
@@ -85,6 +88,7 @@ export default function ActivitiesScreen({ navigation }) {
   // Flux d'activité : fetch au focus + tirer-pour-rafraîchir.
   const [items, setItems] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
 
   const load = useCallback(async () => {
     const { data, error } = await cloudFetchActivity(50);
@@ -99,7 +103,7 @@ export default function ActivitiesScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (!state.profile.notifications) return undefined;
+      // L'inbox Activités reste disponible même si les push système sont coupés.
       load();
       // Realtime : un membre agit sur un album → l'événement apparaît ici
       // sans tirer-pour-rafraîchir. Debounce 500 ms (comme Album/Photo).
@@ -112,7 +116,7 @@ export default function ActivitiesScreen({ navigation }) {
         clearTimeout(timer);
         unsubscribe();
       };
-    }, [load, state.profile.notifications])
+    }, [load])
   );
 
   const onRefresh = async () => {
@@ -147,31 +151,52 @@ export default function ActivitiesScreen({ navigation }) {
   };
   // ── SUPABASE ALBUMS : fin ──
 
-  // Le titre reste dans un emplacement stable avant/après l'activation.
-  const renderEnablePrompt = () => (
-    <View style={styles.enableContent}>
-      <View style={styles.centerContent}>
-        <Image
-          source={require('../../assets/empty/activity.png')}
-          style={{ width: 120, height: 120 }}
-        />
-        <Text style={styles.h}>Activer les notifications</Text>
-        <Text style={styles.p}>
-          Ne manquez pas le moment où quelqu'un vous mentionne dans les commentaires,
-          télécharge de nouvelles photos ou réagit à vos photos.
-        </Text>
-        <View style={styles.buttonContainer}>
-          <CoralButton
-            title="Activer"
-            onPress={() => {
-              updateProfile({ notifications: true });
-              // La préférence partagée s'active immédiatement ; la permission
-              // système et le jeton push sont demandés en parallèle.
-              registerPushToken().catch(() => {});
-            }}
-          />
-        </View>
+  const enablePush = async () => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      const token = await registerPushToken();
+      if (!token) {
+        Alert.alert(
+          'Notifications non activées',
+          'Autorisez les notifications dans les réglages du téléphone puis réessayez. Les push nécessitent l’application installée sur un appareil.',
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { text: 'Réglages', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+      const saved = await updateProfile({ notifications: true });
+      if (!saved) {
+        await unregisterPushToken();
+        await updateProfile({ notifications: false });
+        Alert.alert('Erreur', 'La préférence n’a pas pu être enregistrée. Vérifiez votre connexion.');
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const renderEnableBanner = () => (
+    <View style={styles.pushBanner}>
+      <View style={styles.pushBannerIcon}>
+        <HugeiconsIcon icon={Notification03Icon} size={20} color={colors.tealDark} />
       </View>
+      <View style={styles.pushBannerCopy}>
+        <Text style={styles.pushBannerTitle}>Gardez le fil des albums</Text>
+        <Text style={styles.pushBannerText}>
+          Recevez une alerte pour les photos, commentaires, réactions et nouveaux membres.
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.pushBannerButton, pushBusy && styles.pushBannerButtonBusy]}
+        onPress={enablePush}
+        disabled={pushBusy}
+        accessibilityRole="button"
+      >
+        <Text style={styles.pushBannerButtonText}>{pushBusy ? '…' : 'Activer'}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -247,7 +272,7 @@ export default function ActivitiesScreen({ navigation }) {
         ) : (
           <>
             <Text style={[styles.title, { flex: 1 }]}>Activités</Text>
-            {notificationsEnabled && items.length > 0 && (
+            {items.length > 0 && (
               <TouchableOpacity onPress={() => setSelected([])} hitSlop={10}>
                 <Text style={styles.selectLink}>Sélectionner</Text>
               </TouchableOpacity>
@@ -256,42 +281,39 @@ export default function ActivitiesScreen({ navigation }) {
         )}
       </View>
 
-      {notificationsEnabled ? (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          extraData={selected}
-          contentContainerStyle={[
-            items.length === 0 && styles.content,
-            { paddingBottom: insets.bottom + 20 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.teal}
-              colors={[colors.teal]}
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        extraData={selected}
+        ListHeaderComponent={!notificationsEnabled ? renderEnableBanner : null}
+        contentContainerStyle={[
+          items.length === 0 && styles.content,
+          { paddingBottom: insets.bottom + 20 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.teal}
+            colors={[colors.teal]}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.centerContent}>
+            <Image
+              source={require('../../assets/empty/activity.png')}
+              style={{ width: 120, height: 120 }}
             />
-          }
-          ListEmptyComponent={
-            <View style={styles.centerContent}>
-              <Image
-                source={require('../../assets/empty/activity.png')}
-                style={{ width: 120, height: 120 }}
-              />
-              <Text style={styles.h}>Il n'y a pas encore d'activités</Text>
-              <Text style={styles.p}>
-                Quand un membre rejoint un album, ajoute une photo, commente ou aime,
-                l'événement apparaîtra ici.
-              </Text>
-            </View>
-          }
-        />
-      ) : (
-        renderEnablePrompt()
-      )}
+            <Text style={styles.h}>Il n'y a pas encore d'activités</Text>
+            <Text style={styles.p}>
+              Quand un membre rejoint un album, ajoute une photo, commente ou aime,
+              l'événement apparaîtra ici.
+            </Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -306,7 +328,40 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '600', color: colors.tealDark },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28 },
-  enableContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
+  pushBanner: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: colors.light,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pushBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#DDF0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pushBannerCopy: { flex: 1 },
+  pushBannerTitle: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
+  pushBannerText: { color: colors.muted, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  pushBannerButton: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: colors.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pushBannerButtonBusy: { opacity: 0.55 },
+  pushBannerButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   centerContent: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -327,7 +382,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
-  buttonContainer: { width: '100%', marginTop: 20 },
 
   // Lignes d'activité
   row: {

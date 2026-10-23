@@ -28,7 +28,7 @@ import { FAQ_SECTIONS, PRIVACY_INTRO, PRIVACY_SECTIONS, TERMS_INTRO, TERMS_SECTI
 
 // ── COMPOSANTS RÉUTILISABLES POUR L'UI ──
 
-function SwitchRow({ title, sub, value, onValueChange, isLast }) {
+function SwitchRow({ title, sub, value, onValueChange, isLast, disabled = false }) {
   const knobPosition = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {
@@ -50,11 +50,12 @@ function SwitchRow({ title, sub, value, onValueChange, isLast }) {
   };
 
   return (
-    <Pressable 
-      style={[styles.row, !isLast && styles.rowBorder]} 
-      onPress={() => onValueChange(!value)}
+    <Pressable
+      style={[styles.row, !isLast && styles.rowBorder, disabled && styles.switchDisabled]}
+      onPress={() => !disabled && onValueChange(!value)}
+      disabled={disabled}
       accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
+      accessibilityState={{ checked: value, disabled }}
     >
       <View style={styles.rowTextContainer}>
         <Text style={styles.rt}>{title}</Text>
@@ -91,16 +92,13 @@ export default function ProfileScreen({ navigation }) {
   
   const [busyOut, setBusyOut] = useState(false);
   const [busyDelete, setBusyDelete] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const initialProfileRef = useRef(null);
 
   const profileSignature = JSON.stringify({
     firstName: p.firstName || '',
     lastName: p.lastName || '',
-    notifications: !!p.notifications,
-    newPhotos: !!p.newPhotos,
-    likes: !!p.likes,
-    comments: !!p.comments,
   });
   if (initialProfileRef.current === null) initialProfileRef.current = profileSignature;
   const hasProfileChanges = profileSignature !== initialProfileRef.current;
@@ -112,6 +110,53 @@ export default function ProfileScreen({ navigation }) {
     (isNativeBuild ? Application.nativeApplicationVersion : null) ||
     Constants.expoConfig?.version ||
     '1.0.4';
+
+  const changePushEnabled = async (enabled) => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (enabled) {
+        const token = await registerPushToken();
+        if (!token) {
+          Alert.alert(
+            'Notifications non activées',
+            'Autorisez les notifications dans les réglages du téléphone et réessayez. Les notifications push nécessitent l’application installée sur un appareil.'
+          );
+          return;
+        }
+        const saved = await updateProfile({ notifications: true });
+        if (!saved) {
+          await unregisterPushToken();
+          await updateProfile({ notifications: false });
+          Alert.alert('Erreur', 'Votre préférence n’a pas pu être enregistrée. Vérifiez votre connexion.');
+        }
+        return;
+      }
+
+      const saved = await updateProfile({ notifications: false });
+      const removed = await unregisterPushToken();
+      if (!saved) await updateProfile({ notifications: true });
+      if (!saved || !removed) {
+        Alert.alert(
+          'Préférence partiellement appliquée',
+          'La désactivation a été demandée, mais le serveur n’a pas confirmé toutes les modifications. Réessayez avec une connexion stable.'
+        );
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de modifier les notifications pour le moment.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const changePushCategory = async (key, value) => {
+    const previousValue = Boolean(p[key]);
+    const saved = await updateProfile({ [key]: value });
+    if (!saved) {
+      await updateProfile({ [key]: previousValue });
+      Alert.alert('Erreur', 'Cette préférence n’a pas pu être synchronisée. Réessayez.');
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -127,6 +172,15 @@ export default function ProfileScreen({ navigation }) {
   const executeLogout = async () => {
     if (busyOut) return;
     setBusyOut(true);
+    const removed = await unregisterPushToken();
+    if (!removed) {
+      Alert.alert(
+        'Déconnexion impossible',
+        'Impossible de retirer le jeton push de cet appareil. Réessayez avec une connexion internet avant de vous déconnecter.'
+      );
+      setBusyOut(false);
+      return;
+    }
     try { await signOut(); } catch {}
     clearAuthUser();
     setBusyOut(false);
@@ -338,21 +392,42 @@ export default function ProfileScreen({ navigation }) {
         {/* ── NOTIFICATIONS ── */}
         <Text style={styles.sectionTitle}>Préférences de notifications</Text>
         <View style={styles.card}>
-          {/* ── SUPABASE PUSH : intégration ── */}
           <SwitchRow
             title="Notifications push"
+            sub={pushBusy ? 'Mise à jour…' : 'Recevoir des alertes même lorsque SharePix est fermé'}
             value={p.notifications}
-            onValueChange={(v) => {
-              updateProfile({ notifications: v });
-              // Token Expo Push : enregistré à l'activation, retiré à la désactivation
-              if (v) registerPushToken().catch(() => {});
-              else unregisterPushToken().catch(() => {});
-            }}
+            onValueChange={changePushEnabled}
+            disabled={pushBusy}
           />
-          {/* ── SUPABASE PUSH : fin ── */}
-          <SwitchRow title="Nouvelles Photos" sub="Quand un membre ajoute des photos" value={p.newPhotos} onValueChange={(v) => updateProfile({ newPhotos: v })} />
-          <SwitchRow title="Mentions J'aime" sub="Quand quelqu'un aime vos photos" value={p.likes} onValueChange={(v) => updateProfile({ likes: v })} />
-          <SwitchRow title="Commentaires" sub="Nouvelles interactions sur vos contenus" value={p.comments} onValueChange={(v) => updateProfile({ comments: v })} isLast />
+          <SwitchRow
+            title="Nouvelles photos"
+            sub="Quand un membre ajoute des photos"
+            value={p.newPhotos}
+            onValueChange={(v) => changePushCategory('newPhotos', v)}
+            disabled={!p.notifications}
+          />
+          <SwitchRow
+            title="Réactions J’aime"
+            sub="Quand quelqu’un aime une photo"
+            value={p.likes}
+            onValueChange={(v) => changePushCategory('likes', v)}
+            disabled={!p.notifications}
+          />
+          <SwitchRow
+            title="Commentaires"
+            sub="Quand quelqu’un commente une photo"
+            value={p.comments}
+            onValueChange={(v) => changePushCategory('comments', v)}
+            disabled={!p.notifications}
+          />
+          <SwitchRow
+            title="Nouveaux membres"
+            sub="Quand une personne rejoint un album"
+            value={p.memberJoined}
+            onValueChange={(v) => changePushCategory('memberJoined', v)}
+            disabled={!p.notifications}
+            isLast
+          />
         </View>
 
         {/* ── SUPPORT & AIDE ── */}
@@ -485,6 +560,7 @@ const styles = StyleSheet.create({
   // Lignes (Settings & Liens)
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  switchDisabled: { opacity: 0.45 },
   rowTextContainer: { flex: 1, paddingRight: 16 },
   rt: { fontSize: 16, fontWeight: '500', color: colors.tealDark },
   rs: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
