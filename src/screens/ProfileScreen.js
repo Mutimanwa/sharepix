@@ -287,7 +287,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={[styles.card, styles.guestCard]}>
             <View style={styles.accountRow}>
               <View style={[styles.accountIcon, styles.guestIcon]}>
-                   <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.tealDark} />
+                   <HugeiconsIcon icon={UserCircle02Icon} size={34} color={colors.coralDark} />
               </View>
               <View style={{ flex: 1 }}>
                 <View style={styles.accountTitleRow}>
@@ -311,7 +311,7 @@ export default function ProfileScreen({ navigation }) {
               accessibilityLabel="Sécuriser mon compte invité"
             >
             {/* ── SUPABASE ALBUMS : fin ── */}
-              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={18} color="#fff" />
+              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={18} color={colors.coralDark} />
               <Text style={styles.primaryBtnText}>Sécuriser mon compte</Text>
             </TouchableOpacity>
           </View>
@@ -437,7 +437,7 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.helpBox}>
           <Text style={styles.helpTitle}>Besoin d'aide ?</Text>
           <Text style={styles.helpDesc}>Une question ou un problème ? Notre équipe est là pour vous aider.</Text>
-          <TouchableOpacity style={styles.mailBtn} onPress={() => Linking.openURL('mailto:hello@sharepix.app')} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.mailBtn} onPress={() => Linking.openURL('mailto:hello@restartburundi@gmail.com')} activeOpacity={0.8}>
             <Text style={styles.mailBtnText}>Contacter le support</Text>
           </TouchableOpacity>
         </View>
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
   syncBadge: { position: 'absolute', right: 0, top: 5, fontSize: 10, color: colors.teal, fontWeight: '700', textTransform: 'uppercase' },
 
   // Compte & Invité
-  guestCard: { borderColor: colors.coral, borderWidth: 1, },
+  guestCard: { borderColor: colors.border, borderWidth: 1, },
   accountRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   accountIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.light },
   guestIcon: { backgroundColor: '#FDECEA' },
@@ -557,8 +557,8 @@ const styles = StyleSheet.create({
   statusBadge: { backgroundColor: '#FFF1E8', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeText: { color: colors.coralDark, fontSize: 10, fontWeight: '700' },
   
-  primaryBtn: { marginTop: 16, backgroundColor: colors.coral, borderRadius: 12, minHeight: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  primaryBtnText: { color: '#fff', fontWeight: '500', fontSize: 15 },
+  primaryBtn: { marginTop: 16, backgroundColor: "#FDECEA", borderRadius: 12, minHeight: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  primaryBtnText: { color: colors.coralDark, fontWeight: '500', fontSize: 15 },
   
   logoutBtn: { marginTop: 16, backgroundColor: '#FDECEA', borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   logoutBtnText: { color: colors.coralDark, fontWeight: '500', fontSize: 15 },

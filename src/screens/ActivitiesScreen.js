@@ -286,7 +286,7 @@ export default function ActivitiesScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         extraData={selected}
-        ListHeaderComponent={!notificationsEnabled ? renderEnableBanner : null}
+        ListFooterComponent={!notificationsEnabled ? renderEnableBanner : null}
         contentContainerStyle={[
           items.length === 0 && styles.content,
           { paddingBottom: insets.bottom + 20 },
