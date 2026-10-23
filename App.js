@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -13,6 +13,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Platform } from 'react-native';
 import { PlatformPressable } from '@react-navigation/elements';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 import { StoreProvider } from './src/store';
 import { initSentry, wrapRoot } from './src/lib/sentry';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -39,6 +40,37 @@ initSentry();
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const navigationRef = createNavigationContainerRef();
+let pendingPushAlbumId = null;
+let lastHandledPushResponseId = null;
+
+function openPendingPushAlbum() {
+  if (!pendingPushAlbumId || !navigationRef.isReady()) return;
+  const currentRoute = navigationRef.getCurrentRoute()?.name;
+  if (!currentRoute || ['Splash', 'Onboarding', 'Auth'].includes(currentRoute)) return;
+
+  const albumId = pendingPushAlbumId;
+  pendingPushAlbumId = null;
+  navigationRef.navigate('Album', { id: albumId });
+}
+
+function handlePushResponse(response) {
+  const request = response?.notification?.request;
+  if (!request) return;
+  if (request.identifier && request.identifier === lastHandledPushResponseId) {
+    Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    return;
+  }
+  if (request.identifier) lastHandledPushResponseId = request.identifier;
+
+  const albumId = request.content?.data?.albumId;
+  if (typeof albumId === 'string' && albumId) {
+    pendingPushAlbumId = albumId;
+    openPendingPushAlbum();
+  }
+  // Évite de rejouer un ancien tap à chaque ouverture ultérieure de l'app.
+  Notifications.clearLastNotificationResponseAsync().catch(() => {});
+}
 
 // ── Configuration du Deep Linking ──
 // ── DEEP LINK QR : intégration ──
@@ -77,13 +109,13 @@ const linking = {
   // Fonction pour obtenir l'URL initiale
   async getInitialURL() {
     const url = await Linking.getInitialURL();
-    console.log('Initial URL:', url);
+    if (url) console.log('Initial deep link received');
     return url;
   },
   // Fonction pour écouter les changements d'URL
   subscribe(listener) {
     const onReceiveURL = ({ url }) => {
-      console.log('URL received:', url);
+      if (url) console.log('Deep link received');
       listener(url);
     };
     const subscription = Linking.addEventListener('url', onReceiveURL);
@@ -170,9 +202,8 @@ function App() {
   useEffect(() => {
     // Fonction pour traiter les URLs reçues
     const handleDeepLink = async ({ url }) => {
-      console.log('App received deep link:', url);
-      
       if (!url) return;
+      console.log('App received deep link');
       
       // Vérifier si c'est un callback OAuth
       if (url.includes('access_token') || url.includes('refresh_token')) {
@@ -211,7 +242,7 @@ function App() {
     // Vérifier les liens initiaux (quand l'app est lancée depuis un lien)
     Linking.getInitialURL().then((url) => {
       if (url) {
-        console.log('🔗 Initial URL on app start:', url);
+        console.log('Initial deep link on app start');
         handleDeepLink({ url });
       }
     });
@@ -222,12 +253,26 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    const subscription = Notifications.addNotificationResponseReceivedListener(handlePushResponse);
+    Notifications.getLastNotificationResponseAsync()
+      .then(handlePushResponse)
+      .catch(() => {});
+    return () => subscription.remove();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <StoreProvider>
           <QrScannerProvider>
-            <NavigationContainer linking={linking}>
+            <NavigationContainer
+              ref={navigationRef}
+              linking={linking}
+              onReady={openPendingPushAlbum}
+              onStateChange={openPendingPushAlbum}
+            >
               <StatusBar style="light" />
               <Stack.Navigator
                 screenOptions={{

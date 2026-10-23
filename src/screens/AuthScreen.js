@@ -36,6 +36,7 @@ import {
   linkGoogleIdentity,
   requestPasswordReset,
 } from '../services/auth';
+import { registerPushToken, unregisterPushToken } from '../services/push';
 import { colors } from '../theme';
 import LocalDocumentModal from '../components/LocalDocumentModal';
 import { PRIVACY_INTRO, PRIVACY_SECTIONS, TERMS_INTRO, TERMS_SECTIONS } from '../data/localInfo';
@@ -104,7 +105,7 @@ export default function AuthScreen({ navigation, route }) {
   const [legalDocument, setLegalDocument] = useState(null);
 
   const insets = useSafeAreaInsets();
-  const { setAuthUser } = useStore();
+  const { setAuthUser, state } = useStore();
   const [resetSending, setResetSending] = useState(false);
   const isLogin = mode === 'login';
   // ── SUPABASE ALBUMS : intégration ──
@@ -172,9 +173,12 @@ export default function AuthScreen({ navigation, route }) {
       // Onglet connexion : connexion normale à un compte existant.
       if (converting) {
         result = await convertAnonymousUser(email, password, { firstName, lastName });
-      } else
-      // ── SUPABASE ALBUMS : fin ──
-      if (isLogin) {
+      } else if (isLogin) {
+        // Si l'invité choisit un autre compte, détacher d'abord ce jeton de
+        // l'ancien user_id pour éviter que le téléphone reçoive encore ses push.
+        if (state.user?.isAnonymous && !(await unregisterPushToken())) {
+          throw new Error("Impossible de retirer les notifications de l'ancien compte. Réessaie avec une connexion réseau.");
+        }
         result = await signInWithEmail(email, password);
       } else {
         result = await signUpWithEmail(email, password, { firstName, lastName });
@@ -191,6 +195,9 @@ export default function AuthScreen({ navigation, route }) {
       if (result.user) {
         console.log('✅ Auth SUCCESS');
         setAuthUser(result.user);
+        if (result.user.notificationPreferences?.notifications) {
+          await registerPushToken();
+        }
         navigation.replace('Main');
       } else {
         setError('Une erreur est survenue. Veuillez réessayer.');
@@ -247,6 +254,9 @@ export default function AuthScreen({ navigation, route }) {
       // Onglet inscription en mode conversion : on LIE Google au compte
       // invité (linkIdentity, même id → rien n'est perdu). Onglet
       // connexion (ou écran normal) : connexion Google classique.
+      if (!converting && state.user?.isAnonymous && !(await unregisterPushToken())) {
+        throw new Error("Impossible de retirer les notifications de l'ancien compte. Réessaie avec une connexion réseau.");
+      }
       const result = converting ? await linkGoogleIdentity() : await signInWithGoogle();
       // ── SUPABASE ALBUMS : fin ──
       
@@ -256,7 +266,12 @@ export default function AuthScreen({ navigation, route }) {
         // existait — le code PKCE n'ayant jamais été échangé, on arrivait
         // sur l'accueil avec l'ancien compte anonyme.
         // Le service renvoie maintenant l'utilisateur réellement connecté.
-        if (result.user) setAuthUser(result.user);
+        if (result.user) {
+          setAuthUser(result.user);
+          if (result.user.notificationPreferences?.notifications) {
+            await registerPushToken();
+          }
+        }
         navigation.replace('Main');
       }
     } catch (err) {

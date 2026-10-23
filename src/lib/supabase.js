@@ -26,7 +26,7 @@ if (supabase) {
   Linking.addEventListener('url', ({ url }) => {
     // L'URL peut contenir un ?code= OAuth : jamais dans les journaux d'un
     // build de production (elle est lisible par tout outil qui collecte les logs).
-    if (__DEV__) console.log('🔗 Deep link received in client:', url);
+    if (__DEV__ && url) console.log('🔗 Deep link received in client');
     // Le SDK Supabase traite automatiquement les tokens OAuth
   });
 }

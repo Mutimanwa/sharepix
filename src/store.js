@@ -16,6 +16,7 @@ import {
   initializeAuth,
   syncProfile,
 } from './services/auth';
+import { registerPushToken } from './services/push';
 // ── SUPABASE ALBUMS : fin ──
 import { supabase } from './lib/supabase'; // <-- AJOUT POUR LE CLOUD
 // ── SUPABASE ALBUMS : intégration ──
@@ -57,9 +58,10 @@ const defaultState = {
     firstName: '',
     lastName: '',
     notifications: false,
-    newPhotos: false,
-    likes: false,
-    comments: false,
+    newPhotos: true,
+    likes: true,
+    comments: true,
+    memberJoined: true,
   },
   albums: [],
 };
@@ -166,10 +168,21 @@ export function StoreProvider({ children }) {
               user,
               profile: {
                 ...s.profile,
-                firstName: user.firstName || s.profile.firstName,
-                lastName: user.lastName || s.profile.lastName,
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                notifications: user.notificationPreferences?.notifications ?? false,
+                newPhotos: user.notificationPreferences?.newPhotos ?? true,
+                likes: user.notificationPreferences?.likes ?? true,
+                comments: user.notificationPreferences?.comments ?? true,
+                memberJoined: user.notificationPreferences?.memberJoined ?? true,
               },
             }));
+
+            // Ré-enregistre silencieusement ce téléphone si le compte a déjà
+            // choisi les push et que l’autorisation système est encore active.
+            if (user.notificationPreferences?.notifications) {
+              registerPushToken({ requestPermission: false }).catch(() => {});
+            }
 
             // ── SUPABASE ALBUMS : intégration ──
             // Restauration cloud : après login (ou compte anonyme restauré),
@@ -275,8 +288,13 @@ export function StoreProvider({ children }) {
           user,
           profile: {
             ...s.profile,
-            firstName: user?.firstName || s.profile.firstName,
-            lastName: user?.lastName || s.profile.lastName,
+            firstName: user?.firstName || '',
+            lastName: user?.lastName || '',
+            notifications: user?.notificationPreferences?.notifications ?? false,
+            newPhotos: user?.notificationPreferences?.newPhotos ?? true,
+            likes: user?.notificationPreferences?.likes ?? true,
+            comments: user?.notificationPreferences?.comments ?? true,
+            memberJoined: user?.notificationPreferences?.memberJoined ?? true,
           },
         }));
       },
@@ -299,13 +317,17 @@ export function StoreProvider({ children }) {
       
       updateProfile: (p) => {
         setState((s) => ({ ...s, profile: { ...s.profile, ...p } }));
-        if (state.user?.id) {
-          const merged = { ...state.profile, ...p };
-          syncProfile(state.user.id, {
-            firstName: merged.firstName,
-            lastName: merged.lastName,
-          }).catch(() => {});
+        if (!state.user?.id) return Promise.resolve(true);
+
+        const merged = { ...state.profile, ...p };
+        const profileData = {
+          firstName: merged.firstName,
+          lastName: merged.lastName,
+        };
+        for (const key of ['notifications', 'newPhotos', 'likes', 'comments', 'memberJoined']) {
+          if (Object.prototype.hasOwnProperty.call(p, key)) profileData[key] = merged[key];
         }
+        return syncProfile(state.user.id, profileData);
       },
       
       // ── CLOUD & LOCAL : Créer un album ──
