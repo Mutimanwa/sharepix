@@ -14,7 +14,6 @@ import { CoralButton, Logo, Sheet, Field } from '../components/UI';
 import { ArtShare, ArtPrivate, ArtQuality } from '../components/OnboardingArt';
 import CodeBoxes from '../components/CodeBoxes';
 import { useStore } from '../store';
-import { isSupabaseConfigured } from '../config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -52,18 +51,22 @@ export default function OnboardingScreen({ navigation }) {
   const [loadingJoin, setLoadingJoin] = useState(false);
 
   // <-- AJOUT de joinAlbum dans le destructuring
-  const { createAlbum, joinAlbum, setOnboarded, state } = useStore();
+  const { createAlbum, joinAlbum, setOnboarded } = useStore();
   const insets = useSafeAreaInsets();
+
+  const openCreate = () => {
+    setJoin(false);
+    setCreate(true);
+  };
+
+  const openJoin = () => {
+    setCreate(false);
+    setJoin(true);
+  };
 
   const goHome = () => {
     setOnboarded();
-    if (isSupabaseConfigured && !state.user) {
-      console.log('➡️ Onboarding -> Main (Supabase configured, no user)');
-      navigation.replace('Main');
-    } else {
-      console.log('➡️ Onboarding -> Main');
-      navigation.replace('Main');
-    }
+    navigation.replace('Main');
   };
 
   const onScroll = (e) => {
@@ -114,12 +117,26 @@ export default function OnboardingScreen({ navigation }) {
         ))}
       </View>
 
-      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 28) }]}>
-        <CoralButton title="Créez un nouvel album" onPress={() => setCreate(true)} />
+      <View
+        style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 28) }]}
+        collapsable={false}
+      >
+        <CoralButton
+          title="Créez un nouvel album"
+          onPress={openCreate}
+          height={50}
+          style={styles.primaryAction}
+          accessibilityLabel="Créer un nouvel album"
+          testID="onboarding-create-album"
+        />
         <CoralButton
           title="Utilisez le code d'accès"
           color={colors.teal}
-          onPress={() => setJoin(true)}
+          onPress={openJoin}
+          height={50}
+          style={styles.primaryAction}
+          accessibilityLabel="Rejoindre un album avec un code"
+          testID="onboarding-join-album"
         />
       </View>
 
@@ -131,8 +148,6 @@ export default function OnboardingScreen({ navigation }) {
           setCode('');
         }}
         title="Rejoindre un album"
-        inline
-        useSafeArea={true}
       >
         <Text style={styles.center}>Entrez le code à 8 caractères pour rejoindre l'album.</Text>
         {join ? <CodeBoxes value={code} onChange={setCode} autoFocus /> : null}
@@ -164,8 +179,6 @@ export default function OnboardingScreen({ navigation }) {
         visible={create}
         onClose={() => setCreate(false)}
         title="Personnalisez votre album"
-        inline
-        useSafeArea={true}
       >
         <Field
           label="Nom de l'album"
@@ -250,6 +263,12 @@ const styles = StyleSheet.create({
   actions: {
     paddingHorizontal: 22,
     paddingTop: 4,
+    position: 'relative',
+    zIndex: 20,
+    elevation: 20,
+  },
+  primaryAction: {
+    width: '100%',
   },
   center: {
     textAlign: 'center',
