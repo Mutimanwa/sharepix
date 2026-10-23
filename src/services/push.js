@@ -1,21 +1,15 @@
-// @ts-check
-// ── SUPABASE PUSH : intégration ─────────────────────────────────────────
-// Enregistrement des tokens Expo Push dans la table `push_tokens`
-// (migration initiale §8-9). L'envoi est fait côté serveur par l'Edge Function
-// `activity-push` branchée sur activity_log (voir supabase/PUSH.md §2-3).
-//
-// Limites assumées :
-//  - Web : pas de push (la fonction renvoie null silencieusement) ;
-//  - Expo Go : ne reçoit plus les push distants → dev build EAS requis
-//    (eas build --profile development) ;
-//  - Simulateur/émulateur : token souvent indisponible → test sur appareil.
+// ── Push notifications SharePix ────────────────────────────────────────
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
 
-// Affichage quand l'app est OUVERTE (foreground) : bannière + son.
+export const PUSH_CHANNEL_ID = 'sharepix-activity';
+const CACHED_TOKEN_KEY = 'sharepix.pushToken.v1';
+const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -25,77 +19,83 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId;
-
-/**
- * Demande la permission, récupère le token Expo Push et l'enregistre
- * dans push_tokens (PK user_id+token → upsert idempotent).
- * @returns le token, ou null si refusé/indisponible/web.
- */
-export async function registerPushToken() {
-  if (!supabase) return null;
-  if (Platform.OS === 'web') return null; // pas de push sur web
-  if (!Device.isDevice) {
-    console.log('🔕 Push : simulateur/émulateur, token indisponible (teste sur appareil)');
-    return null;
-  }
-
-  // 1. Permission (ne redemande que si jamais décidée)
-  let { status } = await Notifications.getPermissionsAsync();
-  if (status !== 'granted') {
-    ({ status } = await Notifications.requestPermissionsAsync());
-  }
-  if (status !== 'granted') {
-    console.log('🔕 Push : permission refusée');
-    return null;
-  }
-
-  // 2. Canal Android (obligatoire pour afficher quoi que ce soit)
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Notifications SharePix',
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-  }
-
-  // 3. Token Expo Push (nécessite extra.eas.projectId dans app.json)
-  let token;
-  try {
-    ({ data: token } = await Notifications.getExpoPushTokenAsync({
-      projectId: PROJECT_ID,
-    }));
-  } catch (e) {
-    console.log('📛 Push : getExpoPushTokenAsync a échoué (dev build EAS requis ?)', e?.message || e);
-    return null;
-  }
-
-  // 4. Enregistrement côté serveur (user_id rempli par défaut auth.uid())
-  const { error } = await supabase
-    .from('push_tokens')
-    .upsert({ token, platform: Platform.OS, updated_at: new Date().toISOString() });
-  if (error) {
-    console.log('📛 Push : enregistrement du token refusé', error.message);
-    return null;
-  }
-
-  console.log('🔔 Push : token enregistré', token.slice(0, 24) + '…');
-  return token;
+async function ensureAndroidChannel() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(PUSH_CHANNEL_ID, {
+    name: 'Activités SharePix',
+    description: 'Photos, commentaires, réactions et nouveaux membres de vos albums',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 180, 100, 180],
+    lightColor: '#2BA3A8',
+    sound: 'default',
+  });
 }
 
 /**
- * Retrait du token de CET appareil (quand l'utilisateur désactive les
- * notifications push dans le profil). Les autres appareils continuent.
+ * Demande la permission, crée le canal Android et enregistre le jeton Expo
+ * sur le compte connecté. Retourne le jeton ou null si l’activation échoue.
  */
+export async function registerPushToken({ requestPermission = true } = {}) {
+  if (!supabase || Platform.OS === 'web' || !Device.isDevice || !PROJECT_ID) return null;
+
+  try {
+    // Android 13+ doit avoir un canal avant l'affichage de la demande système.
+    await ensureAndroidChannel();
+
+    let permissions = await Notifications.getPermissionsAsync();
+    if (permissions.status !== 'granted' && requestPermission && permissions.canAskAgain) {
+      permissions = await Notifications.requestPermissionsAsync();
+    }
+    if (permissions.status !== 'granted') return null;
+
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+    if (!token) return null;
+
+    const previousToken = await AsyncStorage.getItem(CACHED_TOKEN_KEY);
+    if (previousToken && previousToken !== token) {
+      const { error: removeOldError } = await supabase
+        .from('push_tokens')
+        .delete()
+        .eq('token', previousToken);
+      if (removeOldError) throw removeOldError;
+    }
+
+    const { error } = await supabase
+      .from('push_tokens')
+      .upsert(
+        { token, platform: Platform.OS, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,token' }
+      );
+    if (error) throw error;
+
+    await AsyncStorage.setItem(CACHED_TOKEN_KEY, token);
+    return token;
+  } catch (error) {
+    console.warn('Push registration failed:', error?.message || 'unknown error');
+    return null;
+  }
+}
+
+/** Remove only this installation’s token for the currently authenticated user. */
 export async function unregisterPushToken() {
-  if (!supabase || Platform.OS === 'web' || !Device.isDevice) return;
+  if (!supabase || Platform.OS === 'web' || !Device.isDevice) return true;
+
   try {
-    const { data: token } = await Notifications.getExpoPushTokenAsync({
-      projectId: PROJECT_ID,
-    });
-    await supabase.from('push_tokens').delete().eq('token', token);
-    console.log('🔕 Push : token retiré pour cet appareil');
-  } catch (e) {
-    console.log('📛 Push : retrait du token impossible', e?.message || e);
+    let token = await AsyncStorage.getItem(CACHED_TOKEN_KEY);
+    if (!token && PROJECT_ID) {
+      const permissions = await Notifications.getPermissionsAsync();
+      if (permissions.status !== 'granted') return true;
+      const response = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+      token = response.data;
+    }
+    if (!token) return true;
+
+    const { error } = await supabase.from('push_tokens').delete().eq('token', token);
+    if (error) throw error;
+    await AsyncStorage.removeItem(CACHED_TOKEN_KEY);
+    return true;
+  } catch (error) {
+    console.warn('Push token removal failed:', error?.message || 'unknown error');
+    return false;
   }
 }
-// ── SUPABASE PUSH : fin ──

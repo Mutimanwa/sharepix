@@ -10,6 +10,8 @@ import {
   TextInput,
   // QR : « QR non reconnu » (était appelé sans import → crash).
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -34,6 +36,7 @@ import {
   PencilEdit02Icon,
   ArrowRight01Icon,
   Tick02Icon,
+  Download01Icon,
   Delete02Icon,
   Logout01Icon,
 } from '@hugeicons/core-free-icons';
@@ -46,6 +49,7 @@ import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
 import { subscribeAlbumChanges } from '../services/albums';
+import { requestSharePixGalleryPermission, savePhotoToSharePix } from '../services/galleryDownloads';
 // ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
 
@@ -81,6 +85,7 @@ export default function AlbumScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('all');
   const [uploading, setUploading] = useState(null); // { done, total } | null
+  const [downloading, setDownloading] = useState(null);
 
   // Filtre
   const [filtre, setFilter] = useState(false);
@@ -248,6 +253,57 @@ export default function AlbumScreen({ route, navigation }) {
     exitSelection();
   };
 
+  const downloadSelected = async () => {
+    if (downloading || !selected?.length || Platform.OS === 'web') return;
+    const chosenPhotos = photos.filter((photo) => selected.includes(photo.id));
+    if (!chosenPhotos.length) return;
+
+    try {
+      await requestSharePixGalleryPermission();
+    } catch (error) {
+      Alert.alert('Autorisation requise', error?.message || 'Autorisez l’accès aux photos pour continuer.');
+      return;
+    }
+
+    const failures = [];
+    let savedCount = 0;
+    setDownloading({ done: 0, total: chosenPhotos.length, current: 1, percent: 0 });
+
+    for (let index = 0; index < chosenPhotos.length; index += 1) {
+      const photo = chosenPhotos[index];
+      setDownloading({ done: index, total: chosenPhotos.length, current: index + 1, percent: Math.round((index / chosenPhotos.length) * 100) });
+      try {
+        await savePhotoToSharePix(photo, {
+          permissionGranted: true,
+          onProgress: (fraction) => {
+            if (typeof fraction !== 'number') return;
+            const percent = Math.round(((index + fraction) / chosenPhotos.length) * 100);
+            setDownloading({ done: index, total: chosenPhotos.length, current: index + 1, percent });
+          },
+        });
+        savedCount += 1;
+      } catch (error) {
+        failures.push(error?.message || 'Erreur inconnue');
+      }
+      setDownloading({
+        done: index + 1,
+        total: chosenPhotos.length,
+        current: Math.min(index + 2, chosenPhotos.length),
+        percent: Math.round(((index + 1) / chosenPhotos.length) * 100),
+      });
+    }
+
+    setDownloading(null);
+    exitSelection();
+    const failureMessage = failures.length
+      ? ` ${failures.length} photo(s) n’ont pas pu être enregistrées.`
+      : '';
+    Alert.alert(
+      'Téléchargement terminé',
+      `${savedCount} photo(s) enregistrée(s) dans l’album SharePix.${failureMessage}`
+    );
+  };
+
   const submitRename = () => {
     if (renameValue.trim()) renameAlbum(id, renameValue);
     setRenameOpen(false);
@@ -317,9 +373,31 @@ export default function AlbumScreen({ route, navigation }) {
             <Text style={[styles.title, { flex: 1 }]}>
               {selected.length} sélectionnée{selected.length > 1 ? 's' : ''}
             </Text>
-            <TouchableOpacity onPress={selectAll} style={styles.iconBtn} hitSlop={10}>
+            <TouchableOpacity
+              onPress={selectAll}
+              style={styles.iconBtn}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Tout sélectionner ou désélectionner"
+            >
               <HugeiconsIcon icon={Tick02Icon} size={22} color={colors.tealDark} />
             </TouchableOpacity>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity
+                onPress={downloadSelected}
+                style={styles.iconBtn}
+                hitSlop={10}
+                disabled={!selected.length || Boolean(downloading)}
+                accessibilityRole="button"
+                accessibilityLabel={`Télécharger ${selected.length} photo(s) dans l’album SharePix`}
+              >
+                <HugeiconsIcon
+                  icon={Download01Icon}
+                  size={22}
+                  color={selected.length && !downloading ? colors.tealDark : colors.border}
+                />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => selected.length && setConfirmDeletePhotos(true)}
               style={styles.iconBtn}
@@ -442,15 +520,40 @@ export default function AlbumScreen({ route, navigation }) {
         </View>
       )}
 
-      {/* Bannière upload avec progression */}
-      <Modal visible={!!uploading} transparent animationType="fade">
+      {/* Indicateur de progression pour l’envoi et l’enregistrement Galerie */}
+      <Modal
+        visible={Boolean(uploading || downloading)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
         <SafeAreaView style={styles.modalContainer}>
           <View style={[styles.banner, { marginTop: insets.top + 10 }]}>
-            <Text style={{ color: colors.tealDark, fontWeight: '600' }}>
-              {uploading
-                ? `Envoi ${uploading.done}/${uploading.total}… Ne fermez pas l'appli.`
-                : ''}
-            </Text>
+            <ActivityIndicator size="small" color={colors.teal} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.tealDark, fontWeight: '700' }}>
+                {downloading
+                  ? `Téléchargement ${downloading.done}/${downloading.total}…`
+                  : uploading
+                    ? `Envoi ${uploading.done}/${uploading.total}…`
+                    : ''}
+              </Text>
+              <Text style={styles.progressHint}>
+                {downloading
+                  ? `${downloading.percent}% · Les photos sont enregistrées dans SharePix.`
+                  : 'Ne fermez pas l’application.'}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${downloading?.percent ?? (uploading ? Math.round((uploading.done / uploading.total) * 100) : 0)}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
           </View>
         </SafeAreaView>
       </Modal>
@@ -846,7 +949,19 @@ const styles = StyleSheet.create({
     padding: 14,
     marginHorizontal: 16,
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
+  progressHint: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  progressTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#D7E8E8',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.teal },
 
   // Filtre
   section: {

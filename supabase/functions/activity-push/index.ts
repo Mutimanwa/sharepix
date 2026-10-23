@@ -1,119 +1,221 @@
-// ── SUPABASE PUSH : Edge Function « activity-push » ─────────────────────
-// Appelée par le Database Webhook « activity_log INSERT » (PUSH.md §3).
-// À chaque événement journalisé, elle envoie une notification Expo Push à
-// tous les membres de l'album — sauf l'auteur de l'action.
-//
-// Secrets : SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY sont auto-injectés
-// par la plateforme (jamais côté app). WEBHOOK_SECRET est posé via
-// `supabase secrets set` et vérifié en header : sans lui, l'URL publique
-// de la fonction permettrait à quiconque de spammer des notifications.
-//
-// Dépendance : `@supabase/supabase-js` est déclarée dans l'import map de
-// `supabase/functions/deno.json` (specifier nu, conforme au lint Deno).
+// ── Supabase Edge Function: activity-push ────────────────────────────────
+// Called by the activity_log INSERT trigger. It sends only the activity
+// categories enabled on each recipient's profile.
 import { createClient } from '@supabase/supabase-js';
 
-// Ligne journalisée « activity_log » telle qu'envoyée par le Database Webhook.
 interface ActivityRecord {
+  id?: string;
   album_id: string;
+  photo_id?: string | null;
   actor_id?: string | null;
   actor_name?: string | null;
   album_name?: string | null;
   kind?: string | null;
 }
 
-// Formes minimales des lignes lues (seuls les champs utilisés sont typés).
+type PushPreferenceColumn = 'push_members' | 'push_new_photos' | 'push_comments' | 'push_likes';
+
+const PUSH_PREFERENCE_COLUMNS: Record<string, PushPreferenceColumn> = {
+  member_joined: 'push_members',
+  photo_added: 'push_new_photos',
+  comment_added: 'push_comments',
+  photo_liked: 'push_likes',
+};
+
+const PUSH_COPY: Record<string, { title: string; body: (actor: string, album: string) => string }> = {
+  member_joined: {
+    title: 'Nouveau membre',
+    body: (actor, album) => `${actor} a rejoint « ${album} »`,
+  },
+  photo_added: {
+    title: 'Nouvelle photo',
+    body: (actor, album) => `${actor} a ajouté une photo dans « ${album} »`,
+  },
+  comment_added: {
+    title: 'Nouveau commentaire',
+    body: (actor, album) => `${actor} a commenté une photo dans « ${album} »`,
+  },
+  photo_liked: {
+    title: 'Nouvelle réaction',
+    body: (actor, album) => `${actor} a aimé une photo dans « ${album} »`,
+  },
+};
+
+function safeLabel(value: string | null | undefined, fallback: string, maxLength: number) {
+  const normalized = String(value || fallback).replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return (normalized || fallback).slice(0, maxLength);
+}
+
+function buildPushNotification(record: ActivityRecord) {
+  const template = record.kind ? PUSH_COPY[record.kind] : null;
+  if (!template) return null;
+  const actor = safeLabel(record.actor_name, 'Un membre', 48);
+  const album = safeLabel(record.album_name, 'votre album', 56);
+  return { title: template.title, body: template.body(actor, album) };
+}
+
 interface MemberRow {
   user_id: string;
 }
 
+interface PreferenceRow extends Record<PushPreferenceColumn, boolean> {
+  id: string;
+  push_enabled: boolean;
+}
+
 interface TokenRow {
+  user_id: string;
   token: string;
 }
 
-const TITLES: Record<string, string> = {
-  member_joined: 'Nouveau membre',
-  photo_added: 'Nouvelle photo',
-  comment_added: 'Nouveau commentaire',
-  photo_liked: "J'aime",
-};
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const ANDROID_CHANNEL_ID = 'sharepix-activity';
+const MAX_MESSAGES_PER_REQUEST = 100;
 
-const BODIES: Record<string, (r: ActivityRecord) => string> = {
-  member_joined: (r) => `${r.actor_name || 'Un membre'} a rejoint « ${r.album_name} »`,
-  photo_added: (r) => `${r.actor_name || 'Un membre'} a ajouté une photo dans « ${r.album_name} »`,
-  comment_added: (r) => `${r.actor_name || 'Un membre'} a commenté une photo dans « ${r.album_name} »`,
-  photo_liked: (r) => `${r.actor_name || 'Un membre'} a aimé une photo dans « ${r.album_name} »`,
-};
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req) => {
-  // 0. Secret partagé avec le Database Webhook (anti-rejeu / anti-spam)
-  //
-  // ── SÉCURITÉ (audit P1-03) : FAIL-CLOSED ──
-  // Avant : `if (secret && ...)` — si WEBHOOK_SECRET était absent (oubli de
-  // configuration, nouvel environnement), la fonction acceptait TOUT LE MONDE
-  // et servait de relais à notifications avec le service_role de la
-  // plateforme (verify_jwt = false dans config.toml).
-  const secret = Deno.env.get('WEBHOOK_SECRET');
-  if (!secret) {
-    console.error('WEBHOOK_SECRET manquant : refus de traiter la requête');
+  if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
+
+  // This function is public at the gateway (verify_jwt=false); fail closed
+  // because only the database trigger should be able to invoke it.
+  const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
+  if (!webhookSecret) {
+    console.error('WEBHOOK_SECRET missing; refusing webhook');
     return new Response('server misconfigured', { status: 500 });
   }
-  if (req.headers.get('x-webhook-secret') !== secret) {
+  if (req.headers.get('x-webhook-secret') !== webhookSecret) {
     return new Response('unauthorized', { status: 401 });
   }
 
-  // 1. Payload du webhook : { type: 'INSERT', record: {…} }
   let record: ActivityRecord | undefined;
   try {
-    const payload = (await req.json()) as { record?: ActivityRecord };
+    const payload = await req.json() as { record?: ActivityRecord };
     record = payload.record;
   } catch {
     return new Response('bad json', { status: 400 });
   }
-  if (!record?.album_id) return new Response('no record', { status: 400 });
+  if (!record?.album_id || !record.kind) return new Response('invalid activity', { status: 400 });
 
-  const admin = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, // service_role : lecture cross-utilisateurs, serveur uniquement
-  );
+  const preferenceColumn = record.kind ? PUSH_PREFERENCE_COLUMNS[record.kind] : undefined;
+  const notification = buildPushNotification(record);
+  if (!preferenceColumn || !notification) {
+    return jsonResponse({ sent: 0, reason: 'unsupported activity kind' });
+  }
 
-  // 2. Membres de l'album, sauf l'auteur de l'action (actor_id peut être nul)
-  let q = admin
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('Supabase service environment is incomplete');
+    return new Response('server misconfigured', { status: 500 });
+  }
+  const admin = createClient(supabaseUrl, serviceRoleKey);
+
+  // Find album members but never notify the person who caused the activity.
+  let membersQuery = admin
     .from('album_members')
     .select('user_id')
     .eq('album_id', record.album_id);
-  if (record.actor_id) q = q.neq('user_id', record.actor_id);
-  const { data: members, error: mErr } = await q;
-  if (mErr) return new Response(JSON.stringify({ error: mErr.message }), { status: 500 });
+  if (record.actor_id) membersQuery = membersQuery.neq('user_id', record.actor_id);
+  const { data: members, error: membersError } = await membersQuery;
+  if (membersError) {
+    console.error('Could not load album members:', membersError.message);
+    return new Response('recipient lookup failed', { status: 500 });
+  }
+  const memberIds = [...new Set(((members ?? []) as MemberRow[]).map((member) => member.user_id))];
+  if (!memberIds.length) return jsonResponse({ sent: 0, reason: 'no recipients' });
 
-  const userIds = ((members ?? []) as MemberRow[]).map((m) => m.user_id);
-  if (!userIds.length) return new Response('no recipients');
+  // Notification settings are account-scoped and enforced server-side, so a
+  // disabled switch cannot be bypassed by another device or a stale token.
+  const { data: profiles, error: profilesError } = await admin
+    .from('profiles')
+    .select(`id,push_enabled,${preferenceColumn}`)
+    .in('id', memberIds);
+  if (profilesError) {
+    console.error('Could not load notification preferences:', profilesError.message);
+    return new Response('preferences lookup failed', { status: 500 });
+  }
+  const eligibleIds = ((profiles ?? []) as unknown as PreferenceRow[])
+    .filter((profile) => profile.push_enabled && profile[preferenceColumn])
+    .map((profile) => profile.id);
+  if (!eligibleIds.length) return jsonResponse({ sent: 0, reason: 'notifications disabled' });
 
-  // 3. Leurs tokens Expo Push (tous appareils confondus)
-  const { data: tokens } = await admin
+  const { data: tokenRows, error: tokensError } = await admin
     .from('push_tokens')
-    .select('token')
-    .in('user_id', userIds);
-  if (!tokens?.length) return new Response('no tokens');
+    .select('user_id,token')
+    .in('user_id', eligibleIds);
+  if (tokensError) {
+    console.error('Could not load Expo tokens:', tokensError.message);
+    return new Response('token lookup failed', { status: 500 });
+  }
+  const tokens = [...new Set(((tokenRows ?? []) as TokenRow[]).map((row) => row.token))];
+  if (!tokens.length) return jsonResponse({ sent: 0, reason: 'no registered devices' });
 
-  // 4. Messages Expo Push (l'API Expo relaie vers FCM/APNs — aucun secret
-  //    FCM/APNs dans l'app, conformément à api.md §13.6)
-  const kind = String(record.kind || '');
-  const body = (BODIES[kind] || ((r: ActivityRecord) => `Nouvelle activité dans « ${r.album_name} »`))(record);
-  const messages = ((tokens ?? []) as TokenRow[]).map((t) => ({
-    to: t.token,
+  const messages = tokens.map((token) => ({
+    to: token,
+    title: notification.title,
+    body: notification.body,
     sound: 'default',
-    title: `${TITLES[kind] || 'SharePix'}`,
-    body,
-    data: { albumId: record.album_id },
+    priority: 'default',
+    channelId: ANDROID_CHANNEL_ID,
+    data: {
+      albumId: record.album_id,
+      activityId: record.id || null,
+      photoId: record.photo_id || null,
+      kind: record.kind,
+    },
   }));
 
-  const res = await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(messages),
-  });
-  const expo = await res.json().catch(() => null);
-  console.log('expo push →', res.status, JSON.stringify(expo));
+  let accepted = 0;
+  let failed = 0;
+  const expiredTokens = new Set<string>();
 
-  return new Response(JSON.stringify({ sent: messages.length, status: res.status }));
+  for (let start = 0; start < messages.length; start += MAX_MESSAGES_PER_REQUEST) {
+    const batch = messages.slice(start, start + MAX_MESSAGES_PER_REQUEST);
+    let response: Response;
+    try {
+      response = await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+      });
+    } catch (error) {
+      console.error('Expo Push request failed:', error instanceof Error ? error.message : 'network error');
+      return new Response('push provider unavailable', { status: 502 });
+    }
+
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result) {
+      console.error('Expo Push rejected the batch:', response.status);
+      return new Response('push provider rejected request', { status: 502 });
+    }
+
+    const tickets = Array.isArray(result.data) ? result.data : [];
+    tickets.forEach((ticket: { status?: string; details?: { error?: string } }, index: number) => {
+      if (ticket.status === 'ok') accepted += 1;
+      else {
+        failed += 1;
+        if (ticket.details?.error === 'DeviceNotRegistered') {
+          expiredTokens.add(batch[index].to);
+        }
+      }
+    });
+  }
+
+  if (expiredTokens.size) {
+    const { error } = await admin
+      .from('push_tokens')
+      .delete()
+      .in('token', [...expiredTokens]);
+    if (error) console.error('Could not clean expired push tokens:', error.message);
+  }
+
+  // Never log Expo tokens or message bodies.
+  console.log(`activity-push: accepted=${accepted}, failed=${failed}, expired=${expiredTokens.size}`);
+  return jsonResponse({ sent: accepted, failed, expired: expiredTokens.size });
 });

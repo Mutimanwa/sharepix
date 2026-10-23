@@ -19,6 +19,13 @@ function toAppUser(supaUser, profile) {
     // ON REGARDE ICI : D'abord le profil custom, SINON les metadatas Google ('picture' ou 'avatar_url')
     avatarUrl: profile?.avatar_url ?? meta?.avatar_url ?? meta?.picture ?? null,
     isAnonymous: supaUser.is_anonymous ?? false,
+    notificationPreferences: profile ? {
+      notifications: profile.push_enabled ?? false,
+      newPhotos: profile.push_new_photos ?? true,
+      likes: profile.push_likes ?? true,
+      comments: profile.push_comments ?? true,
+      memberJoined: profile.push_members ?? true,
+    } : null,
   };
 }
 
@@ -36,7 +43,8 @@ export async function initializeAuth() {
     const { data, error } = await supabase.auth.signInAnonymously();
     
     if (!error && data.user) {
-      user = toAppUser(data.user, null);
+      const profile = await fetchProfile(data.user.id);
+      user = toAppUser(data.user, profile);
     }
   }
   
@@ -201,7 +209,8 @@ export async function linkGoogleIdentity() {
   const user = refreshed?.user;
 
   if (user && user.is_anonymous === false) {
-    return { success: true };
+    const profile = await fetchProfile(user.id);
+    return { success: true, user: toAppUser(user, profile) };
   }
   if (result.type === 'cancel' || result.type === 'dismiss') {
     throw new Error('Liaison Google annulée');
@@ -586,17 +595,34 @@ export async function convertAnonymousUser(email, password, metadata = {}) {
 
 // ── Mise à jour du profil ──────────────────────────────────────────────
 
-export async function syncProfile(userId, { firstName, lastName }) {
-  if (!supabase || !userId) return;
+export async function syncProfile(userId, profileData = {}) {
+  if (!supabase || !userId) return false;
+  const row = {
+    id: userId,
+    first_name: profileData.firstName,
+    last_name: profileData.lastName,
+    updated_at: new Date().toISOString(),
+  };
+  const preferenceColumns = {
+    notifications: 'push_enabled',
+    newPhotos: 'push_new_photos',
+    likes: 'push_likes',
+    comments: 'push_comments',
+    memberJoined: 'push_members',
+  };
+  for (const [appKey, column] of Object.entries(preferenceColumns)) {
+    if (Object.prototype.hasOwnProperty.call(profileData, appKey)) {
+      row[column] = Boolean(profileData[appKey]);
+    }
+  }
+
   try {
-    await supabase.from('profiles').upsert({
-      id: userId,
-      first_name: firstName,
-      last_name: lastName,
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await supabase.from('profiles').upsert(row);
+    if (error) throw error;
+    return true;
   } catch (error) {
-    console.log('Profile sync error:', error);
+    console.log('Profile sync error:', error?.message || error);
+    return false;
   }
 }
 

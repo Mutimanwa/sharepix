@@ -48,12 +48,18 @@ export function CoralButton({
   textColor = '#fff',
   style = {},
   height = 45,
+  accessibilityRole = 'button',
+  accessibilityLabel,
+  testID,
 }) {
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel || title}
+      testID={testID}
       style={[
         styles.btn,
         { 
@@ -226,6 +232,7 @@ export function Sheet({
       visible={visible}
       animationType="slide"
       transparent
+      onRequestClose={onClose}
       statusBarTranslucent
       navigationBarTranslucent
     >
