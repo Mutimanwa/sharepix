@@ -1,10 +1,9 @@
 // ── Supabase Edge Function: activity-push ────────────────────────────────
 // Called by the activity_log INSERT trigger. It sends only the activity
 // categories enabled on each recipient's profile.
-// Resolve through Deno's native npm support instead of a remote esm.sh URL.
+// Deno's import map in deno.json pins this bare specifier to an npm version.
 // Production previously returned HTTP 503 BOOT_ERROR before the handler ran.
-// eslint-disable-next-line import/no-unresolved -- Deno resolves npm: specifiers.
-import { createClient } from 'npm:@supabase/supabase-js@2.115.0';
+import { createClient } from '@supabase/supabase-js';
 
 interface ActivityRecord {
   id?: string;
