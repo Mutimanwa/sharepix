@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
 
   let accepted = 0;
   let failed = 0;
+  const providerErrors: Record<string, number> = {};
   const expiredTokens = new Set<string>();
 
   for (let start = 0; start < messages.length; start += MAX_MESSAGES_PER_REQUEST) {
@@ -203,7 +204,12 @@ Deno.serve(async (req) => {
       if (ticket.status === 'ok') accepted += 1;
       else {
         failed += 1;
-        if (ticket.details?.error === 'DeviceNotRegistered') {
+        const rawErrorCode = ticket.details?.error;
+        const errorCode = typeof rawErrorCode === 'string' && /^[A-Z][A-Za-z0-9]{0,63}$/.test(rawErrorCode)
+          ? rawErrorCode
+          : 'Unknown';
+        providerErrors[errorCode] = (providerErrors[errorCode] ?? 0) + 1;
+        if (rawErrorCode === 'DeviceNotRegistered') {
           expiredTokens.add(batch[index].to);
         }
       }
@@ -218,7 +224,7 @@ Deno.serve(async (req) => {
     if (error) console.error('Could not clean expired push tokens:', error.message);
   }
 
-  // Never log Expo tokens or message bodies.
-  console.log(`activity-push: accepted=${accepted}, failed=${failed}, expired=${expiredTokens.size}`);
-  return jsonResponse({ sent: accepted, failed, expired: expiredTokens.size });
+  // Log only aggregate counts and sanitized Expo error codes, never tokens or messages.
+  console.log(`activity-push: accepted=${accepted}, failed=${failed}, expired=${expiredTokens.size}, providerErrors=${JSON.stringify(providerErrors)}`);
+  return jsonResponse({ sent: accepted, failed, expired: expiredTokens.size, providerErrors });
 });
