@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { colors } from '../theme';
 import { CoralButton, Field, Logo, Sheet, Page } from '../components/UI';
 // ── SQUELETTES : intégration ──
@@ -28,7 +28,18 @@ import {
   ArrowRight01Icon,
 } from '@hugeicons/core-free-icons';
 import { useStore } from '../store';
+import { cloudFetchRecentPhotos, subscribePhotosSummary } from '../services/albums';
 import { StatusBar } from 'expo-status-bar';
+
+function formatRecentDate(timestamp) {
+  if (!timestamp) return 'récemment';
+  const minutes = Math.floor((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  return new Date(timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
 
 const suggestions = [
   { title: 'Vacances', sub: 'Vos plus beaux voyages', bg: '#D6F0F1', Icon: IconVacances },
@@ -52,6 +63,56 @@ export default function HomeScreen() {
   // <-- AJOUT des states de chargement
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
+  const [cloudRecentPhotos, setCloudRecentPhotos] = useState([]);
+  const recentRefreshTimer = useRef(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!state.user?.id) {
+        setCloudRecentPhotos([]);
+        return undefined;
+      }
+      let active = true;
+      cloudFetchRecentPhotos(12)
+        .then(({ data, error }) => {
+          if (active && !error) setCloudRecentPhotos(data || []);
+        })
+        .catch(() => {});
+      return () => { active = false; };
+    }, [state.user?.id])
+  );
+
+  useEffect(() => {
+    if (!state.user?.id) return undefined;
+    const unsubscribe = subscribePhotosSummary(() => {
+      clearTimeout(recentRefreshTimer.current);
+      recentRefreshTimer.current = setTimeout(async () => {
+        try {
+          const { data, error } = await cloudFetchRecentPhotos(12);
+          if (!error) setCloudRecentPhotos(data || []);
+        } catch {
+          // Les dernières photos déjà affichées restent disponibles hors-ligne.
+        }
+      }, 650);
+    });
+    return () => {
+      clearTimeout(recentRefreshTimer.current);
+      unsubscribe();
+    };
+  }, [state.user?.id]);
+
+  const recentPhotos = useMemo(() => {
+    const byId = new Map((cloudRecentPhotos || []).map((photo) => [photo.id, photo]));
+    state.albums.forEach((album) => {
+      (album.photos || []).forEach((photo) => {
+        if (!byId.has(photo.id)) byId.set(photo.id, { ...photo, albumId: album.id, albumName: album.name });
+      });
+    });
+    return [...byId.values()]
+      .filter((photo) => photo.uri && photo.albumId)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 12);
+  }, [cloudRecentPhotos, state.albums]);
 
   const openCreatePopup = () => {
     setJoinStage(null);
@@ -194,6 +255,43 @@ export default function HomeScreen() {
         keyboardShouldPersistTaps="handled"
       >
 
+        {recentPhotos.length > 0 && (
+          <View style={styles.recentSection}>
+            <View style={styles.rowHead}>
+              <Text style={styles.h}>Photos récentes</Text>
+              <Text style={styles.recentHint}>Tous vos albums</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentRail}>
+              {recentPhotos.map((photo) => (
+                <TouchableOpacity
+                  key={`${photo.albumId}:${photo.id}`}
+                  style={styles.recentCard}
+                  activeOpacity={0.85}
+                  onPress={() => nav.navigate('Album', { id: photo.albumId })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ouvrir l’album ${photo.albumName || 'photo récente'}`}
+                >
+                  <View style={styles.recentImageWrap}>
+                    <ProgressiveImage
+                      uri={photo.uri}
+                      storagePath={photo.storagePath}
+                      style={styles.recentImage}
+                      radius={12}
+                    />
+                    <View style={styles.recentTimePill}>
+                      <Text style={styles.recentTime}>{formatRecentDate(photo.createdAt)}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.recentAlbumName} numberOfLines={1}>{photo.albumName || 'Album'}</Text>
+                  <Text style={styles.recentAuthor} numberOfLines={1}>
+                    {photo.authorName ? `Ajoutée par ${photo.authorName}` : 'Nouvelle photo'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Idee d'albums */}
         <Text style={styles.h}>Idées d'albums</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
@@ -217,6 +315,8 @@ export default function HomeScreen() {
             );
           })}
         </ScrollView>
+
+
 
         {/* Albums */}
         <View style={styles.rowHead}>
@@ -435,6 +535,24 @@ const styles = StyleSheet.create({
   ideaT: { fontWeight: '700', color: colors.tealDark, fontSize: 15 },
   ideaS: { color: '#434848', marginTop: 4, fontSize: 15 },
   rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18 },
+  recentSection: { marginTop: 3 },
+  recentHint: { color: colors.muted, fontSize: 12, marginTop: 18 },
+  recentRail: { paddingLeft: 18, paddingRight: 8, paddingBottom: 4 },
+  recentCard: { width: 132, marginRight: 11 },
+  recentImageWrap: { height: 142, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cream },
+  recentImage: { width: '100%', height: '100%' },
+  recentTimePill: {
+    position: 'absolute',
+    left: 7,
+    bottom: 7,
+    borderRadius: 11,
+    backgroundColor: 'rgba(20, 35, 35, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  recentTime: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  recentAlbumName: { color: colors.tealDark, fontSize: 13, fontWeight: '700', marginTop: 7 },
+  recentAuthor: { color: colors.muted, fontSize: 11, marginTop: 2 },
   count: {
     marginTop: 10,
     backgroundColor: colors.teal,

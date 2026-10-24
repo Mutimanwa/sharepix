@@ -40,6 +40,7 @@ import {
   cloudRemoveMember,
   cloudDeleteComment,
   cloudFetchAlbumsSummary,
+  photoDuplicateKey,
   subscribePhotosSummary,
   clearSignedUrlCache, // ── BUG-01 / P1-12 : purge le cache d'URLs signées ──
 } from './services/albums';
@@ -427,7 +428,20 @@ export function StoreProvider({ children }) {
       },
       
           // ── CLOUD & LOCAL : Ajouter une photo ──
-      addPhoto: async (albumId, uri) => {
+      addPhoto: async (albumId, assetOrUri) => {
+        const asset = typeof assetOrUri === 'string' ? { uri: assetOrUri } : (assetOrUri || {});
+        const uri = asset.uri;
+        const sourceName = asset.originalName || asset.fileName || String(uri || '').split('/').pop().split('\\').pop()?.split('?')[0] || 'photo';
+        let originalName = String(sourceName);
+        try { originalName = decodeURIComponent(originalName); } catch { /* nom déjà lisible */ }
+        let fileSize = Number(asset.fileSize) || 0;
+        const width = Number(asset.width) || null;
+        const height = Number(asset.height) || null;
+        const mimeType = asset.mimeType || '';
+        const captureValue = asset.capturedAt || asset.exif?.DateTimeOriginal || asset.exif?.DateTime;
+        const capturedAt = captureValue && Number.isFinite(new Date(captureValue).getTime())
+          ? new Date(captureValue).toISOString()
+          : null;
         // ── SUPABASE ALBUMS : intégration ──
         // Cloud uniquement si l'album est réellement synchronisé :
         // un album local a un id timestamp (non-UUID) que la FK
@@ -448,6 +462,12 @@ export function StoreProvider({ children }) {
                       {
                         id: randomId(),
                         uri, // URI locale (file://...)
+                        originalName,
+                        fileSize,
+                        width,
+                        height,
+                        mimeType,
+                        capturedAt: capturedAt ? new Date(capturedAt).getTime() : null,
                         createdAt: Date.now(),
                         liked: false,
                         favorite: false,
@@ -479,6 +499,7 @@ export function StoreProvider({ children }) {
             // SUR LE WEB : On convertit le Data URI en objet Blob que Supabase comprend parfaitement
             const response = await fetch(uri);
             fileToUpload = await response.blob();
+            fileSize = fileSize || Number(fileToUpload.size) || 0;
             if (fileToUpload.size > MAX_UPLOAD_BYTES) throw new Error(TOO_LARGE_MESSAGE);
             if (fileToUpload.type) fileMime = fileToUpload.type;
           } else {
@@ -497,6 +518,7 @@ export function StoreProvider({ children }) {
             // taille est TOUJOURS renvoyée pour un fichier existant, mais
             // elle n'existe pas dans la branche `exists: false` du type.
             const info = await FileSystem.getInfoAsync(uri);
+            fileSize = fileSize || (info.exists ? Number(info.size) || 0 : 0);
             if (info.exists && info.size > MAX_UPLOAD_BYTES) throw new Error(TOO_LARGE_MESSAGE);
 
             // ── P1-11 : alléger AVANT de charger en mémoire ──
@@ -559,6 +581,13 @@ export function StoreProvider({ children }) {
             .insert({
               album_id: albumId,
               storage_path: uploadData.path,
+              original_name: originalName,
+              duplicate_key: photoDuplicateKey(originalName),
+              file_size: fileSize || null,
+              width,
+              height,
+              mime_type: fileMime || mimeType || null,
+              captured_at: capturedAt,
               // ── SUPABASE ALBUMS : prénom pour le centre d'activités ──
               author_name: state.profile.firstName || '',
             })
@@ -592,6 +621,12 @@ export function StoreProvider({ children }) {
             // ── SUPABASE ALBUMS : intégration ──
             cloud: true,
             storagePath: uploadData.path, // nécessaire pour la suppression
+            originalName,
+            fileSize: fileSize || null,
+            width,
+            height,
+            mimeType: fileMime || mimeType,
+            capturedAt: capturedAt ? new Date(capturedAt).getTime() : null,
             // ── SUPABASE ALBUMS : fin ──
             createdAt: Date.now(),
             liked: false,
