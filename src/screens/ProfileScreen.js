@@ -429,6 +429,20 @@ export default function ProfileScreen({ navigation }) {
             value={p.memberJoined}
             onValueChange={(v) => changePushCategory('memberJoined', v)}
             disabled={!p.notifications}
+          />
+          <SwitchRow
+            title="Souvenirs"
+            sub="Anniversaires d’albums et de photos, entre 8 h et 22 h"
+            value={p.memories}
+            onValueChange={(v) => changePushCategory('memories', v)}
+            disabled={!p.notifications}
+          />
+          <SwitchRow
+            title="Rappels d’invitation"
+            sub="Une fois après 24 h si votre album est toujours vide, entre 8 h et 22 h"
+            value={p.reminders}
+            onValueChange={(v) => changePushCategory('reminders', v)}
+            disabled={!p.notifications}
             isLast
           />
         </View>

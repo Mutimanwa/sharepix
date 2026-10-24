@@ -62,6 +62,8 @@ const defaultState = {
     likes: true,
     comments: true,
     memberJoined: true,
+    memories: true,
+    reminders: true,
   },
   albums: [],
 };
@@ -175,8 +177,19 @@ export function StoreProvider({ children }) {
                 likes: user.notificationPreferences?.likes ?? true,
                 comments: user.notificationPreferences?.comments ?? true,
                 memberJoined: user.notificationPreferences?.memberJoined ?? true,
+                memories: user.notificationPreferences?.memories ?? true,
+                reminders: user.notificationPreferences?.reminders ?? true,
               },
             }));
+
+            // Le worker utilise le fuseau IANA de l’appareil pour respecter
+            // la plage silencieuse locale des souvenirs et rappels programmés.
+            try {
+              const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+              syncProfile(user.id, { timezone }).catch(() => {});
+            } catch {
+              syncProfile(user.id, { timezone: 'UTC' }).catch(() => {});
+            }
 
             // Ré-enregistre silencieusement ce téléphone si le compte a déjà
             // choisi les push et que l’autorisation système est encore active.
@@ -295,6 +308,8 @@ export function StoreProvider({ children }) {
             likes: user?.notificationPreferences?.likes ?? true,
             comments: user?.notificationPreferences?.comments ?? true,
             memberJoined: user?.notificationPreferences?.memberJoined ?? true,
+            memories: user?.notificationPreferences?.memories ?? true,
+            reminders: user?.notificationPreferences?.reminders ?? true,
           },
         }));
       },
