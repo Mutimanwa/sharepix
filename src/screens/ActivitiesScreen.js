@@ -23,7 +23,7 @@ import {
   Delete02Icon,
   Tick02Icon,
 } from '@hugeicons/core-free-icons';
-import { BackButton } from '../components/UI';
+import { BackButton, CoralButton, Sheet } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
 import { StatusBar } from 'expo-status-bar';
@@ -134,6 +134,8 @@ export default function ActivitiesScreen({ navigation }) {
 
   // Mode sélection multiple (appui long, comme dans l'album)
   const [selected, setSelected] = useState(null);
+  const [confirmDismissActivities, setConfirmDismissActivities] = useState(false);
+  const [dismissingActivities, setDismissingActivities] = useState(false);
   const selecting = selected !== null;
 
   const enterSelection = (id) => setSelected([id]);
@@ -143,11 +145,26 @@ export default function ActivitiesScreen({ navigation }) {
   const selectAll = () =>
     setSelected(selected.length === items.length ? [] : items.map((i) => i.id));
 
-  const dismissSelected = () => {
-    cloudDismissActivities(selected).catch(() => {});
-    const ids = new Set(selected);
-    setItems((cur) => cur.filter((i) => !ids.has(i.id)));
-    exitSelection();
+  const dismissSelected = async () => {
+    if (!selected?.length || dismissingActivities) return;
+
+    setDismissingActivities(true);
+    try {
+      const { error } = await cloudDismissActivities(selected);
+      if (error) throw error;
+
+      const ids = new Set(selected);
+      setItems((cur) => cur.filter((item) => !ids.has(item.id)));
+      setConfirmDismissActivities(false);
+      exitSelection();
+    } catch (error) {
+      Alert.alert(
+        'Masquage impossible',
+        error?.message || 'Les activités sélectionnées n’ont pas pu être masquées. Réessayez.'
+      );
+    } finally {
+      setDismissingActivities(false);
+    }
   };
   // ── SUPABASE ALBUMS : fin ──
 
@@ -254,18 +271,27 @@ export default function ActivitiesScreen({ navigation }) {
             <Text style={[styles.title, { flex: 1 }]}>
               {selected.length} sélectionnée{selected.length > 1 ? 's' : ''}
             </Text>
-            <TouchableOpacity onPress={selectAll} style={styles.headerBtn} hitSlop={10}>
+            <TouchableOpacity
+              onPress={selectAll}
+              style={styles.headerBtn}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={selected.length === items.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            >
               <HugeiconsIcon icon={Tick02Icon} size={21} color={colors.tealDark} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => selected.length && dismissSelected()}
+              onPress={() => selected.length && setConfirmDismissActivities(true)}
               style={styles.headerBtn}
               hitSlop={10}
+              disabled={!selected.length || dismissingActivities}
+              accessibilityRole="button"
+              accessibilityLabel={`Masquer ${selected.length} activité${selected.length > 1 ? 's' : ''}`}
             >
               <HugeiconsIcon
                 icon={Delete02Icon}
                 size={21}
-                color={selected.length ? colors.coral : colors.border}
+                color={selected.length && !dismissingActivities ? colors.coral : colors.border}
               />
             </TouchableOpacity>
           </>
@@ -314,6 +340,36 @@ export default function ActivitiesScreen({ navigation }) {
           </View>
         }
       />
+
+      <Sheet
+        title="Masquer des activités"
+        visible={confirmDismissActivities}
+        onClose={() => !dismissingActivities && setConfirmDismissActivities(false)}
+      >
+        <View style={styles.dismissIcon}>
+          <HugeiconsIcon icon={Delete02Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.dismissTitle}>
+          Masquer {selected?.length || 0} activité{(selected?.length || 0) > 1 ? 's' : ''} ?
+        </Text>
+        <Text style={styles.dismissCopy}>
+          Ces activités seront masquées uniquement dans votre fil. Les albums, photos et commentaires ne seront pas supprimés.
+        </Text>
+        <CoralButton
+          title={dismissingActivities ? 'Masquage…' : 'Masquer'}
+          onPress={dismissSelected}
+          disabled={!selected?.length || dismissingActivities}
+          color={colors.coral}
+        />
+        <TouchableOpacity
+          style={styles.dismissCancel}
+          onPress={() => setConfirmDismissActivities(false)}
+          disabled={dismissingActivities}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.dismissCancelText}>Annuler</Text>
+        </TouchableOpacity>
+      </Sheet>
     </SafeAreaView>
   );
 }
@@ -426,5 +482,31 @@ const styles = StyleSheet.create({
   },
   selDotOn: { backgroundColor: colors.teal, borderColor: colors.teal },
   headerBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  dismissIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFF0ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  dismissTitle: {
+    color: colors.tealDark,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  dismissCopy: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 18,
+  },
+  dismissCancel: { alignItems: 'center', paddingVertical: 14 },
+  dismissCancelText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   selectLink: { color: colors.teal, fontWeight: '700', fontSize: 14, padding: 6 },
 });
