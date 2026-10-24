@@ -270,12 +270,89 @@ export function mapCloudPhoto(row, signedUrl = '') {
     uri: signedUrl, // URL signée (1 h), pas d'URL publique
     storagePath: row.storage_path,
     cloud: true,
+    albumId: row.album_id,
+    albumName: row.albums?.name || '',
+    authorName: row.author_name || '',
+    originalName: row.original_name || '',
+    fileSize: row.file_size ?? null,
+    width: row.width ?? null,
+    height: row.height ?? null,
+    mimeType: row.mime_type || '',
+    capturedAt: row.captured_at ? new Date(row.captured_at).getTime() : null,
     createdAt: new Date(row.created_at).getTime(),
     liked: false,
     likesCount: 0,
     favorite: false,
     comments: [],
   };
+}
+
+/** Normalise un nom de fichier pour ne comparer que des photos du même album. */
+export function photoDuplicateKey(name) {
+  return String(name || '').split('/').pop().split('\\').pop()
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
+}
+
+/** Retourne un doublon possible (jamais une décision automatique). */
+export async function cloudFindPossibleDuplicate(albumId, metadata) {
+  if (!supabase || !isCloudId(albumId)) return { data: null, error: null };
+  const duplicateKey = photoDuplicateKey(metadata?.originalName);
+  const fileSize = Number(metadata?.fileSize) || 0;
+  if (!duplicateKey || !fileSize) return { data: null, error: null };
+
+  const { data, error } = await supabase
+    .from('photos')
+    .select('id, album_id, storage_path, original_name, duplicate_key, file_size, width, height, mime_type, captured_at, author_name, created_at')
+    .eq('album_id', albumId)
+    .eq('duplicate_key', duplicateKey)
+    .eq('file_size', fileSize)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (error) return { data: null, error };
+
+  const metadataMatches = (photo) => {
+    if (metadata.width && photo.width && Number(metadata.width) !== photo.width) return false;
+    if (metadata.height && photo.height && Number(metadata.height) !== photo.height) return false;
+    if (metadata.capturedAt && photo.captured_at) {
+      const captureTime = new Date(photo.captured_at).getTime();
+      if (Number.isFinite(captureTime) && Math.abs(Number(metadata.capturedAt) - captureTime) > 5000) return false;
+    }
+    return true;
+  };
+  let candidate = (data || []).find(metadataMatches);
+
+  // Les anciennes versions n'enregistraient pas le nom. La migration
+  // récupère leur taille depuis Storage : on peut alors proposer un aperçu
+  // de même taille, clairement comme candidat moins certain.
+  if (!candidate) {
+    const { data: legacyRows, error: legacyError } = await supabase
+      .from('photos')
+      .select('id, album_id, storage_path, original_name, duplicate_key, file_size, width, height, mime_type, captured_at, author_name, created_at')
+      .eq('album_id', albumId)
+      .is('original_name', null)
+      .eq('file_size', fileSize)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (legacyError) return { data: null, error: legacyError };
+    candidate = (legacyRows || []).find(metadataMatches);
+  }
+  if (!candidate) return { data: null, error: null };
+  const [photo] = await withSignedUrls([candidate]);
+  return { data: photo || null, error: null };
+}
+
+/** Les images les plus récemment ajoutées parmi tous les albums accessibles par RLS. */
+export async function cloudFetchRecentPhotos(limit = 12) {
+  if (!supabase) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('photos')
+    .select('*, albums(name)')
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(Number(limit) || 12, 30)));
+  if (error) return { data: [], error };
+  return { data: await withSignedUrls(data || []), error: null };
 }
 
 /** Signe l'URL d'UNE photo (appelé juste après un upload, store.addPhoto). */

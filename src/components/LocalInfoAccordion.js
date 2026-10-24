@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
+import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { colors } from '../theme';
 
 /** Groupe d'informations dépliant, intégré dans l'écran (sans navigateur). */
@@ -28,7 +28,7 @@ export default function LocalInfoAccordion({ title, intro, sections, updatedAt, 
           </View>
         </View>
         <HugeiconsIcon
-          icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
+          icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
           size={19}
           color={colors.teal}
           accessibilityElementsHidden

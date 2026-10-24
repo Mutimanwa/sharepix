@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // ── BUG-03 : SafeAreaView depuis react-native-safe-area-context ──
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,7 +24,7 @@ import {
   Delete02Icon,
   Tick02Icon,
 } from '@hugeicons/core-free-icons';
-import { BackButton } from '../components/UI';
+import { BackButton, CoralButton, Sheet } from '../components/UI';
 import { useStore } from '../store';
 import { colors } from '../theme';
 import { StatusBar } from 'expo-status-bar';
@@ -89,6 +90,35 @@ export default function ActivitiesScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState(false);
+  const user = state.user;
+
+  useEffect(() => {
+    let active = true;
+    const loadWelcomeNotice = async () => {
+      const createdAt = Date.parse(user?.createdAt || '');
+      const ageMs = Date.now() - createdAt;
+      if (!user?.id || !Number.isFinite(createdAt) || ageMs < 0 || ageMs > 7 * 24 * 60 * 60 * 1000) {
+        if (active) setWelcomeVisible(false);
+        return;
+      }
+      try {
+        const seen = await AsyncStorage.getItem(`sharepix.welcome.v1:${user.id}`);
+        if (active) setWelcomeVisible(seen !== 'seen');
+      } catch {
+        if (active) setWelcomeVisible(true);
+      }
+    };
+    loadWelcomeNotice();
+    return () => { active = false; };
+  }, [user?.id, user?.createdAt]);
+
+  const dismissWelcomeNotice = async () => {
+    if (user?.id) {
+      await AsyncStorage.setItem(`sharepix.welcome.v1:${user.id}`, 'seen').catch(() => {});
+    }
+    setWelcomeVisible(false);
+  };
 
   const load = useCallback(async () => {
     const { data, error } = await cloudFetchActivity(50);
@@ -134,6 +164,8 @@ export default function ActivitiesScreen({ navigation }) {
 
   // Mode sélection multiple (appui long, comme dans l'album)
   const [selected, setSelected] = useState(null);
+  const [confirmDismissActivities, setConfirmDismissActivities] = useState(false);
+  const [dismissingActivities, setDismissingActivities] = useState(false);
   const selecting = selected !== null;
 
   const enterSelection = (id) => setSelected([id]);
@@ -143,11 +175,26 @@ export default function ActivitiesScreen({ navigation }) {
   const selectAll = () =>
     setSelected(selected.length === items.length ? [] : items.map((i) => i.id));
 
-  const dismissSelected = () => {
-    cloudDismissActivities(selected).catch(() => {});
-    const ids = new Set(selected);
-    setItems((cur) => cur.filter((i) => !ids.has(i.id)));
-    exitSelection();
+  const dismissSelected = async () => {
+    if (!selected?.length || dismissingActivities) return;
+
+    setDismissingActivities(true);
+    try {
+      const { error } = await cloudDismissActivities(selected);
+      if (error) throw error;
+
+      const ids = new Set(selected);
+      setItems((cur) => cur.filter((item) => !ids.has(item.id)));
+      setConfirmDismissActivities(false);
+      exitSelection();
+    } catch (error) {
+      Alert.alert(
+        'Masquage impossible',
+        error?.message || 'Les activités sélectionnées n’ont pas pu être masquées. Réessayez.'
+      );
+    } finally {
+      setDismissingActivities(false);
+    }
   };
   // ── SUPABASE ALBUMS : fin ──
 
@@ -199,6 +246,51 @@ export default function ActivitiesScreen({ navigation }) {
       </TouchableOpacity>
     </View>
   );
+
+  const renderSystemNotices = () => {
+    if (!welcomeVisible && !user?.isAnonymous) return null;
+    return (
+      <View style={styles.systemNotices}>
+        {welcomeVisible && (
+          <View style={styles.systemNotice}>
+            <View style={styles.systemNoticeIcon}>
+              <HugeiconsIcon icon={Notification03Icon} size={19} color={colors.tealDark} />
+            </View>
+            <View style={styles.systemNoticeCopy}>
+              <Text style={styles.systemNoticeTitle}>Bienvenue sur SharePix !</Text>
+              <Text style={styles.systemNoticeText}>Créez un album et invitez vos proches à partager leurs photos.</Text>
+            </View>
+            <TouchableOpacity
+              onPress={dismissWelcomeNotice}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer le message de bienvenue"
+            >
+              <HugeiconsIcon icon={Tick02Icon} size={20} color={colors.teal} />
+            </TouchableOpacity>
+          </View>
+        )}
+        {user?.isAnonymous && (
+          <TouchableOpacity
+            style={[styles.systemNotice, styles.anonymousNotice]}
+            onPress={() => navigation.navigate('Auth', { mode: 'convert' })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Lier ce compte anonyme à Google ou Gmail"
+          >
+            <View style={[styles.systemNoticeIcon, styles.anonymousNoticeIcon]}>
+              <HugeiconsIcon icon={UserAdd01Icon} size={19} color={colors.coralDark} />
+            </View>
+            <View style={styles.systemNoticeCopy}>
+              <Text style={[styles.systemNoticeTitle, styles.anonymousNoticeTitle]}>Sécurisez votre compte invité</Text>
+              <Text style={styles.systemNoticeText}>Liez-le à Google/Gmail pour retrouver vos albums sur un autre appareil.</Text>
+            </View>
+            <Text style={styles.noticeAction}>Lier</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   const renderItem = ({ item }) => {
     const kind = KINDS[item.kind] || KINDS.photo_added;
@@ -254,23 +346,33 @@ export default function ActivitiesScreen({ navigation }) {
             <Text style={[styles.title, { flex: 1 }]}>
               {selected.length} sélectionnée{selected.length > 1 ? 's' : ''}
             </Text>
-            <TouchableOpacity onPress={selectAll} style={styles.headerBtn} hitSlop={10}>
+            <TouchableOpacity
+              onPress={selectAll}
+              style={styles.headerBtn}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={selected.length === items.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            >
               <HugeiconsIcon icon={Tick02Icon} size={21} color={colors.tealDark} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => selected.length && dismissSelected()}
+              onPress={() => selected.length && setConfirmDismissActivities(true)}
               style={styles.headerBtn}
               hitSlop={10}
+              disabled={!selected.length || dismissingActivities}
+              accessibilityRole="button"
+              accessibilityLabel={`Masquer ${selected.length} activité${selected.length > 1 ? 's' : ''}`}
             >
               <HugeiconsIcon
                 icon={Delete02Icon}
                 size={21}
-                color={selected.length ? colors.coral : colors.border}
+                color={selected.length && !dismissingActivities ? colors.coral : colors.border}
               />
             </TouchableOpacity>
           </>
         ) : (
           <>
+            <View style={styles.headerIconSpacer} />
             <Text style={[styles.title, { flex: 1 }]}>Activités</Text>
             {items.length > 0 && (
               <TouchableOpacity onPress={() => setSelected([])} hitSlop={10}>
@@ -286,7 +388,8 @@ export default function ActivitiesScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         extraData={selected}
-        ListHeaderComponent={!notificationsEnabled ? renderEnableBanner : null}
+        ListHeaderComponent={renderSystemNotices}
+        ListFooterComponent={!notificationsEnabled ? renderEnableBanner : null}
         contentContainerStyle={[
           items.length === 0 && styles.content,
           { paddingBottom: insets.bottom + 20 },
@@ -314,6 +417,36 @@ export default function ActivitiesScreen({ navigation }) {
           </View>
         }
       />
+
+      <Sheet
+        title="Masquer des activités"
+        visible={confirmDismissActivities}
+        onClose={() => !dismissingActivities && setConfirmDismissActivities(false)}
+      >
+        <View style={styles.dismissIcon}>
+          <HugeiconsIcon icon={Delete02Icon} size={28} color={colors.coral} />
+        </View>
+        <Text style={styles.dismissTitle}>
+          Masquer {selected?.length || 0} activité{(selected?.length || 0) > 1 ? 's' : ''} ?
+        </Text>
+        <Text style={styles.dismissCopy}>
+          Ces activités seront masquées uniquement dans votre fil. Les albums, photos et commentaires ne seront pas supprimés.
+        </Text>
+        <CoralButton
+          title={dismissingActivities ? 'Masquage…' : 'Masquer'}
+          onPress={dismissSelected}
+          disabled={!selected?.length || dismissingActivities}
+          color={colors.coral}
+        />
+        <TouchableOpacity
+          style={styles.dismissCancel}
+          onPress={() => setConfirmDismissActivities(false)}
+          disabled={dismissingActivities}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.dismissCancelText}>Annuler</Text>
+        </TouchableOpacity>
+      </Sheet>
     </SafeAreaView>
   );
 }
@@ -321,13 +454,45 @@ export default function ActivitiesScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#fff' },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  title: { fontSize: 20, fontWeight: '600', color: colors.tealDark },
+  headerIconSpacer: { width: 50, height: 40 },
+  title: { fontSize: 18, fontWeight: '600', color: colors.tealDark },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28 },
+  systemNotices: { paddingTop: 10 },
+  systemNotice: {
+    marginHorizontal: 14,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#EAF5F3',
+    borderWidth: 1,
+    borderColor: '#D5E9E6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  systemNoticeIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: '#D7EBE8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  systemNoticeCopy: { flex: 1 },
+  systemNoticeTitle: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  systemNoticeText: { color: colors.muted, fontSize: 12, lineHeight: 16, marginTop: 3 },
+  anonymousNotice: { backgroundColor: '#FFF5F1', borderColor: '#F4D9D2' },
+  anonymousNoticeIcon: { backgroundColor: '#FCE3DC' },
+  anonymousNoticeTitle: { color: colors.coralDark },
+  noticeAction: { color: colors.coralDark, fontSize: 12, fontWeight: '800', paddingHorizontal: 2 },
   pushBanner: {
     marginHorizontal: 16,
     marginTop: 14,
@@ -425,6 +590,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selDotOn: { backgroundColor: colors.teal, borderColor: colors.teal },
-  headerBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  dismissIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFF0ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  dismissTitle: {
+    color: colors.tealDark,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  dismissCopy: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 18,
+  },
+  dismissCancel: { alignItems: 'center', paddingVertical: 14 },
+  dismissCancelText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   selectLink: { color: colors.teal, fontWeight: '700', fontSize: 14, padding: 6 },
 });

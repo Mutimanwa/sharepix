@@ -19,12 +19,15 @@ function toAppUser(supaUser, profile) {
     // ON REGARDE ICI : D'abord le profil custom, SINON les metadatas Google ('picture' ou 'avatar_url')
     avatarUrl: profile?.avatar_url ?? meta?.avatar_url ?? meta?.picture ?? null,
     isAnonymous: supaUser.is_anonymous ?? false,
+    createdAt: supaUser.created_at || null,
     notificationPreferences: profile ? {
       notifications: profile.push_enabled ?? false,
       newPhotos: profile.push_new_photos ?? true,
       likes: profile.push_likes ?? true,
       comments: profile.push_comments ?? true,
       memberJoined: profile.push_members ?? true,
+      memories: profile.push_memories ?? true,
+      reminders: profile.push_reminders ?? true,
     } : null,
   };
 }
@@ -597,10 +600,17 @@ export async function convertAnonymousUser(email, password, metadata = {}) {
 
 export async function syncProfile(userId, profileData = {}) {
   if (!supabase || !userId) return false;
+  let deviceTimeZone = 'UTC';
+  try {
+    deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    // Certains runtimes anciens n’exposent pas le fuseau IANA.
+  }
   const row = {
     id: userId,
     first_name: profileData.firstName,
     last_name: profileData.lastName,
+    timezone: profileData.timezone || deviceTimeZone,
     updated_at: new Date().toISOString(),
   };
   const preferenceColumns = {
@@ -609,6 +619,8 @@ export async function syncProfile(userId, profileData = {}) {
     likes: 'push_likes',
     comments: 'push_comments',
     memberJoined: 'push_members',
+    memories: 'push_memories',
+    reminders: 'push_reminders',
   };
   for (const [appKey, column] of Object.entries(preferenceColumns)) {
     if (Object.prototype.hasOwnProperty.call(profileData, appKey)) {
