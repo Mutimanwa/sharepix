@@ -68,12 +68,15 @@ Actions**. Les workflows s'arrêtent proprement si un secret manque
 ### Preview (OTA)
 
 Chaque push sur `main` publie une mise à jour EAS Update sur la branche
-`preview`. Les appareils équipés d'un build installé (dev client ou APK
-`preview`) la reçoivent automatiquement, sans repasser par le store.
+`preview`. Les appareils équipés d'un build installé (dev client, APK
+Android ou IPA iOS de preview) la reçoivent automatiquement, sans repasser
+par les stores.
 
-Manuellement, cocher *« Builder aussi un APK de preview »* sur le
-workflow_dispatch génère en plus un APK installable
-(`eas build --profile preview`).
+Manuellement, cocher *« Builder aussi une application de preview »* puis
+choisir `android` ou `ios` génère le binaire installable correspondant avec
+le profil `preview`. Android reste le choix par défaut et produit un APK;
+iOS produit un IPA. Une installation iOS sur appareil nécessite les
+identifiants et le provisionnement Apple appropriés dans EAS.
 
 ### Production
 
@@ -85,7 +88,8 @@ git push origin v1.0.1
 ```
 
 - **Android** : AAB (upload Google Play).
-- **iOS** : nécessite les credentials Apple configurés (`eas credentials`).
+- **iOS** : nécessite les credentials Apple et le provisionnement iOS configurés dans EAS.
+- Le déclenchement manuel permet de choisir `android`, `ios` ou `all`; un tag `v*` conserve le build Android par défaut.
 
 La soumission automatique aux stores s'active via l'input `submit` en
 mode manuel, ou en ajoutant `--auto-submit` dans le workflow. Le profil

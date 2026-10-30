@@ -17,6 +17,7 @@ on:
         default: 'android'
         options:
           - android
+          - ios
           - all
       submit:
         description: 'Soumettre automatiquement aux stores après le build'

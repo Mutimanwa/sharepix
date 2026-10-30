@@ -10,15 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.sharepix.mobile",
-      "infoPlist": {
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": [
-              "sharepix"
-            ]
-          }
-        ]
-      }
+      "deploymentTarget": "16.4"
     },
     "android": {
       "package": "app.sharepix.mobile",
@@ -40,12 +32,19 @@
         "expo-camera",
         {
           "cameraPermission": "Autoriser SharePix à utiliser la caméra pour scanner un album",
-          "microphonePermission": "Autoriser SharePix à utiliser le microphone",
+          "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
       ],
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autoriser SharePix à choisir les photos à partager dans un album.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-splash-screen",
         {
