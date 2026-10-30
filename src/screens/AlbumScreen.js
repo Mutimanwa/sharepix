@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   FlatList,
@@ -48,7 +49,7 @@ import {Skeleton, ProgressiveImage } from '../components/Skeleton'
 import { EmptyPhotos, EmptyFavs, EmptyVideos } from '../components/AlbumArt';
 import { useStore } from '../store';
 // ── SUPABASE ALBUMS : intégration ──
-import { subscribeAlbumChanges } from '../services/albums';
+import { cloudFindPossibleDuplicate, photoDuplicateKey, subscribeAlbumChanges } from '../services/albums';
 import { requestSharePixGalleryPermission, savePhotoToSharePix } from '../services/galleryDownloads';
 // ── SUPABASE ALBUMS : fin ──
 import { StatusBar } from 'expo-status-bar';
@@ -63,6 +64,34 @@ const ORDERS = [
   { key: 'recent', label: 'Les plus récentes en premier' },
   { key: 'oldest', label: 'Les plus anciennes en premier' },
 ];
+
+function exifCaptureTime(exif) {
+  const raw = exif?.DateTimeOriginal || exif?.DateTime;
+  if (!raw) return null;
+  const match = String(raw).match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+  const value = match ? `${match[1]}-${match[2]}-${match[3]}T${match[4]}` : String(raw);
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function defaultCopyName(name) {
+  const filename = String(name || 'photo.jpg').split('/').pop().split('\\').pop();
+  const dot = filename.lastIndexOf('.');
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const extension = dot > 0 ? filename.slice(dot) : '';
+  return `${base} (copie)${extension}`;
+}
+
+function readableSize(bytes) {
+  if (!bytes) return 'Taille inconnue';
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} Mo` : `${Math.max(1, Math.round(bytes / 1024))} Ko`;
+}
+
+function readableCaptureDate(timestamp) {
+  return timestamp
+    ? `Prise le ${new Date(timestamp).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`
+    : null;
+}
 
 export default function AlbumScreen({ route, navigation }) {
   const { id } = route.params;
@@ -85,6 +114,8 @@ export default function AlbumScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('all');
   const [uploading, setUploading] = useState(null); // { done, total } | null
+  const [duplicatePrompt, setDuplicatePrompt] = useState(null);
+  const duplicateResolver = useRef(null);
   const [downloading, setDownloading] = useState(null);
 
   // Filtre
@@ -220,19 +251,88 @@ export default function AlbumScreen({ route, navigation }) {
     await scanner.openScanner({ onScan: handleBarcodeScanned });
   };
 
+  const chooseDuplicateResolution = (resolution) => {
+    const name = String(duplicatePrompt?.name || '').trim().split('\\').join('-').split('/').join('-');
+    if (resolution.action === 'copy') {
+      if (!name) {
+        Alert.alert('Nom requis', 'Saisissez un nom pour la copie.');
+        return;
+      }
+      if (photoDuplicateKey(name) === photoDuplicateKey(duplicatePrompt?.asset?.originalName)) {
+        Alert.alert('Nom déjà utilisé', 'Choisissez un nom différent de celui de la photo déjà présente.');
+        return;
+      }
+    }
+    const resolve = duplicateResolver.current;
+    duplicateResolver.current = null;
+    setDuplicatePrompt(null);
+    resolve?.({ ...resolution, name });
+  };
+
+  const askAboutDuplicate = (asset, existing) => new Promise((resolve) => {
+    duplicateResolver.current = resolve;
+    setDuplicatePrompt({ asset, existing, name: defaultCopyName(asset.fileName || asset.originalName) });
+  });
+
   const pick = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], // nouvelle API (MediaTypeOptions est dépréciée)
       quality: 0.8,
+      exif: true,
       allowsMultipleSelection: true,
     });
     if (res.canceled || !res.assets?.length) return;
     const assets = res.assets;
     setUploading({ done: 0, total: assets.length });
-    // Upload séquentiel : progression fiable + pas de saturation réseau
+    // Chaque photo est pré-vérifiée puis traitée isolément : un doublon
+    // ignoré ou une erreur ne met jamais fin au reste du lot.
     for (let i = 0; i < assets.length; i++) {
-      await addPhoto(id, assets[i].uri);
-      setUploading({ done: i + 1, total: assets.length });
+      let asset = assets[i];
+      const originalName = asset.fileName || String(asset.uri || '').split('/').pop().split('\\').pop() || 'photo';
+      const capturedAt = exifCaptureTime(asset.exif);
+      if (capturedAt) asset = { ...asset, originalName, capturedAt };
+      let existing = null;
+      const incomingKey = photoDuplicateKey(originalName);
+      if (!album?.cloud) {
+        existing = (album?.photos || []).find((photo) =>
+          photoDuplicateKey(photo.originalName) === incomingKey
+          && Number(photo.fileSize) === Number(asset.fileSize)
+          && (!asset.width || !photo.width || Number(asset.width) === Number(photo.width))
+          && (!asset.height || !photo.height || Number(asset.height) === Number(photo.height))
+        ) || null;
+      } else {
+        try {
+          const result = await cloudFindPossibleDuplicate(id, {
+            originalName,
+            fileSize: asset.fileSize,
+            width: asset.width,
+            height: asset.height,
+            capturedAt,
+          });
+          existing = result.data;
+          if (result.error) console.log('Pré-vérification doublon ignorée:', result.error.message);
+        } catch (error) {
+          console.warn('Vérification de doublon indisponible; l’envoi continue:', error);
+        }
+      }
+      try {
+        if (existing) {
+          const resolution = await askAboutDuplicate({ ...asset, originalName }, existing);
+          if (resolution.action === 'copy') {
+            const copyName = resolution.name.trim() || defaultCopyName(originalName);
+            asset = { ...asset, fileName: copyName, originalName: copyName };
+          } else {
+            continue;
+          }
+        } else {
+          asset = { ...asset, originalName };
+        }
+        await addPhoto(id, asset);
+      } catch (error) {
+        console.warn('Préparation de la photo impossible; poursuite du lot:', error);
+      } finally {
+        setUploading({ done: i + 1, total: assets.length });
+      }
     }
     setUploading(null);
   };
@@ -522,7 +622,7 @@ export default function AlbumScreen({ route, navigation }) {
 
       {/* Indicateur de progression pour l’envoi et l’enregistrement Galerie */}
       <Modal
-        visible={Boolean(uploading || downloading)}
+        visible={Boolean(downloading || (uploading && !duplicatePrompt))}
         transparent
         animationType="fade"
         onRequestClose={() => {}}
@@ -556,6 +656,86 @@ export default function AlbumScreen({ route, navigation }) {
             </View>
           </View>
         </SafeAreaView>
+      </Modal>
+
+      {/* Comparaison explicite d'un doublon possible; la décision ne concerne
+          que la photo en cours et l'envoi du reste du lot attend en sécurité. */}
+      <Modal
+        visible={Boolean(duplicatePrompt)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => chooseDuplicateResolution({ action: 'skip' })}
+      >
+        <View style={styles.duplicateBackdrop}>
+          <SafeAreaView style={styles.duplicateSafeArea}>
+            {duplicatePrompt && (
+              <View style={styles.duplicateCard}>
+                <Text style={styles.duplicateTitle}>Photo déjà présente ?</Text>
+                <Text style={styles.duplicateIntro}>
+                  {duplicatePrompt.existing.originalName
+                    ? 'Le nom, la taille et certaines métadonnées correspondent à une photo de cet album. Comparez les aperçus.'
+                    : 'La taille correspond à une ancienne photo dont le nom n’a pas été conservé. Vérifiez les aperçus.'}
+                </Text>
+                <View style={styles.duplicateCompare}>
+                  <View style={styles.duplicateColumn}>
+                    <Image source={{ uri: duplicatePrompt.asset.uri }} style={styles.duplicateImage} resizeMode="cover" />
+                    <Text style={styles.duplicateLabel}>Nouvelle sélection</Text>
+                    <Text style={styles.duplicateMeta} numberOfLines={2}>
+                      {duplicatePrompt.asset.originalName} · {readableSize(duplicatePrompt.asset.fileSize)}
+                    </Text>
+                    {duplicatePrompt.asset.width && duplicatePrompt.asset.height && (
+                      <Text style={styles.duplicateMeta}>
+                        {duplicatePrompt.asset.width} × {duplicatePrompt.asset.height}
+                      </Text>
+                    )}
+                    {readableCaptureDate(duplicatePrompt.asset.capturedAt) && (
+                      <Text style={styles.duplicateMeta}>{readableCaptureDate(duplicatePrompt.asset.capturedAt)}</Text>
+                    )}
+                  </View>
+                  <View style={styles.duplicateColumn}>
+                    <Image source={{ uri: duplicatePrompt.existing.uri }} style={styles.duplicateImage} resizeMode="cover" />
+                    <Text style={styles.duplicateLabel}>Déjà dans l’album</Text>
+                    <Text style={styles.duplicateMeta} numberOfLines={2}>
+                      {duplicatePrompt.existing.originalName || 'Nom d’origine non conservé'} · {readableSize(duplicatePrompt.existing.fileSize)}
+                    </Text>
+                    {duplicatePrompt.existing.width && duplicatePrompt.existing.height && (
+                      <Text style={styles.duplicateMeta}>
+                        {duplicatePrompt.existing.width} × {duplicatePrompt.existing.height}
+                      </Text>
+                    )}
+                    {readableCaptureDate(duplicatePrompt.existing.capturedAt) && (
+                      <Text style={styles.duplicateMeta}>{readableCaptureDate(duplicatePrompt.existing.capturedAt)}</Text>
+                    )}
+                  </View>
+                </View>
+                <Text style={styles.duplicateFieldLabel}>Nom de la copie à conserver</Text>
+                <TextInput
+                  value={duplicatePrompt.name}
+                  onChangeText={(nameValue) => setDuplicatePrompt((current) => current ? { ...current, name: nameValue } : current)}
+                  style={styles.duplicateInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  selectTextOnFocus
+                  accessibilityLabel="Nom du fichier en double"
+                />
+                <TouchableOpacity
+                  style={styles.duplicateKeepButton}
+                  onPress={() => chooseDuplicateResolution({ action: 'copy' })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.duplicateKeepText}>Garder comme copie renommée</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.duplicateSkipButton}
+                  onPress={() => chooseDuplicateResolution({ action: 'skip' })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.duplicateSkipText}>Ignorer cette photo</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Filtre (ordre réellement appliqué) */}
@@ -1167,4 +1347,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   qrTxt: { fontWeight: '600', color: colors.tealDark, fontSize: 15 },
+  duplicateBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 26, 28, 0.52)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  duplicateSafeArea: { justifyContent: 'center' },
+  duplicateCard: {
+    backgroundColor: colors.white,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    maxHeight: '94%',
+  },
+  duplicateTitle: { color: colors.tealDark, fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  duplicateIntro: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7, marginBottom: 16 },
+  duplicateCompare: { flexDirection: 'row', gap: 12 },
+  duplicateColumn: { flex: 1, minWidth: 0 },
+  duplicateImage: { width: '100%', height: 112, borderRadius: 12, backgroundColor: colors.cream },
+  duplicateLabel: { color: colors.tealDark, fontSize: 12, fontWeight: '700', marginTop: 8 },
+  duplicateMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  duplicateFieldLabel: { color: colors.tealDark, fontSize: 12, fontWeight: '700', marginTop: 16, marginBottom: 6 },
+  duplicateInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 11,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.tealDark,
+    fontSize: 14,
+  },
+  duplicateKeepButton: {
+    backgroundColor: colors.teal,
+    borderRadius: 13,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  duplicateKeepText: { color: colors.white, fontSize: 14, fontWeight: '700' },
+  duplicateSkipButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  duplicateSkipText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
 });

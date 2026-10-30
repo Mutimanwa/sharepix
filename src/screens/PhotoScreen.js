@@ -536,6 +536,9 @@ export default function PhotoScreen({ route, navigation }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.author}>{album.name}</Text>
           <Text style={styles.when}>{formatAgo(currentPhoto?.createdAt)}</Text>
+          {currentPhoto?.originalName ? (
+            <Text style={styles.photoFileName} numberOfLines={1}>{currentPhoto.originalName}</Text>
+          ) : null}
         </View>
         <TouchableOpacity style={styles.iconHit} onPress={() => setDel(true)} hitSlop={8}>
           <HugeiconsIcon icon={Delete02Icon} size={22} color={colors.coral} />
@@ -642,6 +645,7 @@ const styles = StyleSheet.create({
   },
   author: { fontWeight: '800', fontSize: 16, color: colors.tealDark },
   when: { color: colors.muted, fontSize: 12, marginTop: 1 },
+  photoFileName: { color: colors.muted, fontSize: 10, marginTop: 1 },
   iconHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   pagination: { alignItems: 'center', paddingVertical: 2 },
