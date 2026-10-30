@@ -14,8 +14,8 @@ export function Skeleton({ width = '100%', height = 16, radius = 8, color = '#E2
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: false }),
-        Animated.timing(opacity, { toValue: 0.45, duration: 700, useNativeDriver: false }),
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.45, duration: 700, useNativeDriver: true }),
       ])
     );
     loop.start();
@@ -121,7 +121,7 @@ export function ProgressiveImage({
               // Déjà connue : aucun fondu, l'image est là tout de suite.
               fade.setValue(1);
             } else {
-              Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: false }).start();
+              Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
             }
           }}
           onError={() => {
