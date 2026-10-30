@@ -8,7 +8,7 @@ par Expo.
 
 ```
 PR / push (toute branche) ──▶ CI (typecheck, expo-doctor, Deno, RLS)
-push main ──────────────────▶ Preview : EAS Update (OTA, branche "preview")
+push main ──────────────────▶ Publication EAS Update (réception OTA non activée)
 tag v* / manuel ────────────▶ Production : EAS Build (+ auto-submit)
 supabase/functions/** ──────▶ Déploiement Edge Function Supabase
 ```
@@ -16,7 +16,7 @@ supabase/functions/** ──────▶ Déploiement Edge Function Supabase
 | Workflow | Fichier | Déclencheur | Rôle |
 | --- | --- | --- | --- |
 | **CI** | `.github/workflows/ci.yml` | `pull_request`, `push main`, manuel | Vérifie le code (types, Expo, Deno, RLS) |
-| **Preview** | `.github/workflows/preview.yml` | `push main` (+ manuel) | Publication OTA `eas update` + APK de test |
+| **Preview** | `.github/workflows/preview.yml` | `push main` (+ manuel) | Publication `eas update`; build installable manuel APK Android / IPA iOS |
 | **Production** | `.github/workflows/production.yml` | tag `v*` (+ manuel) | Build EAS `production` (+ soumission stores) |
 | **Edge Functions** | `.github/workflows/supabase-deploy.yml` | `push main` sur `supabase/functions/**` | Déploie `activity-push` |
 
@@ -65,15 +65,20 @@ Actions**. Les workflows s'arrêtent proprement si un secret manque
 
 ## Livraison continue
 
-### Preview (OTA)
+### Preview (publication OTA et builds installables)
 
-Chaque push sur `main` publie une mise à jour EAS Update sur la branche
-`preview`. Les appareils équipés d'un build installé (dev client ou APK
-`preview`) la reçoivent automatiquement, sans repasser par le store.
+Chaque push sur `main` lance `eas update --branch preview`. **À la date de
+ce document, cela publie le bundle mais ne met pas à jour les builds
+installés** : `expo-updates` n'est pas une dépendance du projet et la
+configuration Expo ne déclare pas d'URL/runtime OTA. Pour activer la
+réception, il faudra intégrer et configurer `expo-updates`, puis reconstruire
+et tester les applications.
 
-Manuellement, cocher *« Builder aussi un APK de preview »* sur le
-workflow_dispatch génère en plus un APK installable
-(`eas build --profile preview`).
+Pour produire un binaire installable, une fois ces changements intégrés à
+`main`, lancer manuellement le workflow, cocher *« Builder aussi une
+application de preview »*, puis choisir `android` ou `ios`. Le profil `preview` produit un APK Android ou un IPA iOS;
+Android reste le choix par défaut. Une installation iOS sur appareil
+nécessite les identifiants et le provisionnement Apple appropriés dans EAS.
 
 ### Production
 
@@ -85,7 +90,8 @@ git push origin v1.0.1
 ```
 
 - **Android** : AAB (upload Google Play).
-- **iOS** : nécessite les credentials Apple configurés (`eas credentials`).
+- **iOS** : nécessite les credentials Apple et le provisionnement iOS configurés dans EAS.
+- Le déclenchement manuel permet de choisir `android`, `ios` ou `all`; un tag `v*` conserve le build Android par défaut.
 
 La soumission automatique aux stores s'active via l'input `submit` en
 mode manuel, ou en ajoutant `--auto-submit` dans le workflow. Le profil
@@ -121,12 +127,10 @@ Dès qu'un fichier de `supabase/functions/**` change sur `main`, la fonction
 > secret Vault : la fonction webhook y est donc inerte et ne peut pas
 > notifier la production.
 >
-> Secrets posés le 22/10/2026 : le job s'exécute désormais pour de vrai.
->
-> Reste à faire sur le projet de test : **activer les comptes anonymes**
-> (Authentication → Sign In / Providers → *Anonymous sign-ins*). Sans cela,
-> le script ne peut pas créer son compte de contrôle et sort en code `2` —
-> volontairement, plutôt que d'afficher un vert qui ne prouve rien.
+> **État vérifié le 30/10/2026 :** le projet de test et les comptes anonymes
+> sont configurés; les jobs RLS/Storage ont réussi dans les vérifications CI
+> de la PR #37. Le statut doit être contrôlé à nouveau si les secrets ou le
+> projet de test changent.
 
 ## Lancer les vérifications en local
 

@@ -1,8 +1,9 @@
 # ── SharePix · Livraison continue « preview » ────────────────────────────
-# À chaque push sur `main` : publication d'une mise à jour OTA (EAS Update)
-# sur la branche `preview` → les builds déjà installés (dev client, APK de
-# test) se mettent à jour sans repasser par les stores.
-# En manuel (workflow_dispatch) : possibilité de builder un APK de preview.
+# À chaque push sur `main` : publication avec EAS Update sur `preview`.
+# La réception OTA n'est pas activée tant qu'expo-updates et son URL/runtime
+# ne sont pas configurés dans l'application; les builds installables sont
+# générés manuellement (APK Android ou IPA iOS).
+# En manuel (workflow_dispatch) : choix entre un APK Android et un IPA iOS.
 # ─────────────────────────────────────────────────────────────────────────
 name: Preview (EAS Update)
 
@@ -12,10 +13,18 @@ on:
   workflow_dispatch:
     inputs:
       build:
-        description: 'Builder aussi un APK de preview (Android) ?'
+        description: 'Builder aussi une application de preview installable ?'
         type: boolean
         required: false
         default: false
+      platform:
+        description: 'Plateforme à builder si build=true'
+        type: choice
+        required: true
+        default: android
+        options:
+          - android
+          - ios
 
 concurrency:
   group: preview-${{ github.workflow }}-${{ github.ref }}
@@ -49,7 +58,7 @@ jobs:
         run: eas update --branch preview --auto --non-interactive
 
   build:
-    name: Build preview APK
+    name: Build preview app
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -71,5 +80,5 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build preview APK
-        run: eas build --platform android --profile preview --non-interactive
+      - name: Build preview app
+        run: eas build --platform "${{ github.event.inputs.platform || 'android' }}" --profile preview --non-interactive

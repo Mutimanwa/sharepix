@@ -1,11 +1,12 @@
 # SharePix — Plan d'action
 
-**Document de travail** · créé le 21/10/2026 · branche `arena/323af688-sharepix`
-**Base de référence** : `AUDIT_SHAREPIX.md` (audit v4, vérifié contre la base de production)
+**Snapshot historique** · créé le 21/10/2026 · branche `arena/323af688-sharepix`
+**Base de référence à cette date** : `AUDIT_SHAREPIX.md` (audit v4)
 
-> Ce fichier est la **liste unique et ordonnée de tout ce qu'il reste à faire**.
-> Chaque ligne a un identifiant (`BUG-xx`, `P0-xx`…), une sévérité, un emplacement
-> `fichier:ligne` et un correctif. Cochez au fur et à mesure.
+> Ce plan décrit l'état et les tâches observés au démarrage du projet. Il n'est
+> plus la source de vérité pour le backlog courant : plusieurs correctifs,
+> migrations et livraisons ont eu lieu depuis. Vérifier chaque point contre le
+> code et les rapports récents avant de le traiter comme encore ouvert.
 
 ---
 
@@ -548,7 +549,7 @@ branche « compte connecté ».
 - `supabase/.temp/` versionné · `expo-auth-session` inutilisé
 - `typescript` et `@types/react` en `dependencies` au lieu de `devDependencies`
 - `REDIRECT_URI_WEB` figé sur `localhost:8081`
-- `realease.yml` (faute) · `DOSSIER_SHAREPIX (1).md` · `web/assets/imgs/splash.png` 2,1 Mo
+- `realease.yml` (faute) · `DOSSIER_SHAREPIX.md` · `web/assets/imgs/splash.png` 2,1 Mo
 - `.eq('user_id')` absent sur les suppressions de likes (neutralisé par RLS, à corriger par principe)
 - Nom de fichier `Date.now()` (collision possible) · extension `.jpg` forcée sur le web
 

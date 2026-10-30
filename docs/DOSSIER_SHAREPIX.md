@@ -1,9 +1,13 @@
 # SharePix — Dossier complet
 **Description · Charte graphique · Politique de confidentialité · Conditions d'utilisation**
 
-> Document de référence unique. Les textes légaux (§3 et §4) sont le contenu
-> exact de `public/privacy.html` et `public/terms.html` (publiés aussi dans `web/`).
-> Dernière mise à jour : septembre 2026.
+> Dossier éditorial daté (septembre 2026), à réviser avant usage externe. La
+> description produit ci-dessous est actualisée pour les capacités livrées;
+> les textes légaux du dépôt sont `../web/privacy.html` et `../web/terms.html`.
+> Ces pages et le site vitrine contiennent encore des mentions de vidéos et
+> identifient l'éditeur comme « RESTART », alors que le README du dépôt indique
+> Coral Orca Limited. Ce point doit être confirmé par le propriétaire avant
+> publication; cette réorganisation ne modifie pas les pages légales publiques.
 
 ---
 
@@ -33,26 +37,27 @@ le monde en profite. Rien n'est public : seuls les invités voient le contenu.
 | Confidentialité | **100 % privé** — aucun espace public, aucun inconnu |
 | Friction | **Aucune inscription** pour commencer (compte invité automatique) |
 | Invitation | **10 secondes** : code à 8 caractères ou QR / lien direct |
-| Contenu | Photos **et vidéos**, commentaires, réponses, « j'aime » |
+| Contenu | Photos, commentaires, réponses et réactions; l'envoi vidéo n'est pas livré |
 | Vivant | **Temps réel** : activité, compteurs, couvertures, notifications |
-| Accès | **Hors-ligne** d'abord, synchronisation multi-appareils ensuite |
-| Web | Participation possible depuis un navigateur (sans installer l'app) |
+| Accès | Synchronisation cloud en ligne; pas de file de synchronisation hors-ligne |
+| Web | Site vitrine et pages légales; pas de client web de partage |
 
 ## 1.4 Fonctionnalités détaillées
 
 **Albums privés**
-- Création d'albums photo/vidéo illimités (mariage, vacances, famille…)
+- Création d'albums photo (mariage, vacances, famille…); la vidéo n'est pas prise en charge
 - Invitation par code à 8 caractères, QR code ou lien `sharepix://join?code=…`
   (scan → feuille « Rejoindre » pré-remplie + recherche automatique)
 - Gestion par le propriétaire : renommer, retirer un membre, supprimer l'album
   (fichiers + cascades). Un membre peut quitter un album.
 
-**Photos & vidéos**
+**Photos**
 - Upload vers un stockage **privé** (URLs signées d'1 h, délivrées uniquement
-  aux membres)
-- Onglets Tous / Vidéos / Favoris, sélection multiple, suppression
-- Commentaires avec réponses, « j'aime », favoris personnels
+  aux membres); les images sont préparées avant envoi (jusqu'à 2048 px, JPEG 0,82)
+- Consultation, favoris, sélection multiple et suppression
+- Commentaires avec réponses et réactions « j'aime »
 - Images progressives (pulsation → fondu) et squelettes de chargement
+- La vidéo n'est pas prise en charge dans la version actuelle
 
 **Accueil vivant**
 - Compteurs de photos et couvertures pré-chargés au démarrage
@@ -72,16 +77,16 @@ le monde en profite. Rien n'est public : seuls les invités voient le contenu.
   e-mail ou connexion Google (`linkIdentity`)
 - Synchronisation multi-appareils automatique
 
-**Hors-ligne**
-- L'app fonctionne sans réseau et se synchronise au retour de la connexion
-- Mode 100 % local (repli gracieux) si le cloud est absent/injoignable
+**Connectivité**
+- La synchronisation des albums et photos nécessite une connexion réseau.
+- Les envois interrompus hors-ligne ne sont pas mis en file pour une reprise automatique.
 
 ## 1.5 Parcours utilisateur
 
 1. **Splash** (routage selon la session : onboarding / auth / accueil)
 2. **Onboarding** : créer ou rejoindre un album
 3. **Accueil** : albums avec compteurs + couvertures en direct
-4. **Album** : photos, vidéos, favoris, commentaires, likes
+4. **Album** : photos, favoris, commentaires et réactions; pas d'envoi vidéo
 5. **Invitation** : code 8 caractères + QR deep link
 6. **Centre d'activités** temps réel
 7. **Profil** : conversion de compte, préférences de notifications
@@ -95,7 +100,7 @@ le monde en profite. Rien n'est public : seuls les invités voient le contenu.
 - **Jamais de `service_role` dans l'app** — clé anon uniquement
 - Bucket `album-photos` privé, liens temporaires signés
 - Harnais de vérification `supabase/rls-check.cjs` (exit 1 au moindre souci)
-- Schéma `supabase/schema.sql` ré-exécutable en entier, idempotent
+- Schéma versionné sous `supabase/migrations/`; les migrations sont la source de vérité
 
 ## 1.7 Stack technique
 
@@ -108,14 +113,14 @@ expo-notifications, expo-linking · EAS Build (package `app.sharepix.mobile`).
 | Champ | Valeur |
 | --- | --- |
 | Nom | **SharePix** |
-| Éditeur | **RESTART** |
+| Éditeur | **À confirmer** : pages légales `web/` = RESTART; README dépôt = Coral Orca Limited |
 | Nom store (30 car.) | `SharePix – Albums photo privés` |
 | Description courte (80 car.) | `Partagez vos photos d'événements en albums privés, avec un simple code.` |
 | Package / bundleId | `app.sharepix.mobile` |
 | Deep link | `sharepix://` (join, auth callback) |
 | Catégorie Play Store | Photographie |
 | Langue par défaut | Français (fr-FR) |
-| Distribution | Directe (landing page + APK) → Google Play dès ouverture du compte dev |
+| Distribution | Android via EAS; publication effective à vérifier. iOS en préparation, aucun test iPhone effectué |
 
 ---
 
@@ -159,8 +164,7 @@ expo-notifications, expo-linking · EAS Build (package `app.sharepix.mobile`).
 | --- | --- | --- |
 | Logo horizontal | `assets/sharepix-logo.png` (600×327) | Wordmark + appareil photo, fond transparent |
 | Icône app | `assets/sharepix-icon.png` | Référencée dans `app.json` |
-| Icône Play 512×512 | `store/play-icon-512.png` | Générée, prête console |
-| Bannière 1024×500 | `store/play-banner-1024x500.png` | Logo + slogan + visuel téléphone |
+| Icône de l'application | `assets/sharepix-icon.png` | Source configurée dans `app.json`; vérifier les exigences de chaque store avant publication |
 
 ## 2.4 Iconographie
 
@@ -170,7 +174,7 @@ expo-notifications, expo-linking · EAS Build (package `app.sharepix.mobile`).
 
 ## 2.5 Composants & motifs
 
-- Design system partagé : `components/UI.js` (Page, Sheet, CoralButton, Field…)
+- Design system partagé : `src/components/UI.js` (Page, Sheet, CoralButton, Field…)
 - Cartes blanches, coins arrondis (~12–16 px), bordure `border`
 - **CTA principal = corail**, actions secondaires = teal/outline
 - Sheets en bas d'écran pour les actions (créer / rejoindre / options)
@@ -190,7 +194,7 @@ expo-notifications, expo-linking · EAS Build (package `app.sharepix.mobile`).
 # 3. Politique de confidentialité
 
 *Application **SharePix** — Dernière mise à jour : août 2026*
-*(version web : `public/privacy.html` / `web/privacy.html`)*
+*(source : `../web/privacy.html`)*
 
 > SharePix (« l'application », « le service ») est une application de partage
 > **privé** d'albums photo et vidéo lors d'événements (mariages, vacances,
@@ -291,7 +295,7 @@ l'application.
 # 4. Conditions d'utilisation
 
 *Application **SharePix** — Dernière mise à jour : août 2026*
-*(version web : `public/terms.html` / `web/terms.html`)*
+*(source : `../web/terms.html`)*
 
 > Les présentes conditions régissent l'utilisation de l'application SharePix,
 > éditée par **RESTART** (« l'Éditeur »). En utilisant l'application, vous
@@ -385,7 +389,7 @@ applicables dans votre pays de résidence.
 # Annexe — TODO avant publication
 
 1. **E-mail réel de contact** : remplacer `contact@sharepix.app` partout
-   (`public/privacy.html`, `public/terms.html`, `web/`, landing, Play Console).
+   (`../web/privacy.html`, `../web/terms.html`, `web/`, landing, Play Console).
 2. **Juridiction** : préciser le droit applicable dans `terms.html` §10.
 3. **URL publique de la privacy policy** : déployer et renseigner dans Play
    Console.

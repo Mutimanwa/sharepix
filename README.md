@@ -3,7 +3,8 @@
 Application mobile privée de partage de photos d'événements — mariages,
 vacances, baptêmes, anniversaires.
 
-→ **sharepix.app** · Android & iOS · édité par Coral Orca Limited
+→ **sharepix.app** · Android · préparation iOS en cours (cible iOS 16.4,
+tests iPhone non réalisés) · édité par Coral Orca Limited
 
 ---
 
@@ -21,7 +22,8 @@ par défaut** (un lien suffit à entrer) et ils **recompressent** les images.
 
 Un album = **un code d'invitation à 8 caractères** (ou un QR code).
 Seules les personnes à qui vous transmettez ce code voient le contenu.
-Les photos sont stockées en **qualité originale** dans un espace privé.
+Les photos sont envoyées dans un espace privé après préparation locale
+(redimensionnement jusqu’à 2048 px et recompression JPEG selon le fichier).
 
 Trois principes :
 
@@ -56,7 +58,8 @@ Trois principes :
 - Suppression de compte **avec purge des fichiers Storage**
 
 **Notifications**
-- Push Android (FCM V1) : nouvelles photos, likes, commentaires
+- Push Android (FCM V1) : nouvelles photos, likes, commentaires;
+  iOS/APNs reste à valider sur appareil
 - Préférences par type, enregistrées côté serveur
 - Fonction Edge `activity-push` déclenchée par webhook sur `activity_log`
 
@@ -69,7 +72,7 @@ crée l'album  ──► code 8 car. ──►   scanne le QR / saisit le code
    │                                        │
    └──────────── même album ────────────────┘
                     │
-        photos en qualité originale
+        photos préparées à l'envoi
         stockées dans un bucket privé
         diffusées par URL signée (1 h)
 ```
@@ -86,7 +89,7 @@ crée l'album  ──► code 8 car. ──►   scanne le QR / saisit le code
 | Temps réel | Supabase Realtime (photos, membres, commentaires, likes) |
 | Push | Edge Function Deno `activity-push` + FCM V1 |
 | Images | `expo-image` (cache mémoire + disque) |
-| CI/CD | GitHub Actions + EAS Build / Update |
+| CI/CD | GitHub Actions + EAS Build; publication OTA présente mais réception par l'app non configurée |
 
 ## Sécurité
 
@@ -106,7 +109,8 @@ La sécurité ne repose pas sur le client mais sur la base :
   (lecture anonyme, lecture inter-albums, accès au Storage) contre un
   projet de test dédié, jamais contre la production.
 
-Détail des constats et de leur correction : `AUDIT_SHAREPIX.md`.
+Détail des constats : [audit technique](docs/AUDIT_SHAREPIX.md). Les documents
+de projet sont indexés dans [`docs/`](docs/README.md).
 
 ## Lancer le projet
 
@@ -128,17 +132,21 @@ npx expo start --dev-client
 
 Prérequis : `google-services.json` à la racine et une clé de compte de
 service FCM V1 (`npx eas-cli credentials`).
-Guide : [`supabase/PUSH.md`](supabase/PUSH.md).
+Guides : [CI/CD et credentials](docs/CICD.md),
+[notifications](docs/NOTIFICATIONS_FINAL_REFINEMENT.md) et
+[préparation iOS](docs/IOS_READINESS_PLAN.md).
 
 ## Build & distribution
 
 ```bash
 npx eas-cli build --platform android --profile preview     # APK de test
-npx eas-cli build --platform android --profile production  # store
+npx eas-cli build --platform android --profile production  # Android store
+npx eas-cli build --platform ios --profile preview         # IPA interne (credentials Apple requis)
 ```
 
-> **Ajout d'un module natif** (ex. `expo-image`) : une mise à jour JS seule
-> ne suffit pas, l'APK doit être reconstruit.
+La cible iOS configurée est 16.4; le build et l'installation sur iPhone
+restent à valider. **Ajout d'un module natif** (ex. `expo-image`) : une mise
+à jour JS seule ne suffit pas, le binaire doit être reconstruit.
 
 ## Base de données
 
@@ -149,6 +157,9 @@ Le schéma vit dans `supabase/migrations/`, seule source de vérité :
 | `20261021000000_initial_schema.sql` | État complet : 9 tables, index, 8 fonctions, 6 triggers, 21 policies, bucket privé |
 | `20261021120000_fix_storage_delete_policy.sql` | Policy DELETE du Storage (appartenance de l'album) |
 | `20261021120500_bucket_upload_limits.sql` | 25 Mo + types MIME autorisés |
+| `20261023122932_notification_preferences.sql` | Préférences de notifications par compte |
+| `20261024064336_notification_center_batching.sql` | Regroupement et rappels du centre d'activités |
+| `20261024071955_photo_metadata_deduplication.sql` | Métadonnées et détection de doublons photo |
 
 ```bash
 npx supabase link --project-ref <ref>
@@ -175,17 +186,19 @@ supabase/
 
 ## Sentry (rapport de crash)
 
-Le SDK est intégré mais **inactif tant qu'aucun DSN n'est fourni** — sans
-elle, l'application se comporte comme avant.
+Le SDK et le plugin natif sont intégrés. Les variables Sentry ont été
+configurées pour EAS selon le plan d'implémentation, mais l'upload des source
+maps et la réception d'un événement de test restent à valider. En local,
+configurer le DSN dans `.env` :
 
 ```bash
 cp .env.example .env
-# puis renseigner EXPO_PUBLIC_SENTRY_DSN=https://…@o….ingest.sentry.io/…
+# renseigner EXPO_PUBLIC_SENTRY_DSN sans le publier
 ```
 
 Sentry est un module natif : il faut un build (EAS ou dev client), pas
-Expo Go. Les rapports excluent toute donnée personnelle (`sendDefaultPii:
-false`) et retirent les URL d'authentification contenant un `?code=`.
+Expo Go. Les rapports excluent les données personnelles par défaut et le
+filtrage retire les URL d'authentification contenant un `?code=`.
 
 ## Qualité
 
@@ -207,7 +220,7 @@ ne peuvent pas être vérifiées à l'œil sur un téléphone.
 
 CI (`.github/workflows/ci.yml`) : TypeScript, ESLint, Jest, Expo Doctor,
 Edge Function (Deno check & lint), RLS/Storage. Détail :
-[`CICD.md`](CICD.md).
+[`docs/CICD.md`](docs/CICD.md).
 
 ## Limites connues
 
@@ -218,7 +231,7 @@ Edge Function (Deno check & lint), RLS/Storage. Détail :
   25 Mo). L'import vidéo demande donc une migration, un envoi en flux (la
   lecture base64 actuelle ne tient pas 50 Mo en mémoire) et un lecteur.
   Ordre retenu : images → production → vidéo → premium. Voir
-  [`DECISIONS.md`](DECISIONS.md) (D-05).
+  [`docs/DECISIONS.md`](docs/DECISIONS.md) (D-05).
 - **Pas de premium fonctionnel** : l'écran « Album Premium » est une
   vitrine, aucun paiement n'est branché et aucune notion d'abonnement
   n'existe en base.
@@ -226,21 +239,18 @@ Edge Function (Deno check & lint), RLS/Storage. Détail :
   mode local mais ne rejoue pas les envois à la reconnexion.
 - Pas encore de pagination sur les albums volumineux.
 - Contrastes à retravailler sur les libellés corail (accessibilité).
-- Le test RLS de la CI est **inactif** tant qu'aucun projet de test n'est
-  configuré (`STAGING_SUPABASE_URL`).
+- Les contrôles RLS/Storage de la CI ciblent le projet de test dédié; ils ont
+  passé dans le dernier run de la PR #37. Sans secrets de staging, le workflow
+  prévient et ne teste rien plutôt que de basculer vers la production.
+- La publication `eas update` existe, mais l'app ne consomme pas encore ces
+  mises à jour : `expo-updates` et sa configuration runtime manquent.
+- iOS est configuré (cible minimale 16.4), mais aucun IPA n'a encore été
+  installé ni testé sur iPhone.
 
-Feuille de route détaillée : [`PLAN_ACTION.md`](PLAN_ACTION.md).
-Décisions produit et techniques : [`DECISIONS.md`](DECISIONS.md).
-
-## Documents
-
-| Fichier | Contenu |
-|---|---|
-| `AUDIT_SHAREPIX.md` | Audit technique et sécurité, vérifié sur la base de production |
-| `PLAN_ACTION.md` | Liste ordonnée de tout le travail restant |
-| `SPRINT1_RAPPORT.md` | Rapport d'exécution du premier sprint |
-| `PRESENTATION_VIDEO.md` | Dossier de tournage de la vidéo de présentation |
-| `CICD.md` | Pipeline, secrets, déclencheurs |
+La documentation est regroupée et indexée dans [`docs/README.md`](docs/README.md).
+Le [plan d'action](docs/PLAN_ACTION.md) et les [décisions](docs/DECISIONS.md)
+sont des snapshots datés; consulter leur date et ne pas les prendre pour l'état
+courant sans vérification.
 
 ## Licence
 

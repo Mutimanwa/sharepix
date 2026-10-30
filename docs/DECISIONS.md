@@ -398,7 +398,10 @@ que le système popup est voulu et attribue le problème à son téléphone.
 
 # Ce qui bloque la mise en production
 
-État vérifié le 2026-10-22, en base et dans les workflows.
+État vérifié le 2026-10-22, en base et dans les workflows. Ce tableau est
+un snapshot historique; il n'est pas l'état courant de tous les points.
+Depuis, le test de staging RLS a été reconfiguré et son job CI a réussi le
+30/10/2026 (voir `CICD.md`). Les autres statuts ci-dessous restent à revalider.
 
 | # | Point | Statut | Impact |
 |---|-------|--------|--------|
@@ -406,7 +409,7 @@ que le système popup est voulu et attribue le problème à son téléphone.
 | 2 | **Sentry annoncé dans la politique de confidentialité, absent du code** | ✅ codé le 22/10 | SDK intégré (`src/lib/sentry.js`), inactif sans DSN. **Reste à créer le projet et fournir `EXPO_PUBLIC_SENTRY_DSN`.** Sans DSN, la mention de la politique reste inexacte. |
 | 3 | `password_min_length` = 6, protection HIBP désactivée | ⚠️ | Mots de passe faibles acceptés (`123456` passe). |
 | 4 | 81 comptes anonymes sur 84, 11 albums | ✅ réglé le 22/10 | Base remise à zéro (voir ci-dessous). Les comptes fantômes ne reviendront pas : le correctif P1-08 tari la source. |
-| 5 | Secrets `STAGING_*` posés, mais **comptes anonymes désactivés** sur le projet de test | ⚠️ | Le script ne peut pas créer son compte de contrôle : il sort en code `2` (non vérifié) au lieu d'un faux vert. Une case à cocher dans la console du projet de test. |
+| 5 | Secrets `STAGING_*` et comptes anonymes du projet de test | ✅ résolu au 30/10/2026 | Le job RLS/Storage CI s'exécute contre le projet dédié et a réussi dans le run de la PR #37. |
 | 6 | `version` d'`app.json` = 1.0.0, dernière release = v1.0.4 | ⚠️ | EAS gère les numéros de build à distance (`appVersionSource: remote`), donc ce n'est pas bloquant, mais la version affichée n'est pas la version réelle. |
 | 7 | `REDIRECT_URI_WEB` en dur sur `http://localhost:8081` | ℹ️ | OAuth impossible sur le web en production. Le mobile n'est pas concerné. |
 

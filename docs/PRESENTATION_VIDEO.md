@@ -77,8 +77,8 @@ d'un logiciel » (Université, Département Sciences et Technologies).
 > ouvrir. Les outils existants ont deux défauts : ils sont publics par
 > défaut, et ils recompressent les photos.
 > SharePix répond à une question précise : **comment rassembler les photos
-> d'un événement en qualité originale, sans les rendre publiques et sans
-> demander à chacun de créer un compte compliqué ?** »
+> d'un événement dans un espace privé, sans demander à chacun de créer un
+> compte compliqué ?** »
 
 **1.4 — Objectifs de la présentation (3 pts)**
 > « Mon objectif est triple. D'abord vous montrer **ce que fait** SharePix
@@ -92,13 +92,13 @@ d'un logiciel » (Université, Département Sciences et Technologies).
 > « SharePix transforme un téléphone en **album de famille partagé**. Un
 > album se crée en dix secondes et s'ouvre avec un **code à 8 caractères**.
 > Ce code, c'est la clé : qui ne l'a pas ne voit rien. L'utilité tient en
-> une phrase — réunir toutes les photos d'un événement en un seul endroit,
-> en qualité d'origine, accessible seulement aux invités. »
+> une phrase — réunir les photos d'un événement dans un seul espace privé,
+> accessible seulement aux invités. »
 
 **2.2 — Fonctionnalités principales (4 pts)** — annoncer, sans démontrer :
 > « Six fonctions structurent l'application :
 > 1. **Créer un album** et inviter par code ou par QR.
-> 2. **Envoyer des photos** en qualité originale, avec progression.
+> 2. **Envoyer des photos** préparées pour l'envoi, avec progression.
 > 3. **Consulter** les photos, les commenter, les aimer, les mettre en favori.
 > 4. **Suivre l'activité** en temps réel : qui a rejoint, qui a publié.
 > 5. **Gérer l'album** : renommer, retirer un membre, supprimer.
@@ -111,16 +111,16 @@ d'un logiciel » (Université, Département Sciences et Technologies).
 > parent, un chef de groupe. **L'invité**, qui n'a aucune compétence
 > technique : il scanne un QR et c'est terminé. Et **le photographe
 > amateur**, celui qui mitraille tout l'événement et veut retrouver ses
-> fichiers en pleine résolution. »
+> photos préparées pour l'envoi dans un album partagé. »
 
 **2.4 — Avantages (3 pts)**
 > « Quatre avantages face aux solutions existantes. **La confidentialité
-> par défaut** : pas de lien public, un code privé. **La qualité
-> originale** : aucune recompression. **L'absence de friction** : l'invité
-> installe, scanne, et il est dedans, sans mot de passe à retenir. Et **la
-> sécurité vérifiable** : les règles d'accès sont appliquées par la base de
-> données, pas par l'interface — un utilisateur malin ne peut pas
-> contourner l'écran. »
+> par défaut** : pas de lien public, un code privé. **La préparation des
+> images** : les photos sont optimisées avant l'envoi pour réduire leur poids.
+> **L'absence de friction** : l'invité installe, scanne, et il est dedans,
+> sans mot de passe à retenir. Et **la sécurité vérifiable** : les règles
+> d'accès sont appliquées par la base de données, pas par l'interface — un
+> utilisateur malin ne peut pas contourner l'écran. »
 
 ### Séquence 3 — Démonstration (6:30 → 18:45)
 
@@ -182,18 +182,18 @@ Terminer par la suppression d'album, qui efface les fichiers :
 ### Séquence 4 — Conclusion (18:45 → 21:30)
 
 **8.1 — Résumé (2 pts)**
-> « Nous avons vu : création d'un album privé, invitation par QR, envoi en
-> qualité originale, consultation avec commentaires et favoris, temps réel
-> entre deux téléphones, et vérification de l'accès. »
+> « Nous avons vu : création d'un album privé, invitation par QR, envoi de
+> photos préparées pour l'upload, consultation avec commentaires et favoris,
+> temps réel entre deux téléphones, et vérification de l'accès. »
 
 **8.2 — Avantages (2 pts)**
-> « Privé par défaut, sans friction pour l'invité, sans perte de qualité, et
-> sécurisé au niveau de la base et non de l'écran. »
+> « Privé par défaut, sans friction pour l'invité, avec des photos optimisées
+> pour l'envoi, et sécurisé au niveau de la base et non de l'écran. »
 
 **8.3 — Limites (2 pts)** — **à dire honnêtement, c'est noté** :
 > « Trois limites, que j'assume. Aujourd'hui l'application gère les
-> **photos, pas encore les vidéos** : le modèle de données les prévoit,
-> l'interface suivra. Il n'y a pas de **file d'attente hors-ligne** : sans
+> **photos uniquement** : les vidéos ne sont prises en charge ni par le
+> modèle actuel ni par l'interface. Il n'y a pas de **file d'attente hors-ligne** : sans
 > réseau, on reste en mode local sans rejouer les envois. Enfin, les albums
 > très volumineux **n'ont pas encore de pagination**. »
 
