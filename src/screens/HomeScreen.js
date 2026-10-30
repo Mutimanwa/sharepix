@@ -343,7 +343,7 @@ export default function HomeScreen() {
                     // ── SQUELETTES : intégration ──
                     <ProgressiveImage
                       uri={a.photos[0]?.uri || a.coverUrl}
-                      storagePath={a.photos[0]?.storagePath}
+                      storagePath={a.photos[0]?.storagePath || a.coverStoragePath}
                       style={styles.coverImg}
                       radius={5}
                     />

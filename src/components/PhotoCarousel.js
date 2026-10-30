@@ -13,16 +13,16 @@
 //    <ProgressiveImage> repartait de zéro → squelette + fondu de 220 ms +
 //    retéléchargement. D'où « l'image charge à chaque fois » et « ça crache
 //    quand on swipe ».
-// 3. <Animated.Image> (RN) ne s'appuie que sur le cache mémoire/HTTP :
-//    une URL signée renouvelée = une nouvelle clé = nouveaux octets.
+// 3. Avant l'intégration d'expo-image, le cache suivait l'URL signée :
+//    une URL renouvelée à l'ouverture = une nouvelle clé = nouveaux octets.
 //
 // ── CE QUE FAIT CE COMPOSANT ───────────────────────────────────────────
 // a. `React.memo` + comparaison STRUCTURELLE : un refresh qui ne change ni
 //    l'identifiant ni l'URL d'une photo ne re-rend pas le carrousel. Un
 //    like ou un commentaire ne touche donc plus jamais les images.
-// b. `expo-image` avec `cachePolicy="memory-disk"` : les octets survivent
-//    au démontage de la cellule, donc un remontage n'entraîne plus aucun
-//    téléchargement.
+// b. `expo-image` utilise `storagePath` comme `cacheKey` stable et
+//    `cachePolicy="memory-disk"` : les URL signées peuvent tourner sans
+//    invalider le cache disque, y compris après fermeture de l'app.
 // c. Fenêtre de rendu large + `removeClippedSubviews={false}` : les pages
 //    voisines restent montées, le swipe est instantané.
 // d. `transition={0}` et un registre de session (`ALREADY_LOADED`) : une
@@ -75,7 +75,13 @@ function CarouselPage({ photo, width, height }) {
       {photo.uri ? (
         ExpoImage ? (
           <ExpoImage
-            source={{ uri: photo.uri }}
+            source={{
+              uri: photo.uri,
+              // L'URL signée change à chaque session; le storage_path, lui,
+              // reste stable. Il permet de réutiliser le cache disque même
+              // après fermeture complète de l'application.
+              cacheKey: photo.storagePath || photo.id,
+            }}
             // Clé de recyclage : expo-image garde la bonne image sur la
             // bonne cellule quand la liste réutilise une page.
             recyclingKey={photo.id}

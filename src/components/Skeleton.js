@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
+import { Image as CachedImage } from 'expo-image';
 
 // couvertures, avatars… Couleur adaptable (viewer Photo = fond noir).
 /**
@@ -38,7 +39,8 @@ export function Skeleton({ width = '100%', height = 16, radius = 8, color = '#E2
  * repassaient en squelette et retéléchargeaient en boucle.
  *
  * Maintenant :
- *  - l'identité de la photo est `storagePath` (stable), pas l'URL (rotative) ;
+ *  - l'identité/cacheKey de la photo est `storagePath` (stable), pas l'URL signée (rotative);
+ *  - `expo-image` conserve les octets en cache disque (`memory-disk`) entre les lancements;
  *  - une rotation d'URL sur une image déjà affichée ne provoque AUCUN clignotement ;
  *  - une rotation d'URL sur une image en échec déclenche une nouvelle tentative ;
  *  - un échec définitif affiche un état visible au lieu d'un squelette infini.
@@ -107,29 +109,34 @@ export function ProgressiveImage({
       )}
 
       {uri ? (
-        <Animated.Image
+        <Animated.View
           key={identity}
-          source={{ uri }}
-          resizeMode={resizeMode}
           style={{ width: '100%', height: '100%', opacity: fade }}
-          onLoad={() => {
-            const wasKnown = !!identity && ALREADY_LOADED.has(identity);
-            if (identity) ALREADY_LOADED.add(identity);
-            setLoaded(true);
-            setFailed(false);
-            if (wasKnown) {
-              // Déjà connue : aucun fondu, l'image est là tout de suite.
-              fade.setValue(1);
-            } else {
-              Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-            }
-          }}
-          onError={() => {
-            setFailed(true);
-            setLoaded(false);
-          }}
-          {...imgProps}
-        />
+        >
+          <CachedImage
+            source={{ uri, cacheKey: identity }}
+            cachePolicy="memory-disk"
+            contentFit={resizeMode}
+            style={{ width: '100%', height: '100%' }}
+            onLoad={() => {
+              const wasKnown = !!identity && ALREADY_LOADED.has(identity);
+              if (identity) ALREADY_LOADED.add(identity);
+              setLoaded(true);
+              setFailed(false);
+              if (wasKnown) {
+                // Déjà connue : aucun fondu, l'image est là tout de suite.
+                fade.setValue(1);
+              } else {
+                Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+              }
+            }}
+            onError={() => {
+              setFailed(true);
+              setLoaded(false);
+            }}
+            {...imgProps}
+          />
+        </Animated.View>
       ) : null}
 
       {failed && (

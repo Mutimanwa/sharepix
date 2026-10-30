@@ -275,7 +275,12 @@ export function StoreProvider({ children }) {
             const sum = data.find((d) => d.id === a.id);
             // On ne touche qu'au résumé : si l'album est ouvert, ses photos
             // sont déjà rafraîchies par l'abonnement de l'écran Album.
-            return sum ? { ...a, photoCount: sum.photoCount, coverUrl: sum.coverUrl } : a;
+            return sum ? {
+              ...a,
+              photoCount: sum.photoCount,
+              coverUrl: sum.coverUrl,
+              coverStoragePath: sum.coverStoragePath || '',
+            } : a;
           }),
         }));
       }, 600);
@@ -644,6 +649,7 @@ export function StoreProvider({ children }) {
                     // Résumé accueil : compteur +1, nouvelle couverture
                     photoCount: a.photos.length + 1,
                     coverUrl: newPhoto.uri || a.coverUrl || '',
+                    coverStoragePath: newPhoto.storagePath || a.coverStoragePath || '',
                   }
                 : a
             ),
