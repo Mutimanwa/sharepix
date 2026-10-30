@@ -1,7 +1,8 @@
 # ── SharePix · Livraison continue « preview » ────────────────────────────
-# À chaque push sur `main` : publication d'une mise à jour OTA (EAS Update)
-# sur la branche `preview` → les builds déjà installés (dev client, APK Android
-# ou IPA iOS) se mettent à jour sans repasser par les stores.
+# À chaque push sur `main` : publication avec EAS Update sur `preview`.
+# La réception OTA n'est pas activée tant qu'expo-updates et son URL/runtime
+# ne sont pas configurés dans l'application; les builds installables sont
+# générés manuellement (APK Android ou IPA iOS).
 # En manuel (workflow_dispatch) : choix entre un APK Android et un IPA iOS.
 # ─────────────────────────────────────────────────────────────────────────
 name: Preview (EAS Update)

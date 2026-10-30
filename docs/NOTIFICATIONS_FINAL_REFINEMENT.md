@@ -38,3 +38,12 @@
 - Déclencher une activité de chaque catégorie, vérifier le filtrage et le contenu affiché, toucher le push pour confirmer l’ouverture de l’album, puis désactiver une catégorie/le réglage global et vérifier l’absence d’envoi.
 - Tester la déconnexion et le changement de compte : le jeton de l’ancien compte doit être supprimé.
 - Le résultat des vérifications ci-dessus dépend d’un test sur appareil; ne pas annoncer la livraison réelle tant qu’il n’a pas été réalisé.
+
+## Mise à jour ultérieure — diagnostic push (2026-10-24)
+
+Les constats « zéro jeton » et « aucun envoi réel » ci-dessus décrivent l'état
+au moment de cette première livraison. Le diagnostic ultérieur est consigné dans
+[`PUSH_NOTIFICATIONS_DIAGNOSTIC_PLAN.md`](PUSH_NOTIFICATIONS_DIAGNOSTIC_PLAN.md) :
+la fonction a été corrigée/redéployée, un événement réel a produit `sent:1`,
+et l'utilisateur a confirmé la réception. Cette validation concerne le parcours
+Android testé; elle ne valide pas encore APNs ni les push iOS.

@@ -16,7 +16,7 @@
 2. **Production** : ajout du choix `ios`; les options sont désormais `android`, `ios` et `all`. Les tags `v*` gardent leur comportement Android par défaut.
 3. **Configuration iOS Expo** : le schéma `sharepix` est maintenant géré par la propriété Expo `scheme`, sans `CFBundleURLTypes` dupliqué. La cible iOS minimale effective générée par SDK 57 est explicitée à `16.4`.
 4. **Permissions** : l'app utilise la caméra pour scanner et choisit/enregistre des photos, sans enregistrer d'audio. Les descriptions iOS de caméra et photothèque sont configurées; les permissions microphone sont désactivées.
-5. **Documentation** : `CICD.md` explique les choix de plateformes et les prérequis de signature Apple.
+5. **Documentation** : [`CICD.md`](CICD.md) explique les choix de plateformes et les prérequis de signature Apple.
 
 ## Vérifications effectuées
 

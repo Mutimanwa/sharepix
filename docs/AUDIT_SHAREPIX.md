@@ -6,6 +6,11 @@
 **Branche** : `arena/323af688-sharepix` · **Date** : 21 octobre 2026
 **Version** : **v4 — vérifiée contre la base réelle**
 
+> Audit historique : les constats et références de lignes décrivent le dépôt
+> et la base tels qu'inspectés à cette date. Ils ne constituent pas l'état
+> courant; vérifier le README et les documents de suivi avant d'en reprendre
+> une conclusion.
+
 ---
 
 ## 0. Synthèse
@@ -446,7 +451,7 @@ compte**. `store.js:167-179` resynchronise, les albums disparaissent de l'accuei
 
 ### 5.4 🟠 P1 — Aucune file de synchronisation hors-ligne
 
-`README.md:8-9` promet « fonctionne hors-ligne et se synchronise au retour du réseau ».
+`../README.md:8-9` promet « fonctionne hors-ligne et se synchronise au retour du réseau ».
 Réalité (`store.js:318-403, 729-743`) : une photo ajoutée hors-ligne reste `cloud: false`
 **pour toujours**. Aucun `NetInfo`, aucune relance, aucun badge. L'utilisateur croit avoir
 partagé.
@@ -573,10 +578,10 @@ Correctif à fort effet : `coralText: '#B5544A'` (≈ 5,1:1).
 
 | Document | Affirmation | Réalité |
 |---|---|---|
-| `README.md:88` | `schema.sql` = « schéma complet, ré-exécutable, à rejouer » | 4 tables sur 9, et destructeur (§3.5) |
-| `README.md:70, 91, 92` | `supabase/PUSH.md`, `supabase/GUIDE.md` | **n'existent pas** |
-| `README.md:8-9` | « fonctionne hors-ligne » | aucune file de sync |
-| `README.md:102` | « Album (Tous / Vidéos / Favoris) » | vidéos non implémentées |
+| `../README.md:88` | `schema.sql` = « schéma complet, ré-exécutable, à rejouer » | 4 tables sur 9, et destructeur (§3.5) |
+| `../README.md:70, 91, 92` | `supabase/PUSH.md`, `supabase/GUIDE.md` | **n'existent pas** |
+| `../README.md:8-9` | « fonctionne hors-ligne » | aucune file de sync |
+| `../README.md:102` | « Album (Tous / Vidéos / Favoris) » | vidéos non implémentées |
 | `CICD.md:55-60` | « chaque push publie une mise à jour EAS » | `expo-updates` absent |
 | `CICD.md:92-95` | « le schéma n'est pas appliqué automatiquement » | vrai — et il n'y a **aucune** migration |
 
