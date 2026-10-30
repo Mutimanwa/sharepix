@@ -25,6 +25,7 @@
 - Les deux workflows GitHub Actions sont syntaxiquement valides en YAML.
 - `npx expo config --type public --json` confirme iOS, Android et Web, le schéma, le bundle ID, la cible 16.4 et les paramètres de permissions attendus.
 - `npm run verify` : réussite après les changements — typecheck, lint, 8 suites / 45 tests.
+- CI GitHub de la PR #37 (run `41046930535`) : les trois jobs sont passés — qualité/Expo Doctor, Edge Function Deno et RLS/Storage sur le projet de test.
 - Le dossier natif généré par Prebuild n'est pas versionné : le projet reste en mode Expo managed.
 - **Non vérifiés** : compilation/signature iOS cloud, installation sur iPhone, OAuth Google réel, caméra/photothèque réelles et réception APNs. Aucune de ces validations ne peut être déduite d'un Prebuild réussi.
 - Une tentative de `expo export --platform ios` est restée sur « Starting Metro Bundler » jusqu'au délai de 180 s, sans produire d'export; elle ne compte pas comme validation réussie.
