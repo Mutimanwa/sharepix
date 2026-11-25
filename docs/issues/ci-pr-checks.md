@@ -22,10 +22,11 @@
 - `npm ci` puis `npm run verify` réussissent : TypeScript, ESLint et 9 suites / 48 tests.
 - `npm ls` confirme exactement les dix versions attendues; le contrôle Expo Doctor GitHub est maintenant vert.
 - Restauration du projet de test avec autorisation; Supabase le déclare maintenant `ACTIVE_HEALTHY` et les connexions anonymes sont activées.
-- Le test RLS renvoie toujours le code `2`, mais son nouveau log ne révèle pas le statut/code de l’erreur Auth. Les libellés vides du test actuel sont insuffisants pour conclure que les tables sont bien protégées.
-- Diagnostic amélioré dans le script : journaliser nom/code/statut/message sans afficher d’identifiants; seules les erreurs de permission reconnues comptent comme refus, les erreurs inconnues restent non vérifiées. Des tests unitaires couvrent les erreurs RLS, réseau et Auth sans détails.
-- Le workflow impose désormais la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée.
-- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de confirmer ici la présence ou la correspondance des valeurs secrètes. La prochaine exécution CI doit exposer le diagnostic Auth enrichi. Si le secret est absent ou pointe vers une autre cible, le workflow l’indiquera sans afficher sa valeur.
+- Après le push `bf01481`, le run GitHub `45678864160` est vert sur les trois jobs, y compris « RLS & Storage ». Cela confirme que la configuration du workflow est présente et que le contrôle a retourné le code 0. GitHub renvoie néanmoins `EOF` lors de la récupération du journal détaillé.
+- Relecture du script après ce run : les échecs de préparation album/upload Storage pouvaient être seulement avertis et laisser un code 0. Pour éviter toute fausse validation, le correctif suivant transforme ces étapes manquées ainsi que les réponses réseau/HTTP ambiguës en vérifications non concluantes (code 2).
+- Le script journalise maintenant nom/code/statut/message sans afficher d’identifiants; seules les erreurs de permission reconnues comptent comme refus, les erreurs inconnues restent non vérifiées. Des tests unitaires couvrent les erreurs RLS, réseau et Auth sans détails.
+- Le workflow impose la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée.
+- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer les secrets. L’exécution CI précédente a toutefois traversé le contrôle Auth; la nouvelle exécution confirmera aussi sans ambiguïté chaque sous-étape Storage.
 
 ## Versions Expo signalées dans le log
 

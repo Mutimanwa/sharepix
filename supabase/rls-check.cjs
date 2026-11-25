@@ -127,7 +127,10 @@ function verdict(label, { count, error }, attendu = 0) {
   });
   const albumId = rpc.data?.id;
   if (rpc.error || !albumId) {
-    console.log('  ⚠️  préparation impossible (create_album) :', rpc.error?.message || "pas d'id");
+    pannes += 1;
+    console.log(
+      `  ⛔ préparation impossible (create_album) : ${rpc.error ? describeError(rpc.error) : "id d’album absent"} — Storage NON VÉRIFIÉ`
+    );
   } else {
     const path = `${albumId}/check.jpg`;
     const jpeg = Buffer.from(
@@ -139,20 +142,33 @@ function verdict(label, { count, error }, attendu = 0) {
       .upload(path, jpeg, { contentType: 'image/jpeg', upsert: true });
 
     if (up.error) {
-      console.log('  ⚠️  upload membre refusé :', up.error.message);
+      pannes += 1;
+      console.log(`  ⛔ upload membre impossible : ${describeError(up.error)} — Storage NON VÉRIFIÉ`);
+      try {
+        await frais.from('albums').delete().eq('id', albumId);
+      } catch {}
     } else {
       // a) URL publique : doit être REFUSÉE (bucket privé)
       const { data: pub } = frais.storage.from('album-photos').getPublicUrl(path);
-      const pubRes = await fetch(pub.publicUrl).catch(() => null);
-      if (pubRes && pubRes.ok) {
+      let pubRes;
+      try {
+        pubRes = await fetch(pub.publicUrl);
+      } catch (error) {
+        pannes += 1;
+        console.log(`  ⛔ test URL publique injoignable : ${describeError(error)} — NON VÉRIFIÉ`);
+      }
+      if (pubRes?.ok) {
         fuites += 1;
         console.log(
           '  ❌ bucket PUBLIC : l\'URL publique renvoie HTTP',
           pubRes.status,
           '→ bucket à repasser en privé (migration bucket idempotente)'
         );
-      } else {
-        console.log('  ✅ URL publique refusée (HTTP', pubRes ? pubRes.status : '?', ')');
+      } else if (pubRes && [400, 401, 403, 404].includes(pubRes.status)) {
+        console.log('  ✅ URL publique refusée (HTTP', pubRes.status, ')');
+      } else if (pubRes) {
+        pannes += 1;
+        console.log('  ⛔ URL publique réponse HTTP', pubRes.status, '— NON VÉRIFIÉ');
       }
 
       // b) URL signée demandée par le membre : doit fonctionner
@@ -160,8 +176,8 @@ function verdict(label, { count, error }, attendu = 0) {
       if (!sig.error && sig.data?.signedUrl) {
         console.log('  ✅ URL signée générée pour le membre');
       } else {
-        fuites += 1;
-        console.log('  ❌ URL signée refusée au MEMBRE :', sig.error?.message || sig.error_msg);
+        pannes += 1;
+        console.log(`  ⛔ URL signée membre impossible : ${describeError(sig.error)} — Storage NON VÉRIFIÉ`);
       }
 
       // c) URL signée demandée par un NON-membre : doit être refusée
@@ -176,14 +192,28 @@ function verdict(label, { count, error }, attendu = 0) {
       } else {
         const sig2 = await etranger.storage.from('album-photos').createSignedUrl(path, 60);
         if (sig2.error || !sig2.data?.signedUrl) {
-          console.log('  ✅ URL signée refusée au non-membre');
+          if (isPermissionDenied(sig2.error)) {
+            console.log('  ✅ URL signée refusée au non-membre');
+          } else {
+            pannes += 1;
+            console.log(`  ⛔ URL signée non-membre non concluante : ${describeError(sig2.error)} — NON VÉRIFIÉ`);
+          }
         } else {
-          const r2 = await fetch(sig2.data.signedUrl).catch(() => null);
-          if (r2 && r2.ok) {
+          let r2;
+          try {
+            r2 = await fetch(sig2.data.signedUrl);
+          } catch (error) {
+            pannes += 1;
+            console.log(`  ⛔ téléchargement non-membre injoignable : ${describeError(error)} — NON VÉRIFIÉ`);
+          }
+          if (r2?.ok) {
             fuites += 1;
             console.log('  ❌ un non-membre peut télécharger la photo via URL signée !');
-          } else {
-            console.log('  ✅ non-membre : URL signée inutilisable');
+          } else if (r2 && [400, 401, 403, 404].includes(r2.status)) {
+            console.log('  ✅ non-membre : URL signée inutilisable (HTTP', r2.status, ')');
+          } else if (r2) {
+            pannes += 1;
+            console.log('  ⛔ non-membre réponse HTTP', r2.status, '— NON VÉRIFIÉ');
           }
         }
       }
@@ -196,7 +226,7 @@ function verdict(label, { count, error }, attendu = 0) {
 
   if (pannes > 0) {
     console.log(
-      `\n⛔ ${pannes} VÉRIFICATION(S) NON EXÉCUTÉE(S) : le serveur n'a pas répondu.\n` +
+      `\n⛔ ${pannes} VÉRIFICATION(S) NON EXÉCUTÉE(S) OU NON CONCLUANTE(S).\n` +
         '   Ce n\'est pas un succès : on ne sait pas si les données sont protégées.\n'
     );
   }

@@ -124,10 +124,9 @@ jobs:
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      # Codes de sortie du script : 0 = protégé, 1 = fuite réelle,
-      # 2 = vérification impossible (projet injoignable, ou compte de
-      # contrôle non créable). On distingue les deux dans l'onglet Actions :
-      # sans cela, les deux cas affichent le même « exit code 2 » opaque.
+      # Codes de sortie du script : 0 = vérifications achevées sans fuite,
+      # 1 = fuite réelle, 2 = une vérification est impossible ou non concluante.
+      # Une erreur de configuration ne doit jamais devenir un succès RLS.
       - name: RLS / Storage check
         if: steps.staging.outputs.ready == 'true'
         env:
