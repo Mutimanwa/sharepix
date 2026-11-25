@@ -23,6 +23,7 @@ export function mapCloudAlbum(row) {
     // (refreshAlbumPhotos / addPhoto / deletePhoto…).
     photoCount: 0, // nombre réel de photos
     coverUrl: '', // URL signée de la photo la plus récente (couverture)
+    coverStoragePath: '', // chemin stable utilisé comme clé de cache disque
     createdAt: new Date(row.created_at).getTime(),
     members: row.creator_name ? [{ name: row.creator_name, role: 'admin' }] : [],
     cloud: true,
@@ -122,8 +123,10 @@ async function fillAlbumsSummary(albums) {
     });
   }
   albums.forEach((a) => {
+    const coverPath = covers.get(a.id) || '';
     a.photoCount = counts[a.id] || 0;
-    a.coverUrl = signed.get(covers.get(a.id)) || '';
+    a.coverUrl = signed.get(coverPath) || '';
+    a.coverStoragePath = coverPath;
   });
 }
 
@@ -137,7 +140,12 @@ export async function cloudFetchAlbumsSummary(albumIds) {
   if (!supabase || !albums.length) return { data: [], error: null };
   await fillAlbumsSummary(albums);
   return {
-    data: albums.map((a) => ({ id: a.id, photoCount: a.photoCount, coverUrl: a.coverUrl })),
+    data: albums.map((a) => ({
+      id: a.id,
+      photoCount: a.photoCount,
+      coverUrl: a.coverUrl,
+      coverStoragePath: a.coverStoragePath,
+    })),
     error: null,
   };
 }

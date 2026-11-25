@@ -23,6 +23,12 @@
 // on réutilise celui installé avec les dépendances du projet.
 global.WebSocket = require('../node_modules/ws');
 const { createClient } = require('../node_modules/@supabase/supabase-js');
+const {
+  describeError,
+  isNetworkFailure,
+  isPermissionDenied,
+  isStorageObjectHidden,
+} = require('./rls-check-utils.cjs');
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_ANON_KEY;
@@ -43,8 +49,6 @@ let fuites = 0;
 // veut dire que le serveur n'a pas répondu. Compter cela comme un succès
 // reviendrait à déclarer la base protégée parce que le réseau est coupé.
 let pannes = 0;
-const PANNE_RESEAU =
-  /fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket hang up|network|aborted|terminated/i;
 
 async function compter(client, table) {
   const { count, error } = await client
@@ -55,15 +59,14 @@ async function compter(client, table) {
 
 function verdict(label, { count, error }, attendu = 0) {
   if (error) {
-    if (PANNE_RESEAU.test(error.message || '')) {
+    const details = describeError(error);
+    if (isPermissionDenied(error)) {
+      console.log(`  ✅ ${label.padEnd(18)} : accès refusé (${details})`);
+    } else {
       pannes += 1;
-      console.log(
-        `  ⛔ ${label.padEnd(18)} : injoignable (${error.message.slice(0, 50)}) — RIEN N'EST PROUVÉ`
-      );
-      return;
+      const kind = isNetworkFailure(error) ? 'injoignable' : 'erreur non concluante';
+      console.log(`  ⛔ ${label.padEnd(18)} : ${kind} (${details}) — NON VÉRIFIÉ`);
     }
-    // Vraie erreur d'accès (RLS, table absente) = protégé en pratique
-    console.log(`  ✅ ${label.padEnd(18)} : refusé (${error.message.slice(0, 60)})`);
     return;
   }
   if ((count ?? 0) === attendu) {
@@ -89,20 +92,17 @@ function verdict(label, { count, error }, attendu = 0) {
   });
   const s = await frais.auth.signInAnonymously();
   if (s.error) {
-    console.log('  ⛔ signInAnonymously impossible :', s.error.message);
+    pannes += 1;
+    console.log(`  ⛔ signInAnonymously impossible : ${describeError(s.error)}`);
     console.log(
-      '\n  Le test a besoin d\'un compte jetable pour vérifier ce qu\'un nouvel\n' +
-        '  utilisateur peut voir. Deux causes possibles :\n' +
-        '   • les comptes anonymes sont DÉSACTIVÉS sur le projet de test\n' +
-        '     (Authentication → Sign In / Providers → Anonymous sign-ins).\n' +
-        '     La production les utilise : le projet de test doit faire pareil,\n' +
-        '     sinon la configuration testée n\'est pas celle de la production ;\n' +
-        '   • le projet est injoignable (en pause, URL erronée, réseau coupé).\n' +
-        '\n  Rien n\'a été vérifié.\n'
+      '  Vérification interrompue : confirmer que l’URL et la clé anon du workflow\n' +
+        '  correspondent au projet sharepix-staging et que les inscriptions anonymes\n' +
+        '  sont activées. Aucun secret ne doit être affiché dans les logs.\n' +
+        '  Les contrôles RLS du compte neuf et Storage restent NON VÉRIFIÉS.\n'
     );
     process.exit(2);
   }
-  console.log('  compte de test :', s.data.user.id);
+  console.log('  compte anonyme de test créé');
   for (const t of TABLES_PRIVEES) {
     verdict(t, await compter(frais, t));
   }
@@ -112,6 +112,9 @@ function verdict(label, { count, error }, attendu = 0) {
     console.log('  ✅ profiles           : 1 ligne (le sien, normal)');
   } else if (!prof.error && (prof.count ?? 0) === 0) {
     console.log('  ✅ profiles           : 0 ligne visible');
+  } else if (prof.error) {
+    pannes += 1;
+    console.log(`  ⛔ profiles           : ${describeError(prof.error)} — NON VÉRIFIÉ`);
   } else {
     fuites += 1;
     console.log(`  ❌ profiles           : FUITE → ${prof.count} ligne(s) !`);
@@ -129,7 +132,10 @@ function verdict(label, { count, error }, attendu = 0) {
   });
   const albumId = rpc.data?.id;
   if (rpc.error || !albumId) {
-    console.log('  ⚠️  préparation impossible (create_album) :', rpc.error?.message || "pas d'id");
+    pannes += 1;
+    console.log(
+      `  ⛔ préparation impossible (create_album) : ${rpc.error ? describeError(rpc.error) : "id d’album absent"} — Storage NON VÉRIFIÉ`
+    );
   } else {
     const path = `${albumId}/check.jpg`;
     const jpeg = Buffer.from(
@@ -141,20 +147,33 @@ function verdict(label, { count, error }, attendu = 0) {
       .upload(path, jpeg, { contentType: 'image/jpeg', upsert: true });
 
     if (up.error) {
-      console.log('  ⚠️  upload membre refusé :', up.error.message);
+      pannes += 1;
+      console.log(`  ⛔ upload membre impossible : ${describeError(up.error)} — Storage NON VÉRIFIÉ`);
+      try {
+        await frais.from('albums').delete().eq('id', albumId);
+      } catch {}
     } else {
       // a) URL publique : doit être REFUSÉE (bucket privé)
       const { data: pub } = frais.storage.from('album-photos').getPublicUrl(path);
-      const pubRes = await fetch(pub.publicUrl).catch(() => null);
-      if (pubRes && pubRes.ok) {
+      let pubRes;
+      try {
+        pubRes = await fetch(pub.publicUrl);
+      } catch (error) {
+        pannes += 1;
+        console.log(`  ⛔ test URL publique injoignable : ${describeError(error)} — NON VÉRIFIÉ`);
+      }
+      if (pubRes?.ok) {
         fuites += 1;
         console.log(
           '  ❌ bucket PUBLIC : l\'URL publique renvoie HTTP',
           pubRes.status,
           '→ bucket à repasser en privé (migration bucket idempotente)'
         );
-      } else {
-        console.log('  ✅ URL publique refusée (HTTP', pubRes ? pubRes.status : '?', ')');
+      } else if (pubRes && [400, 401, 403, 404].includes(pubRes.status)) {
+        console.log('  ✅ URL publique refusée (HTTP', pubRes.status, ')');
+      } else if (pubRes) {
+        pannes += 1;
+        console.log('  ⛔ URL publique réponse HTTP', pubRes.status, '— NON VÉRIFIÉ');
       }
 
       // b) URL signée demandée par le membre : doit fonctionner
@@ -162,8 +181,8 @@ function verdict(label, { count, error }, attendu = 0) {
       if (!sig.error && sig.data?.signedUrl) {
         console.log('  ✅ URL signée générée pour le membre');
       } else {
-        fuites += 1;
-        console.log('  ❌ URL signée refusée au MEMBRE :', sig.error?.message || sig.error_msg);
+        pannes += 1;
+        console.log(`  ⛔ URL signée membre impossible : ${describeError(sig.error)} — Storage NON VÉRIFIÉ`);
       }
 
       // c) URL signée demandée par un NON-membre : doit être refusée
@@ -178,14 +197,28 @@ function verdict(label, { count, error }, attendu = 0) {
       } else {
         const sig2 = await etranger.storage.from('album-photos').createSignedUrl(path, 60);
         if (sig2.error || !sig2.data?.signedUrl) {
-          console.log('  ✅ URL signée refusée au non-membre');
+          if (isPermissionDenied(sig2.error) || isStorageObjectHidden(sig2.error)) {
+            console.log(`  ✅ URL signée refusée au non-membre (${describeError(sig2.error)})`);
+          } else {
+            pannes += 1;
+            console.log(`  ⛔ URL signée non-membre non concluante : ${describeError(sig2.error)} — NON VÉRIFIÉ`);
+          }
         } else {
-          const r2 = await fetch(sig2.data.signedUrl).catch(() => null);
-          if (r2 && r2.ok) {
+          let r2;
+          try {
+            r2 = await fetch(sig2.data.signedUrl);
+          } catch (error) {
+            pannes += 1;
+            console.log(`  ⛔ téléchargement non-membre injoignable : ${describeError(error)} — NON VÉRIFIÉ`);
+          }
+          if (r2?.ok) {
             fuites += 1;
             console.log('  ❌ un non-membre peut télécharger la photo via URL signée !');
-          } else {
-            console.log('  ✅ non-membre : URL signée inutilisable');
+          } else if (r2 && [400, 401, 403, 404].includes(r2.status)) {
+            console.log('  ✅ non-membre : URL signée inutilisable (HTTP', r2.status, ')');
+          } else if (r2) {
+            pannes += 1;
+            console.log('  ⛔ non-membre réponse HTTP', r2.status, '— NON VÉRIFIÉ');
           }
         }
       }
@@ -198,7 +231,7 @@ function verdict(label, { count, error }, attendu = 0) {
 
   if (pannes > 0) {
     console.log(
-      `\n⛔ ${pannes} VÉRIFICATION(S) NON EXÉCUTÉE(S) : le serveur n'a pas répondu.\n` +
+      `\n⛔ ${pannes} VÉRIFICATION(S) NON EXÉCUTÉE(S) OU NON CONCLUANTE(S).\n` +
         '   Ce n\'est pas un succès : on ne sait pas si les données sont protégées.\n'
     );
   }
