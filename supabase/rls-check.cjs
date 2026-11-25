@@ -97,7 +97,7 @@ function verdict(label, { count, error }, attendu = 0) {
     );
     process.exit(2);
   }
-  console.log('  compte de test :', s.data.user.id);
+  console.log('  compte anonyme de test créé');
   for (const t of TABLES_PRIVEES) {
     verdict(t, await compter(frais, t));
   }

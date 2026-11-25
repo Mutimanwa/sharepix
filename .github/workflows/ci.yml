@@ -134,11 +134,16 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
         run: |
           set +e
-          node supabase/rls-check.cjs
+          OUT=$(node supabase/rls-check.cjs 2>&1)
           CODE=$?
+          printf '%s\n' "$OUT"
           if [ $CODE -eq 1 ]; then
             echo "::error title=Fuite RLS::Au moins une table ou un fichier est accessible sans en avoir le droit. Vérifie les policies de supabase/migrations/."
           elif [ $CODE -eq 2 ]; then
-            echo "::error title=Vérification RLS impossible::Le diagnostic détaillé ci-dessus indique une erreur réseau, de configuration ou Auth. Vérifier les identifiants du staging et les connexions anonymes; les contrôles non atteints restent NON VÉRIFIÉS."
+            # Reproduire la cause utile dans une annotation consultable via l’API
+            # GitHub quand les archives de logs Actions sont indisponibles.
+            MSG=$(printf '%s\n' "$OUT" | grep -E '⛔|NON VÉRIFIÉ' | tail -n 12 | tr '\n' ' ' | tr -d '%' | cut -c1-900)
+            if [ -z "$MSG" ]; then MSG="Une vérification RLS/Storage est non concluante; consulter les logs du job."; fi
+            echo "::error title=Vérification RLS impossible::${MSG}"
           fi
           exit $CODE

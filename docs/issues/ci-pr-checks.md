@@ -22,11 +22,13 @@
 - `npm ci` puis `npm run verify` réussissent : TypeScript, ESLint et 9 suites / 48 tests.
 - `npm ls` confirme exactement les dix versions attendues; le contrôle Expo Doctor GitHub est maintenant vert.
 - Restauration du projet de test avec autorisation; Supabase le déclare maintenant `ACTIVE_HEALTHY` et les connexions anonymes sont activées.
-- Après le push `bf01481`, le run GitHub `45678864160` est vert sur les trois jobs, y compris « RLS & Storage ». Cela confirme que la configuration du workflow est présente et que le contrôle a retourné le code 0. GitHub renvoie néanmoins `EOF` lors de la récupération du journal détaillé.
-- Relecture du script après ce run : les échecs de préparation album/upload Storage pouvaient être seulement avertis et laisser un code 0. Pour éviter toute fausse validation, le correctif suivant transforme ces étapes manquées ainsi que les réponses réseau/HTTP ambiguës en vérifications non concluantes (code 2).
-- Le script journalise maintenant nom/code/statut/message sans afficher d’identifiants; seules les erreurs de permission reconnues comptent comme refus, les erreurs inconnues restent non vérifiées. Des tests unitaires couvrent les erreurs RLS, réseau et Auth sans détails.
+- Après le push `bf01481`, le run `45678864160` était vert, mais le script permettait encore que des étapes de préparation Storage échouent sans rendre le job non concluant; le journal Actions est par ailleurs inaccessible via `gh` (EOF).
+- Le script corrige ce faux positif potentiel : création de l’album, upload, URL publique et URL signée membre/non-membre doivent désormais être effectivement testés; réseau, erreurs inconnues ou préparation impossible renvoient le code 2. Les refus d’accès reconnus seulement sont acceptés comme protection.
+- Le run `45679208260` a ensuite échoué en code 2. GitHub confirme le code mais son archive de logs renvoie EOF; la cause Auth n’est donc toujours pas observable dans les éléments actuels.
+- Pour lever ce blocage, le workflow republiera désormais les lignes diagnostic (nom/code/statut/message, sans identifiants) dans l’annotation GitHub du job; la prochaine exécution permettra de distinguer erreur de clé, refus Auth, CAPTCHA, limite, panne ou autre cause.
+- Des tests unitaires couvrent les erreurs RLS, réseau et Auth sans détails. `npm run verify` est vert localement (10 suites, 52 tests).
 - Le workflow impose la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée.
-- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer les secrets. L’exécution CI précédente a toutefois traversé le contrôle Auth; la nouvelle exécution confirmera aussi sans ambiguïté chaque sous-étape Storage.
+- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer les valeurs. Le projet Supabase est sain et l’Auth anonyme activée; aucune modification de configuration Supabase n’a été faite.
 
 ## Versions Expo signalées dans le log
 
