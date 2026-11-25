@@ -28,9 +28,10 @@
 - Ce résultat est le refus attendu de Supabase Storage : après que le compte membre a créé l’album, téléversé l’objet et obtenu son URL signée, Storage masque l’objet à l’utilisateur étranger en renvoyant `NoSuchKey` / « Object not found ». Le test le classait à tort comme indéterminé; cela n’indique pas une fuite, ni un échec Auth.
 - Le contrôle accepte maintenant uniquement cette signature précise (HTTP 400 + `NoSuchKey`) comme refus Storage masqué pour le non-membre. Les autres erreurs non reconnues restent non vérifiées et bloquantes.
 - Les logs Actions restent inaccessibles via `gh` (EOF), mais l’annotation diagnostic a permis de récupérer le code, le statut HTTP et le message sans exposer les secrets.
-- Des tests unitaires couvrent les erreurs RLS/réseau, les erreurs Auth sans détails et le cas `NoSuchKey`. La CI sera relancée après ce correctif final.
+- Résultat final du run `45679796797` sur `9ec9d75` : les trois jobs sont verts (Qualité + Expo Doctor, Edge Function, RLS & Storage). Le contrôle strict a donc parcouru toutes ses étapes sans fuite ni vérification non concluante.
+- `npm run verify` local est vert : TypeScript, ESLint et 10 suites / 53 tests. Les tests unitaires couvrent les erreurs RLS/réseau, les erreurs Auth sans détails et le cas `NoSuchKey`.
 - Le workflow impose la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée. Le staging Supabase reste sain et l’Auth anonyme activée; aucune modification de configuration Supabase n’a été faite.
-- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer directement les valeurs, mais le run a validé URL/clé présentes et la création d’un utilisateur anonyme.
+- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer directement les valeurs, mais la CI a validé l’URL/clé présentes, la création d’un compte anonyme et l’accès aux API.
 
 ## Versions Expo signalées dans le log
 
