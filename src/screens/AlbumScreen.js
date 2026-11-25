@@ -444,7 +444,7 @@ export default function AlbumScreen({ route, navigation }) {
       >
         {/* ── SQUELETTES : tuile fantôme jusqu'à onLoad, puis fondu ── */}
         <ProgressiveImage
-          uri={item.uri}
+          uri={item.localUri || item.uri}
           storagePath={item.storagePath}
           style={styles.thumb}
         />
@@ -867,7 +867,7 @@ export default function AlbumScreen({ route, navigation }) {
               {album.photos.length > 0 ? (
                 // ── SQUELETTES : couverture progressive ──
                 <ProgressiveImage
-                  uri={album.photos[0].uri}
+                  uri={album.photos[0].localUri || album.photos[0].uri}
                   storagePath={album.photos[0].storagePath}
                   style={styles.coverImg}
                 />

@@ -56,6 +56,7 @@ const ALREADY_LOADED = new Set();
 
 // ── Une page du carrousel ───────────────────────────────────────────────
 function CarouselPage({ photo, width, height }) {
+  const imageUri = photo.localUri || photo.uri;
   const known = ALREADY_LOADED.has(photo.id);
   const [ready, setReady] = useState(known);
   const [failed, setFailed] = useState(false);
@@ -72,11 +73,11 @@ function CarouselPage({ photo, width, height }) {
         <Skeleton width="100%" height="100%" radius={0} color="#2A2A2A" />
       ) : null}
 
-      {photo.uri ? (
+      {imageUri ? (
         ExpoImage ? (
           <ExpoImage
             source={{
-              uri: photo.uri,
+              uri: imageUri,
               // L'URL signée change à chaque session; le storage_path, lui,
               // reste stable. Il permet de réutiliser le cache disque même
               // après fermeture complète de l'application.
@@ -101,7 +102,7 @@ function CarouselPage({ photo, width, height }) {
           />
         ) : (
           <RNImage
-            source={{ uri: photo.uri }}
+            source={{ uri: imageUri }}
             resizeMode="contain"
             // Pas de fondu à l'affichage (Android) : rien ne doit clignoter.
             fadeDuration={0}

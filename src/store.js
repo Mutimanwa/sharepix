@@ -44,6 +44,13 @@ import {
   subscribePhotosSummary,
   clearSignedUrlCache, // ── BUG-01 / P1-12 : purge le cache d'URLs signées ──
 } from './services/albums';
+import {
+  attachOfflinePhotoFiles,
+  cachePhotosForOffline,
+  clearOfflinePhotoCache,
+  loadCachedAlbumPhotos,
+  saveAlbumPhotoMetadata,
+} from './services/offlinePhotos';
 // ── SUPABASE ALBUMS : fin ──
 import { Alert, Platform } from 'react-native';
 
@@ -213,11 +220,23 @@ export function StoreProvider({ children }) {
               if (cancelled || error) return;
               console.log(`☁️ ${cloudAlbums.length} album(s) restauré(s) depuis le cloud`);
               setState((s) => {
+                const previousById = new Map(s.albums.map((album) => [album.id, album]));
                 const cloudIds = new Set(cloudAlbums.map((a) => a.id));
+                const restoredCloud = cloudAlbums.map((album) => {
+                  const previous = previousById.get(album.id);
+                  return previous ? {
+                    ...album,
+                    // La réponse de résumé ne contient pas les photos.
+                    // Garder le snapshot local évite de vider l'album à chaque démarrage.
+                    photos: previous.photos || [],
+                    coverUrl: album.coverUrl || previous.coverUrl || '',
+                    coverStoragePath: album.coverStoragePath || previous.coverStoragePath || '',
+                  } : album;
+                });
                 const localOnly = s.albums.filter(
                   (a) => !a.cloud && !cloudIds.has(a.id)
                 );
-                return { ...s, albums: [...cloudAlbums, ...localOnly] };
+                return { ...s, albums: [...restoredCloud, ...localOnly] };
               });
             });
             // ── SUPABASE ALBUMS : fin ──
@@ -327,6 +346,7 @@ export function StoreProvider({ children }) {
       clearAuthUser: () => {
         console.log('👋 Clearing auth user');
         clearSignedUrlCache();
+        void clearOfflinePhotoCache(state.user?.id);
         setState((s) => ({
           ...s,
           user: null,
@@ -851,8 +871,40 @@ export function StoreProvider({ children }) {
       refreshAlbumPhotos: async (albumId) => {
         const album = state.albums.find((a) => a.id === albumId);
         if (!album?.cloud) return;
-        const { data: cloudPhotos, error } = await cloudFetchAlbumPhotos(albumId);
-        if (error) return;
+        const userId = state.user?.id;
+
+        // Afficher d'abord les fichiers persistants (s'ils existent), sans
+        // attendre le réseau. Cela fournit aussi un fallback aux albums dont
+        // le store local a été reconstruit après une mise à jour.
+        if (userId) {
+          const cachedPhotos = await loadCachedAlbumPhotos(userId, albumId).catch(() => []);
+          if (cachedPhotos.length) {
+            setState((s) => ({
+              ...s,
+              albums: s.albums.map((a) => {
+                if (a.id !== albumId) return a;
+                const byId = new Map((a.photos || []).map((photo) => [photo.id, photo]));
+                cachedPhotos.forEach((photo) => {
+                  const previous = byId.get(photo.id);
+                  byId.set(photo.id, {
+                    ...previous,
+                    ...photo,
+                    localUri: photo.localUri || '',
+                    uri: photo.localUri || previous?.uri || photo.uri || '',
+                    comments: previous?.comments || photo.comments || [],
+                    liked: previous?.liked ?? photo.liked ?? false,
+                    favorite: previous?.favorite ?? photo.favorite ?? false,
+                  });
+                });
+                return { ...a, photos: [...byId.values()] };
+              }),
+            }));
+          }
+        }
+
+        const { data: fetchedPhotos, error } = await cloudFetchAlbumPhotos(albumId);
+        if (error || !supabase) return;
+        const cloudPhotos = await attachOfflinePhotoFiles(userId, fetchedPhotos || []);
 
         // Commentaires (arborescence) + likes (compteurs + mes likes)
         const photoIds = cloudPhotos.map((p) => p.id);
@@ -877,6 +929,7 @@ export function StoreProvider({ children }) {
               const localTemps = prevTop.filter((c) => !c.cloud);
               return {
                 ...cp,
+                localUri: cp.localUri || '',
                 liked: myLikes.has(cp.id),
                 likesCount: likeCounts[cp.id] || 0,
                 favorite: prev?.favorite ?? false, // les favoris restent personnels
@@ -893,6 +946,23 @@ export function StoreProvider({ children }) {
             };
           }),
         }));
+
+        if (userId) {
+          await saveAlbumPhotoMetadata(userId, albumId, cloudPhotos).catch(() => {});
+          // Limiter le nombre de téléchargements simultanés; la navigation
+          // et la galerie restent réactives pendant la mise en cache.
+          void cachePhotosForOffline(userId, cloudPhotos, ({ id, storagePath, localUri }) => {
+            setState((s) => ({
+              ...s,
+              albums: s.albums.map((a) => a.id !== albumId ? a : {
+                ...a,
+                photos: a.photos.map((photo) => photo.id === id && photo.storagePath === storagePath
+                  ? { ...photo, localUri }
+                  : photo),
+              }),
+            }));
+          }).catch(() => {});
+        }
       },
       // ── SUPABASE ALBUMS : fin ──
 

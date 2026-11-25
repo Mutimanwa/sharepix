@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
   Alert,
@@ -29,6 +30,11 @@ import {
 } from '@hugeicons/core-free-icons';
 import { useStore } from '../store';
 import { cloudFetchRecentPhotos, subscribePhotosSummary } from '../services/albums';
+import {
+  cachePhotosForOffline,
+  loadCachedRecentPhotos,
+  saveRecentPhotoMetadata,
+} from '../services/offlinePhotos';
 import { StatusBar } from 'expo-status-bar';
 
 function formatRecentDate(timestamp) {
@@ -66,40 +72,61 @@ export default function HomeScreen() {
   const [cloudRecentPhotos, setCloudRecentPhotos] = useState([]);
   const recentRefreshTimer = useRef(null);
 
+  const refreshRecentPhotos = useCallback(async (userId, isActive = () => true) => {
+    try {
+      const { data, error } = await cloudFetchRecentPhotos(12);
+      if (error || !isActive()) return;
+      const photos = await saveRecentPhotoMetadata(userId, data || []);
+      if (!isActive()) return;
+      setCloudRecentPhotos(photos);
+      // Copies locales en arrière-plan, deux transferts à la fois.
+      void cachePhotosForOffline(userId, photos, ({ id, storagePath, localUri }) => {
+        if (!isActive()) return;
+        setCloudRecentPhotos((current) => current.map((photo) =>
+          photo.id === id && photo.storagePath === storagePath
+            ? { ...photo, localUri, uri: localUri }
+            : photo
+        ));
+      }).catch(() => {});
+    } catch {
+      // La dernière copie locale reste affichée si le réseau est indisponible.
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      if (!state.user?.id) {
+      const userId = state.user?.id;
+      if (!userId) {
         setCloudRecentPhotos([]);
         return undefined;
       }
       let active = true;
-      cloudFetchRecentPhotos(12)
-        .then(({ data, error }) => {
-          if (active && !error) setCloudRecentPhotos(data || []);
+      loadCachedRecentPhotos(userId)
+        .then((photos) => {
+          if (active && photos.length) setCloudRecentPhotos(photos);
         })
         .catch(() => {});
+      void refreshRecentPhotos(userId, () => active);
       return () => { active = false; };
-    }, [state.user?.id])
+    }, [state.user?.id, refreshRecentPhotos])
   );
 
   useEffect(() => {
-    if (!state.user?.id) return undefined;
+    const userId = state.user?.id;
+    if (!userId) return undefined;
+    let active = true;
     const unsubscribe = subscribePhotosSummary(() => {
       clearTimeout(recentRefreshTimer.current);
-      recentRefreshTimer.current = setTimeout(async () => {
-        try {
-          const { data, error } = await cloudFetchRecentPhotos(12);
-          if (!error) setCloudRecentPhotos(data || []);
-        } catch {
-          // Les dernières photos déjà affichées restent disponibles hors-ligne.
-        }
+      recentRefreshTimer.current = setTimeout(() => {
+        void refreshRecentPhotos(userId, () => active);
       }, 650);
     });
     return () => {
+      active = false;
       clearTimeout(recentRefreshTimer.current);
       unsubscribe();
     };
-  }, [state.user?.id]);
+  }, [state.user?.id, refreshRecentPhotos]);
 
   const recentPhotos = useMemo(() => {
     const byId = new Map((cloudRecentPhotos || []).map((photo) => [photo.id, photo]));
@@ -261,10 +288,18 @@ export default function HomeScreen() {
               <Text style={styles.h}>Photos récentes</Text>
               <Text style={styles.recentHint}>Tous vos albums</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentRail}>
-              {recentPhotos.map((photo) => (
+            <FlatList
+              horizontal
+              data={recentPhotos}
+              keyExtractor={(photo) => `${photo.albumId}:${photo.id}`}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentRail}
+              initialNumToRender={3}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              removeClippedSubviews
+              renderItem={({ item: photo }) => (
                 <TouchableOpacity
-                  key={`${photo.albumId}:${photo.id}`}
                   style={styles.recentCard}
                   activeOpacity={0.85}
                   onPress={() => nav.navigate('Album', { id: photo.albumId })}
@@ -273,7 +308,7 @@ export default function HomeScreen() {
                 >
                   <View style={styles.recentImageWrap}>
                     <ProgressiveImage
-                      uri={photo.uri}
+                      uri={photo.localUri || photo.uri}
                       storagePath={photo.storagePath}
                       style={styles.recentImage}
                       radius={12}
@@ -287,8 +322,8 @@ export default function HomeScreen() {
                     {photo.authorName ? `Ajoutée par ${photo.authorName}` : 'Nouvelle photo'}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              )}
+            />
           </View>
         )}
 
@@ -339,11 +374,11 @@ export default function HomeScreen() {
                 <View style={styles.cover}>
                   {/* ── COUVERTURE ACCUEIL : photos chargées (album déjà ouvert)
                       sinon couverture cloud pré-signée au boot (coverUrl) ── */}
-                  {(a.photos[0]?.uri || a.coverUrl) ? (
+                  {(a.photos[0]?.localUri || cloudRecentPhotos.find((photo) => photo.albumId === a.id && photo.localUri)?.localUri || a.photos[0]?.uri || a.coverUrl) ? (
                     // ── SQUELETTES : intégration ──
                     <ProgressiveImage
-                      uri={a.photos[0]?.uri || a.coverUrl}
-                      storagePath={a.photos[0]?.storagePath || a.coverStoragePath}
+                      uri={a.photos[0]?.localUri || cloudRecentPhotos.find((photo) => photo.albumId === a.id && photo.localUri)?.localUri || a.photos[0]?.uri || a.coverUrl}
+                      storagePath={a.photos[0]?.storagePath || cloudRecentPhotos.find((photo) => photo.albumId === a.id && photo.localUri)?.storagePath || a.coverStoragePath}
                       style={styles.coverImg}
                       radius={5}
                     />
