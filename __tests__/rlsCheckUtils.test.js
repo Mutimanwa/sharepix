@@ -2,6 +2,7 @@ const {
   describeError,
   isNetworkFailure,
   isPermissionDenied,
+  isStorageObjectHidden,
 } = require('../supabase/rls-check-utils.cjs');
 
 describe('diagnostic des erreurs RLS/Auth de Supabase', () => {
@@ -21,6 +22,12 @@ describe('diagnostic des erreurs RLS/Auth de Supabase', () => {
     const error = { name: 'TypeError', message: 'fetch failed' };
     expect(isNetworkFailure(error)).toBe(true);
     expect(describeError(error)).toContain('fetch failed');
+  });
+
+  it('reconnaît le NoSuchKey HTTP 400 de Storage comme un refus masqué pour le non-membre', () => {
+    expect(isStorageObjectHidden({ status: 400, code: 'NoSuchKey', message: 'Object not found' })).toBe(true);
+    expect(isStorageObjectHidden({ status: 400, code: 'PayloadTooLarge', message: 'Object not found' })).toBe(false);
+    expect(isStorageObjectHidden({ status: 404, code: 'NoSuchKey', message: 'Object not found' })).toBe(false);
   });
 
   it('laisse une erreur vide non concluante plutôt que de l’appeler refus RLS', () => {

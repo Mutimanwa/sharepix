@@ -21,6 +21,13 @@ function isPermissionDenied(error) {
   return fields.code === '42501' || fields.status === 403 || ACCESS_DENIED.test(fields.message);
 }
 
+// Storage intentionally masks inaccessible objects as HTTP 400 NoSuchKey,
+// rather than revealing whether another user's object exists.
+function isStorageObjectHidden(error) {
+  const fields = errorFields(error);
+  return fields.status === 400 && fields.code === 'NoSuchKey';
+}
+
 function describeError(error) {
   const fields = errorFields(error);
   const details = [];
@@ -34,4 +41,4 @@ function describeError(error) {
   return details.join('; ');
 }
 
-module.exports = { describeError, isNetworkFailure, isPermissionDenied };
+module.exports = { describeError, isNetworkFailure, isPermissionDenied, isStorageObjectHidden };

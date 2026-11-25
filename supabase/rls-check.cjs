@@ -23,7 +23,12 @@
 // on réutilise celui installé avec les dépendances du projet.
 global.WebSocket = require('../node_modules/ws');
 const { createClient } = require('../node_modules/@supabase/supabase-js');
-const { describeError, isNetworkFailure, isPermissionDenied } = require('./rls-check-utils.cjs');
+const {
+  describeError,
+  isNetworkFailure,
+  isPermissionDenied,
+  isStorageObjectHidden,
+} = require('./rls-check-utils.cjs');
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_ANON_KEY;
@@ -192,8 +197,8 @@ function verdict(label, { count, error }, attendu = 0) {
       } else {
         const sig2 = await etranger.storage.from('album-photos').createSignedUrl(path, 60);
         if (sig2.error || !sig2.data?.signedUrl) {
-          if (isPermissionDenied(sig2.error)) {
-            console.log('  ✅ URL signée refusée au non-membre');
+          if (isPermissionDenied(sig2.error) || isStorageObjectHidden(sig2.error)) {
+            console.log(`  ✅ URL signée refusée au non-membre (${describeError(sig2.error)})`);
           } else {
             pannes += 1;
             console.log(`  ⛔ URL signée non-membre non concluante : ${describeError(sig2.error)} — NON VÉRIFIÉ`);

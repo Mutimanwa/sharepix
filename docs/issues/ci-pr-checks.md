@@ -24,11 +24,13 @@
 - Restauration du projet de test avec autorisation; Supabase le déclare maintenant `ACTIVE_HEALTHY` et les connexions anonymes sont activées.
 - Après le push `bf01481`, le run `45678864160` était vert, mais le script permettait encore que des étapes de préparation Storage échouent sans rendre le job non concluant; le journal Actions est par ailleurs inaccessible via `gh` (EOF).
 - Le script corrige ce faux positif potentiel : création de l’album, upload, URL publique et URL signée membre/non-membre doivent désormais être effectivement testés; réseau, erreurs inconnues ou préparation impossible renvoient le code 2. Les refus d’accès reconnus seulement sont acceptés comme protection.
-- Le run `45679208260` a ensuite échoué en code 2. GitHub confirme le code mais son archive de logs renvoie EOF; la cause Auth n’est donc toujours pas observable dans les éléments actuels.
-- Pour lever ce blocage, le workflow republiera désormais les lignes diagnostic (nom/code/statut/message, sans identifiants) dans l’annotation GitHub du job; la prochaine exécution permettra de distinguer erreur de clé, refus Auth, CAPTCHA, limite, panne ou autre cause.
-- Des tests unitaires couvrent les erreurs RLS, réseau et Auth sans détails. `npm run verify` est vert localement (10 suites, 52 tests).
-- Le workflow impose la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée.
-- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer les valeurs. Le projet Supabase est sain et l’Auth anonyme activée; aucune modification de configuration Supabase n’a été faite.
+- Le run `45679208260` a échoué en code 2. La dernière annotation du run `45679495216` fournit le diagnostic exact : `StorageApiError; HTTP 400; code NoSuchKey; Object not found` lors de la demande d’URL signée par un non-membre.
+- Ce résultat est le refus attendu de Supabase Storage : après que le compte membre a créé l’album, téléversé l’objet et obtenu son URL signée, Storage masque l’objet à l’utilisateur étranger en renvoyant `NoSuchKey` / « Object not found ». Le test le classait à tort comme indéterminé; cela n’indique pas une fuite, ni un échec Auth.
+- Le contrôle accepte maintenant uniquement cette signature précise (HTTP 400 + `NoSuchKey`) comme refus Storage masqué pour le non-membre. Les autres erreurs non reconnues restent non vérifiées et bloquantes.
+- Les logs Actions restent inaccessibles via `gh` (EOF), mais l’annotation diagnostic a permis de récupérer le code, le statut HTTP et le message sans exposer les secrets.
+- Des tests unitaires couvrent les erreurs RLS/réseau, les erreurs Auth sans détails et le cas `NoSuchKey`. La CI sera relancée après ce correctif final.
+- Le workflow impose la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée. Le staging Supabase reste sain et l’Auth anonyme activée; aucune modification de configuration Supabase n’a été faite.
+- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de lire ou comparer directement les valeurs, mais le run a validé URL/clé présentes et la création d’un utilisateur anonyme.
 
 ## Versions Expo signalées dans le log
 
