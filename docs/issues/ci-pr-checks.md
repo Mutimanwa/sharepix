@@ -10,18 +10,22 @@
 
 ## Vérification Supabase live
 
-- Le projet `sharepix-staging` est actuellement `INACTIVE`; la lecture de sa configuration Auth indique que les comptes anonymes y sont activés.
-- La vérification de santé Supabase a répondu qu’il n’y avait pas de services actifs pour ce projet. Cela correspond aux échecs `fetch failed`; le test n’a pas pu atteindre la base.
-- Ne pas restaurer le projet automatiquement, ne pas changer les secrets GitHub à l’aveugle, et ne pas pointer le test sur la production. Il faut que le projet de staging soit réactivé et que les deux secrets de staging pointent bien vers lui.
+- Après autorisation explicite, `sharepix-staging` a été restauré. Supabase le déclare maintenant `ACTIVE_HEALTHY` pour Auth, DB et Storage.
+- `external_anonymous_users_enabled` vaut `true` sur le staging.
+- Les tables `profiles`, `albums`, `photos`, `album_members`, `photo_comments` et `photo_likes` existent; le trigger `on_auth_user_created` appelle bien `handle_new_user()`.
+- L’historique exposé par Supabase ne correspond pas exactement aux six fichiers de migration locaux; ne pas déduire que les tables ou objets manquent sans consulter le schéma réel.
+- Le nouveau journal montre des erreurs de requête sans message exploitable (« refusé () ») puis une erreur Auth sans détail (« <none> »). Le secret URL/clé est masqué par GitHub et ne peut pas être vérifié ici.
 
 ## Travail effectué / restant
 
 - Mise à jour des dix dépendances du SDK 57 vers les versions correctives listées ci-dessous; lockfile régénéré par npm.
 - `npm ci` puis `npm run verify` réussissent : TypeScript, ESLint et 9 suites / 48 tests.
-- `npm ls` confirme exactement les dix versions attendues dans le log.
-- Expo Doctor local n’a pas pu achever deux vérifications qui requièrent des services Expo externes (échec TLS/fetch dans l’environnement). Cela ne démontre pas de défaut de configuration; la CI GitHub peut réessayer ces contrôles.
-- Le code de sortie `2` du test RLS est conservé : un test injoignable ne doit jamais être présenté comme réussi.
-- Action requise côté Supabase : réactiver manuellement le projet de staging `sharepix-staging` et confirmer que `STAGING_SUPABASE_URL` et `STAGING_SUPABASE_ANON_KEY` pointent vers ce projet de test. Ne pas pointer le test sur la production. Après réactivation, relancer la CI pour exécuter vraiment le contrôle RLS/Storage.
+- `npm ls` confirme exactement les dix versions attendues; le contrôle Expo Doctor GitHub est maintenant vert.
+- Restauration du projet de test avec autorisation; Supabase le déclare maintenant `ACTIVE_HEALTHY` et les connexions anonymes sont activées.
+- Le test RLS renvoie toujours le code `2`, mais son nouveau log ne révèle pas le statut/code de l’erreur Auth. Les libellés vides du test actuel sont insuffisants pour conclure que les tables sont bien protégées.
+- Diagnostic amélioré dans le script : journaliser nom/code/statut/message sans afficher d’identifiants; seules les erreurs de permission reconnues comptent comme refus, les erreurs inconnues restent non vérifiées. Des tests unitaires couvrent les erreurs RLS, réseau et Auth sans détails.
+- Le workflow impose désormais la présence des deux secrets et bloque toute URL dont l’hôte n’est pas celui du projet de test `sharepix-staging`; aucune URL ni clé n’est imprimée.
+- `gh secret list` est refusé par GitHub (HTTP 403, droits de l’intégration insuffisants) : impossible de confirmer ici la présence ou la correspondance des valeurs secrètes. La prochaine exécution CI doit exposer le diagnostic Auth enrichi. Si le secret est absent ou pointe vers une autre cible, le workflow l’indiquera sans afficher sa valeur.
 
 ## Versions Expo signalées dans le log
 

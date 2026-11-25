@@ -23,6 +23,7 @@
 // on réutilise celui installé avec les dépendances du projet.
 global.WebSocket = require('../node_modules/ws');
 const { createClient } = require('../node_modules/@supabase/supabase-js');
+const { describeError, isNetworkFailure, isPermissionDenied } = require('./rls-check-utils.cjs');
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_ANON_KEY;
@@ -43,8 +44,6 @@ let fuites = 0;
 // veut dire que le serveur n'a pas répondu. Compter cela comme un succès
 // reviendrait à déclarer la base protégée parce que le réseau est coupé.
 let pannes = 0;
-const PANNE_RESEAU =
-  /fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket hang up|network|aborted|terminated/i;
 
 async function compter(client, table) {
   const { count, error } = await client
@@ -55,15 +54,14 @@ async function compter(client, table) {
 
 function verdict(label, { count, error }, attendu = 0) {
   if (error) {
-    if (PANNE_RESEAU.test(error.message || '')) {
+    const details = describeError(error);
+    if (isPermissionDenied(error)) {
+      console.log(`  ✅ ${label.padEnd(18)} : accès refusé (${details})`);
+    } else {
       pannes += 1;
-      console.log(
-        `  ⛔ ${label.padEnd(18)} : injoignable (${error.message.slice(0, 50)}) — RIEN N'EST PROUVÉ`
-      );
-      return;
+      const kind = isNetworkFailure(error) ? 'injoignable' : 'erreur non concluante';
+      console.log(`  ⛔ ${label.padEnd(18)} : ${kind} (${details}) — NON VÉRIFIÉ`);
     }
-    // Vraie erreur d'accès (RLS, table absente) = protégé en pratique
-    console.log(`  ✅ ${label.padEnd(18)} : refusé (${error.message.slice(0, 60)})`);
     return;
   }
   if ((count ?? 0) === attendu) {
@@ -89,16 +87,13 @@ function verdict(label, { count, error }, attendu = 0) {
   });
   const s = await frais.auth.signInAnonymously();
   if (s.error) {
-    console.log('  ⛔ signInAnonymously impossible :', s.error.message);
+    pannes += 1;
+    console.log(`  ⛔ signInAnonymously impossible : ${describeError(s.error)}`);
     console.log(
-      '\n  Le test a besoin d\'un compte jetable pour vérifier ce qu\'un nouvel\n' +
-        '  utilisateur peut voir. Deux causes possibles :\n' +
-        '   • les comptes anonymes sont DÉSACTIVÉS sur le projet de test\n' +
-        '     (Authentication → Sign In / Providers → Anonymous sign-ins).\n' +
-        '     La production les utilise : le projet de test doit faire pareil,\n' +
-        '     sinon la configuration testée n\'est pas celle de la production ;\n' +
-        '   • le projet est injoignable (en pause, URL erronée, réseau coupé).\n' +
-        '\n  Rien n\'a été vérifié.\n'
+      '  Vérification interrompue : confirmer que l’URL et la clé anon du workflow\n' +
+        '  correspondent au projet sharepix-staging et que les inscriptions anonymes\n' +
+        '  sont activées. Aucun secret ne doit être affiché dans les logs.\n' +
+        '  Les contrôles RLS du compte neuf et Storage restent NON VÉRIFIÉS.\n'
     );
     process.exit(2);
   }
@@ -112,6 +107,9 @@ function verdict(label, { count, error }, attendu = 0) {
     console.log('  ✅ profiles           : 1 ligne (le sien, normal)');
   } else if (!prof.error && (prof.count ?? 0) === 0) {
     console.log('  ✅ profiles           : 0 ligne visible');
+  } else if (prof.error) {
+    pannes += 1;
+    console.log(`  ⛔ profiles           : ${describeError(prof.error)} — NON VÉRIFIÉ`);
   } else {
     fuites += 1;
     console.log(`  ❌ profiles           : FUITE → ${prof.count} ligne(s) !`);
